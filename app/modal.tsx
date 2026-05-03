@@ -1,38 +1,31 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  Alert,
-  Switch,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store/useStore';
-import { Colors, Spacing, BorderRadius, FontSize } from '../constants/theme';
 
-function SettingRow({ icon, label, onPress, rightElement, destructive = false }: {
-  icon: string;
-  label: string;
-  onPress?: () => void;
-  rightElement?: React.ReactNode;
-  destructive?: boolean;
+const BG = '#FFFFFF'; const CARD = '#F4F4F4'; const SURFACE = '#EEEEEE';
+const TEXT = '#111111'; const TEXT2 = '#767676'; const TEXT3 = '#ABABAB';
+const RED = '#E60023'; const GOLD = '#D4860A'; const BORDER = '#E8E8E8'; const PILL = 999;
+
+function Row({
+  icon, label, sub, onPress, danger = false, right,
+}: {
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  label: string; sub?: string; onPress?: () => void;
+  danger?: boolean; right?: React.ReactNode;
 }) {
   return (
-    <TouchableOpacity
-      style={styles.settingRow}
-      onPress={onPress}
-      disabled={!onPress}
-      activeOpacity={0.7}
-    >
-      <Text style={styles.settingIcon}>{icon}</Text>
-      <Text style={[styles.settingLabel, destructive && { color: Colors.danger }]}>{label}</Text>
-      <View style={styles.settingRight}>
-        {rightElement ?? <Text style={styles.chevron}>›</Text>}
+    <TouchableOpacity style={styles.row} onPress={onPress} disabled={!onPress} activeOpacity={0.65}>
+      <View style={[styles.rowIcon, danger && styles.rowIconDanger]}>
+        <Ionicons name={icon} size={17} color={danger ? RED : TEXT2} />
       </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.rowLabel, danger && { color: RED }]}>{label}</Text>
+        {sub && <Text style={styles.rowSub}>{sub}</Text>}
+      </View>
+      {right ?? (onPress && <Ionicons name="chevron-forward" size={15} color={TEXT3} />)}
     </TouchableOpacity>
   );
 }
@@ -42,175 +35,147 @@ export default function ModalScreen() {
   const user = useStore((s) => s.user);
   const updateUser = useStore((s) => s.updateUser);
   const togglePro = useStore((s) => s.togglePro);
-  const accentColor = user.gender === 'female' ? Colors.female : Colors.male;
-
-  const [editingUsername, setEditingUsername] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [username, setUsername] = useState(user.username);
 
   const saveUsername = () => {
     if (!username.trim()) return;
     updateUser({ username: username.trim() });
-    setEditingUsername(false);
-    Alert.alert('✓', 'Kullanıcı adı güncellendi!');
-  };
-
-  const handleDeleteAccount = () => {
-    Alert.alert(
-      'Hesabı Sil',
-      'Tüm verileriniz kalıcı olarak silinecek. Emin misiniz?',
-      [
-        { text: 'İptal', style: 'cancel' },
-        {
-          text: 'Sil',
-          style: 'destructive',
-          onPress: () => Alert.alert('✓', 'Hesap silindi (simülasyon)'),
-        },
-      ]
-    );
+    setEditing(false);
   };
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Drag handle */}
+      <View style={styles.handle} />
+
+      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Ayarlar</Text>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.closeBtn}>✕</Text>
+        <TouchableOpacity style={styles.closeBtn} onPress={() => router.back()}>
+          <Ionicons name="close" size={20} color={TEXT2} />
         </TouchableOpacity>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
 
-        {/* PRO PLAN BANNER */}
-        <View style={[styles.proBanner, user.isPro && styles.proBannerActive]}>
-          <Text style={styles.proBannerTitle}>
-            {user.isPro ? '✦ Pro Üye' : '🔓 Buzları Kaldır'}
-          </Text>
-          <Text style={styles.proBannerSub}>
-            {user.isPro
-              ? 'Tüm Pro ayrıcalıklarından yararlanıyorsunuz.'
-              : "Mate'inin fotoğraflarını net gör ve serbestçe mesajlaş."}
-          </Text>
-          {!user.isPro && (
-            <TouchableOpacity
-              style={[styles.proBtn, { backgroundColor: accentColor }]}
-              onPress={togglePro}
-            >
-              <Text style={styles.proBtnText}>Pro'ya Geç</Text>
-            </TouchableOpacity>
-          )}
-          {user.isPro && (
-            <TouchableOpacity
-              style={[styles.proBtn, { backgroundColor: Colors.surfaceAlt }]}
-              onPress={togglePro}
-            >
-              <Text style={[styles.proBtnText, { color: Colors.textSecondary }]}>Pro'yu İptal Et</Text>
-            </TouchableOpacity>
-          )}
+        {/* Pro Card */}
+        <View style={[styles.proCard, user.isPro && styles.proCardActive]}>
+          <View style={styles.proCardHeader}>
+            <View style={[styles.proIcon, { backgroundColor: user.isPro ? GOLD + '20' : SURFACE }]}>
+              <Ionicons name={user.isPro ? 'star' : 'lock-open-outline'} size={22} color={GOLD} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.proCardTitle}>{user.isPro ? 'Pro Üye ✦' : 'Buzları Kaldır'}</Text>
+              <Text style={styles.proCardSub}>
+                {user.isPro ? 'Tüm ayrıcalıklardan faydalanıyorsunuz.' : "Mate'in fotoğraflarını gör, serbestçe mesajlaş."}
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={[styles.proBtn, user.isPro && styles.proBtnSecondary]}
+            onPress={togglePro}
+            activeOpacity={0.85}
+          >
+            <Ionicons
+              name={user.isPro ? 'lock-closed-outline' : 'lock-open-outline'}
+              size={16}
+              color={user.isPro ? TEXT2 : '#fff'}
+            />
+            <Text style={[styles.proBtnText, user.isPro && { color: TEXT2 }]}>
+              {user.isPro ? "Pro'yu İptal Et" : "Pro'ya Geç"}
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        {/* PROFILE SECTION */}
-        <Text style={styles.sectionHeader}>PROFİL</Text>
-        <View style={styles.section}>
-          {editingUsername ? (
-            <View style={styles.usernameEdit}>
-              <TextInput
-                style={[styles.usernameInput, { borderColor: accentColor + '66' }]}
-                value={username}
-                onChangeText={setUsername}
-                autoFocus
-                maxLength={30}
-              />
+        {/* Profile */}
+        <Text style={styles.groupLabel}>PROFİL</Text>
+        <View style={styles.group}>
+          {editing ? (
+            <View style={styles.editBox}>
+              <View style={[styles.editInput, { borderColor: TEXT }]}>
+                <Ionicons name="at" size={16} color={TEXT2} />
+                <TextInput
+                  style={styles.editField}
+                  value={username}
+                  onChangeText={setUsername}
+                  autoFocus
+                  maxLength={30}
+                />
+                {username.length > 0 && (
+                  <TouchableOpacity onPress={() => setUsername('')}>
+                    <Ionicons name="close-circle" size={16} color={TEXT3} />
+                  </TouchableOpacity>
+                )}
+              </View>
               <View style={styles.editActions}>
-                <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditingUsername(false)}>
-                  <Text style={styles.cancelBtnText}>İptal</Text>
+                <TouchableOpacity style={styles.cancelBtn} onPress={() => { setUsername(user.username); setEditing(false); }}>
+                  <Text style={styles.cancelText}>İptal</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.saveBtn, { backgroundColor: accentColor }]}
-                  onPress={saveUsername}
-                >
-                  <Text style={styles.saveBtnText}>Kaydet</Text>
+                <TouchableOpacity style={styles.saveBtn} onPress={saveUsername}>
+                  <Text style={styles.saveText}>Kaydet</Text>
                 </TouchableOpacity>
               </View>
             </View>
           ) : (
-            <SettingRow
-              icon="👤"
-              label={`@${user.username}`}
-              onPress={() => setEditingUsername(true)}
-            />
+            <Row icon="person-outline" label={`@${user.username}`} onPress={() => setEditing(true)} />
           )}
-
           <View style={styles.divider} />
-
-          <SettingRow
-            icon={user.gender === 'male' ? '♂' : '♀'}
+          <Row
+            icon={user.gender === 'male' ? 'male-outline' : 'female-outline'}
             label={`Cinsiyet: ${user.gender === 'male' ? 'Erkek' : 'Kadın'}`}
-            rightElement={
-              <View style={[styles.genderBadge, { backgroundColor: accentColor + '22' }]}>
-                <Text style={[{ color: accentColor, fontSize: 11, fontWeight: '700' }]}>
-                  {user.gender === 'male' ? 'Erkek' : 'Kadın'}
-                </Text>
-              </View>
+            right={
+              <View style={[styles.genderDot, { backgroundColor: user.gender === 'female' ? '#e91e63' : '#3498db' }]} />
             }
           />
         </View>
 
-        {/* NOTIFICATIONS SECTION */}
-        <Text style={styles.sectionHeader}>BİLDİRİMLER</Text>
-        <View style={styles.section}>
-          <SettingRow
-            icon="⏰"
+        {/* Notifications */}
+        <Text style={styles.groupLabel}>BİLDİRİMLER</Text>
+        <View style={styles.group}>
+          <Row
+            icon="alarm-outline"
             label="Bildirim Saatini Değiştir"
-            onPress={() => Alert.alert('Yakında', 'Bildirim saati ayarı eklenecek.')}
+            sub="Rutin hatırlatıcılarını yönet"
+            onPress={() => Alert.alert('Yakında', 'Bildirim ayarları eklenecek.')}
           />
         </View>
 
-        {/* ABOUT SECTION */}
-        <Text style={styles.sectionHeader}>HAKKINDA</Text>
-        <View style={styles.section}>
-          <SettingRow
-            icon="🔗"
-            label="Arkadaşını Davet Et"
-            onPress={() => Alert.alert('Paylaş', 'https://routinmate.app/invite')}
-          />
+        {/* App */}
+        <Text style={styles.groupLabel}>UYGULAMA</Text>
+        <View style={styles.group}>
+          <Row icon="share-social-outline" label="Arkadaşını Davet Et" onPress={() => Alert.alert('Paylaş', 'https://routinmate.app')} />
           <View style={styles.divider} />
-          <SettingRow
-            icon="📜"
-            label="KVKK & Gizlilik"
-            onPress={() => Alert.alert('KVKK', 'Gizlilik politikası içeriği...')}
-          />
+          <Row icon="shield-checkmark-outline" label="KVKK & Gizlilik" onPress={() => Alert.alert('KVKK', 'Gizlilik politikası')} />
           <View style={styles.divider} />
-          <SettingRow
-            icon="📋"
-            label="Kullanıcı Sözleşmesi"
-            onPress={() => Alert.alert('Sözleşme', 'Kullanıcı sözleşmesi içeriği...')}
-          />
+          <Row icon="document-text-outline" label="Kullanıcı Sözleşmesi" onPress={() => Alert.alert('Sözleşme', 'Kullanıcı sözleşmesi')} />
         </View>
 
-        {/* DANGER ZONE */}
-        <Text style={styles.sectionHeader}>TEHLİKE BÖLGESİ</Text>
-        <View style={styles.section}>
-          <SettingRow
-            icon="🚪"
-            label="Çıkış Yap"
-            onPress={() => Alert.alert('Çıkış', 'Çıkış yapıldı (simülasyon).')}
-            destructive
-          />
+        {/* Danger */}
+        <Text style={styles.groupLabel}>TEHLİKE BÖLGESİ</Text>
+        <View style={styles.group}>
+          <Row icon="log-out-outline" label="Çıkış Yap" onPress={() => Alert.alert('Çıkış', 'Çıkış yapıldı.')} danger />
           <View style={styles.divider} />
-          <SettingRow
-            icon="🗑"
+          <Row
+            icon="trash-outline"
             label="Hesabı Sil"
-            onPress={handleDeleteAccount}
-            destructive
+            danger
+            onPress={() =>
+              Alert.alert('Hesabı Sil', 'Tüm verileriniz kalıcı olarak silinecek.', [
+                { text: 'İptal', style: 'cancel' },
+                { text: 'Sil', style: 'destructive', onPress: () => Alert.alert('Silindi', 'Simülasyon.') },
+              ])
+            }
           />
         </View>
 
-        {/* Debug button */}
+        {/* Dev panel */}
         <TouchableOpacity
-          style={styles.debugBtn}
-          onPress={() => { router.back(); setTimeout(() => router.push('/debug'), 200); }}
+          style={styles.devBtn}
+          onPress={() => { router.back(); setTimeout(() => router.push('/debug'), 250); }}
         >
-          <Text style={styles.debugBtnText}>⚙ Geliştirici Paneli (Debug)</Text>
+          <Ionicons name="code-slash-outline" size={15} color={TEXT3} />
+          <Text style={styles.devText}>Geliştirici Paneli</Text>
         </TouchableOpacity>
 
         <View style={{ height: 60 }} />
@@ -220,166 +185,45 @@ export default function ModalScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: 0.5,
-    borderBottomColor: Colors.cardBorder,
-  },
-  title: {
-    fontSize: FontSize.xl,
-    color: Colors.text,
-    fontWeight: '800',
-  },
-  closeBtn: {
-    fontSize: FontSize.lg,
-    color: Colors.textSecondary,
-    padding: 4,
-  },
-  proBanner: {
-    margin: Spacing.lg,
-    backgroundColor: Colors.card,
-    borderRadius: BorderRadius.xl,
-    padding: Spacing.lg,
-    borderWidth: 1,
-    borderColor: Colors.proGold + '33',
-  },
-  proBannerActive: {
-    backgroundColor: Colors.proGold + '11',
-  },
-  proBannerTitle: {
-    fontSize: FontSize.xl,
-    color: Colors.proGold,
-    fontWeight: '800',
-    marginBottom: 6,
-  },
-  proBannerSub: {
-    fontSize: FontSize.sm,
-    color: Colors.textSecondary,
-    marginBottom: Spacing.md,
-    lineHeight: 20,
-  },
-  proBtn: {
-    borderRadius: BorderRadius.lg,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  proBtnText: {
-    fontSize: FontSize.md,
-    color: '#fff',
-    fontWeight: '800',
-  },
-  sectionHeader: {
-    fontSize: FontSize.xs,
-    color: Colors.textMuted,
-    fontWeight: '700',
-    letterSpacing: 1.5,
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.sm,
-    paddingTop: Spacing.sm,
-  },
-  section: {
-    marginHorizontal: Spacing.lg,
-    backgroundColor: Colors.card,
-    borderRadius: BorderRadius.lg,
-    marginBottom: Spacing.lg,
-    borderWidth: 0.5,
-    borderColor: Colors.cardBorder,
-    overflow: 'hidden',
-  },
-  settingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 16,
-  },
-  settingIcon: {
-    fontSize: 18,
-    marginRight: Spacing.md,
-    width: 24,
-    textAlign: 'center',
-  },
-  settingLabel: {
-    flex: 1,
-    fontSize: FontSize.md,
-    color: Colors.text,
-    fontWeight: '500',
-  },
-  settingRight: {
-    alignItems: 'flex-end',
-  },
-  chevron: {
-    fontSize: 20,
-    color: Colors.textMuted,
-  },
-  divider: {
-    height: 0.5,
-    backgroundColor: Colors.cardBorder,
-    marginLeft: 52,
-  },
-  genderBadge: {
-    borderRadius: BorderRadius.sm,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  usernameEdit: {
-    padding: Spacing.md,
-  },
-  usernameInput: {
-    backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.md,
-    borderWidth: 1,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 12,
-    fontSize: FontSize.md,
-    color: Colors.text,
-    marginBottom: 10,
-  },
-  editActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  cancelBtn: {
-    flex: 1,
-    borderRadius: BorderRadius.md,
-    paddingVertical: 10,
-    alignItems: 'center',
-    backgroundColor: Colors.surfaceAlt,
-  },
-  cancelBtnText: {
-    color: Colors.textSecondary,
-    fontWeight: '600',
-  },
-  saveBtn: {
-    flex: 1,
-    borderRadius: BorderRadius.md,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  saveBtnText: {
-    color: '#fff',
-    fontWeight: '700',
-  },
-  debugBtn: {
-    marginHorizontal: Spacing.lg,
-    backgroundColor: Colors.card,
-    borderRadius: BorderRadius.lg,
-    paddingVertical: 14,
-    alignItems: 'center',
-    borderWidth: 0.5,
-    borderColor: Colors.cardBorder,
-    marginBottom: Spacing.md,
-  },
-  debugBtnText: {
-    color: Colors.textSecondary,
-    fontSize: FontSize.sm,
-    fontWeight: '600',
-  },
+  container: { flex: 1, backgroundColor: BG },
+  handle: { width: 36, height: 4, backgroundColor: SURFACE, borderRadius: 2, alignSelf: 'center', marginTop: 10, marginBottom: 4 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 0.5, borderBottomColor: BORDER },
+  title: { fontSize: 20, color: TEXT, fontWeight: '900' },
+  closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center' },
+
+  // Pro card
+  proCard: { margin: 16, backgroundColor: CARD, borderRadius: 20, padding: 16, borderWidth: 1, borderColor: GOLD + '30' },
+  proCardActive: { backgroundColor: GOLD + '08', borderColor: GOLD + '55' },
+  proCardHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 14 },
+  proIcon: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  proCardTitle: { fontSize: 17, color: TEXT, fontWeight: '900', marginBottom: 4 },
+  proCardSub: { fontSize: 13, color: TEXT2, lineHeight: 18 },
+  proBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#E60023', borderRadius: PILL, paddingVertical: 14 },
+  proBtnSecondary: { backgroundColor: SURFACE },
+  proBtnText: { fontSize: 15, color: '#fff', fontWeight: '900' },
+
+  // Sections
+  groupLabel: { fontSize: 11, color: TEXT3, fontWeight: '700', letterSpacing: 1.5, paddingHorizontal: 16, paddingBottom: 8 },
+  group: { marginHorizontal: 16, backgroundColor: CARD, borderRadius: 18, marginBottom: 24, overflow: 'hidden', borderWidth: 1, borderColor: BORDER },
+  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 14, gap: 12 },
+  rowIcon: { width: 34, height: 34, borderRadius: 10, backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center' },
+  rowIconDanger: { backgroundColor: RED + '12' },
+  rowLabel: { fontSize: 15, color: TEXT, fontWeight: '600' },
+  rowSub: { fontSize: 12, color: TEXT2, marginTop: 2 },
+  divider: { height: 0.5, backgroundColor: BORDER, marginLeft: 60 },
+  genderDot: { width: 14, height: 14, borderRadius: 7 },
+
+  // Edit username
+  editBox: { padding: 14 },
+  editInput: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: SURFACE, borderRadius: 12, paddingHorizontal: 14, borderWidth: 1.5, marginBottom: 12 },
+  editField: { flex: 1, fontSize: 15, color: TEXT, paddingVertical: 12 },
+  editActions: { flexDirection: 'row', gap: 10 },
+  cancelBtn: { flex: 1, backgroundColor: SURFACE, borderRadius: PILL, paddingVertical: 12, alignItems: 'center' },
+  cancelText: { color: TEXT2, fontWeight: '700', fontSize: 14 },
+  saveBtn: { flex: 1, backgroundColor: '#E60023', borderRadius: PILL, paddingVertical: 12, alignItems: 'center' },
+  saveText: { color: '#fff', fontWeight: '900', fontSize: 14 },
+
+  // Dev btn
+  devBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginHorizontal: 16, backgroundColor: CARD, borderRadius: PILL, paddingVertical: 14, marginBottom: 8, borderWidth: 1, borderColor: BORDER },
+  devText: { color: TEXT3, fontSize: 13, fontWeight: '600' },
 });

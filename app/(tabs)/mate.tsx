@@ -1,418 +1,205 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Image,
-  ImageBackground,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { useStore } from '../../store/useStore';
-import { Colors, Spacing, BorderRadius, FontSize } from '../../constants/theme';
+import Svg, { Circle } from 'react-native-svg';
+
+const CircularProgress = ({ size = 72, strokeWidth = 5, progress = 0, color = '#000', children }: any) => {
+  const radius = (size - strokeWidth) / 2;
+  const circum = radius * 2 * Math.PI;
+  const dashoffset = circum - (Math.min(Math.max(progress, 0), 1) * circum);
+
+  return (
+    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ position: 'absolute', transform: [{ rotate: '-90deg' }] }}>
+        <Svg width={size} height={size}>
+          <Circle stroke="#E8E8E8" fill="none" cx={size/2} cy={size/2} r={radius} strokeWidth={strokeWidth} />
+          <Circle
+            stroke={color}
+            fill="none"
+            cx={size/2}
+            cy={size/2}
+            r={radius}
+            strokeWidth={strokeWidth}
+            strokeDasharray={`${circum} ${circum}`}
+            strokeDashoffset={dashoffset}
+            strokeLinecap="round"
+          />
+        </Svg>
+      </View>
+      {children}
+    </View>
+  );
+};
 
 const today = new Date().toISOString().split('T')[0];
-
-function BlurredAvatar({ uri, size, accentColor, isPro }: {
-  uri: string | null;
-  size: number;
-  accentColor: string;
-  isPro: boolean;
-}) {
-  return (
-    <View style={[
-      styles.avatarRing,
-      {
-        width: size + 6,
-        height: size + 6,
-        borderRadius: (size + 6) / 2,
-        borderColor: accentColor,
-      }
-    ]}>
-      <View style={[styles.avatarBase, { width: size, height: size, borderRadius: size / 2 }]}>
-        {/* Since we can't use BlurView for null images, show initials */}
-        <View style={[styles.avatarPlaceholder, {
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          backgroundColor: accentColor + '33',
-        }]}>
-          <Text style={[styles.avatarInitial, { color: accentColor, fontSize: size * 0.35 }]}>?</Text>
-          {!isPro && (
-            <View style={[StyleSheet.absoluteFillObject, {
-              borderRadius: size / 2,
-              backgroundColor: 'rgba(0,0,0,0.75)',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }]}>
-              <Text style={{ fontSize: 20 }}>🔒</Text>
-            </View>
-          )}
-        </View>
-      </View>
-    </View>
-  );
-}
-
-function MateRoutineRow({ routine }: { routine: any }) {
-  const isCompleted = routine.completedDates.includes(today);
-  return (
-    <View style={styles.mateRoutineRow}>
-      <View style={[styles.routineStatus, { backgroundColor: isCompleted ? '#2ecc71' : '#333' }]}>
-        {isCompleted && <Text style={{ color: '#fff', fontSize: 10 }}>✓</Text>}
-      </View>
-      <Text style={[styles.mateRoutineName, !isCompleted && { opacity: 0.5 }]}>{routine.name}</Text>
-      <View style={[
-        styles.statusBadge,
-        { backgroundColor: isCompleted ? '#2ecc7122' : '#e74c3c22' }
-      ]}>
-        <Text style={[styles.statusText, { color: isCompleted ? '#2ecc71' : '#e74c3c' }]}>
-          {isCompleted ? 'Tamamlandı' : 'Bekleniyor'}
-        </Text>
-      </View>
-    </View>
-  );
-}
+const BG='#FFFFFF'; const CARD='#F4F4F4'; const SURFACE='#EEEEEE';
+const TEXT='#111111'; const TEXT2='#767676'; const TEXT3='#ABABAB';
+const RED='#E60023'; const GREEN='#008800'; const GOLD='#D4860A';
+const BORDER='#E8E8E8'; const PILL=999;
 
 export default function MateScreen() {
-  const user = useStore((s) => s.user);
-  const mate = useStore((s) => s.mate);
+  const user = useStore(s => s.user);
+  const mate = useStore(s => s.mate);
   const router = useRouter();
-  const accentColor = mate.gender === 'female' ? Colors.female : Colors.male;
+  const accent = mate.gender === 'female' ? '#e91e63' : '#3498db';
 
-  const matchedSince = new Date(user.matchedSince);
-  const daysPassed = Math.floor((Date.now() - matchedSince.getTime()) / (1000 * 60 * 60 * 24));
-  const daysLeft = 30 - daysPassed;
+  const daysPassed = Math.floor((Date.now() - new Date(user.matchedSince).getTime()) / 86400000);
+  const daysLeft = Math.max(30 - daysPassed, 0);
+  const matchPct = Math.min(Math.floor((daysPassed / 30) * 100), 100);
+  const doneToday = mate.routines.filter(r => r.completedDates.includes(today)).length;
 
-  const completedToday = mate.routines.filter((r) => r.completedDates.includes(today)).length;
+  const FREQ_LABEL: Record<string,string> = { daily:'Günlük', weekly:'Haftalık', monthly:'Aylık' };
+  const FREQ_COLOR: Record<string,string> = { daily:'#2980b9', weekly:'#8e44ad', monthly:'#d35400' };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={s.container} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false}>
+
         {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>Rutinmate</Text>
-          <View style={styles.matchTimer}>
-            <Text style={styles.timerLabel}>Kalan</Text>
-            <Text style={[styles.timerDays, { color: daysLeft < 7 ? Colors.danger : Colors.male }]}>
-              {daysLeft}g
-            </Text>
-          </View>
-        </View>
-
-        {/* Mate Card */}
-        <View style={styles.mateCard}>
-          <View style={styles.mateTop}>
-            <BlurredAvatar
-              uri={mate.avatarUri}
-              size={80}
-              accentColor={accentColor}
-              isPro={user.isPro}
-            />
-            <View style={styles.mateInfo}>
-              <Text style={styles.mateUsername}>@{mate.username}</Text>
-              <View style={[styles.genderBadge, { backgroundColor: accentColor + '22', borderColor: accentColor + '55' }]}>
-                <Text style={[styles.genderText, { color: accentColor }]}>
-                  {mate.gender === 'male' ? '♂ Erkek' : '♀ Kadın'}
-                </Text>
+        <View style={s.header}>
+          <Text style={s.title}>Rutinmate</Text>
+          {!user.isPro && (
+            <TouchableOpacity style={s.headerPro} activeOpacity={0.7} onPress={() => router.push('/modal')}>
+              <View style={s.headerProTop}>
+                <FontAwesome5 name="crown" size={10} color={RED} />
+                <Text style={s.headerProTxt}>Pro'ya Geç</Text>
               </View>
-              <View style={styles.scoreRow}>
-                <Text style={styles.scoreLabel}>Başarı: </Text>
-                <Text style={[styles.scoreValue, { color: accentColor }]}>{mate.achievementScore}%</Text>
+              <Text style={s.headerProSub}>profil kilidini aç</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Mate summary minimal */}
+        <View style={s.mateCard}>
+          <View style={s.mateTop}>
+            <View style={[s.avatar, {borderColor: accent}]}>
+              {user.isPro
+                ? <Text style={[s.avatarLetter, {color: accent}]}>{mate.username[0].toUpperCase()}</Text>
+                : <Ionicons name="lock-closed" size={20} color={TEXT3} />}
+            </View>
+            <View style={{flex:1}}>
+              <Text style={s.mateName}>@{mate.username}</Text>
+              <Text style={[s.mateScore, {color: accent}]}>{mate.achievementScore}% genel başarı</Text>
+            </View>
+            <TouchableOpacity style={s.profileBtn} onPress={() => router.push('/mate-profile')}>
+              <Text style={s.profileBtnTxt}>Profil</Text>
+              <Ionicons name="chevron-forward" size={14} color={TEXT2} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Stats inline side-by-side with Circular Loaders */}
+          <View style={s.stats}>
+            <View style={s.statItem}>
+              <CircularProgress 
+                size={40} 
+                strokeWidth={4} 
+                progress={mate.routines.length > 0 ? doneToday / mate.routines.length : 0} 
+                color={GREEN}
+              >
+                <Ionicons name="checkmark-outline" size={18} color={GREEN} />
+              </CircularProgress>
+              <View style={s.statTextGroup}>
+                <Text style={s.statNum}>{doneToday}<Text style={s.statDenom}>/{mate.routines.length}</Text></Text>
+                <Text style={s.statLabel}>Görev</Text>
+              </View>
+            </View>
+            
+            <View style={s.statItem}>
+              <CircularProgress 
+                size={40} 
+                strokeWidth={4} 
+                progress={daysPassed / 30} 
+                color={accent}
+              >
+                <Ionicons name="calendar-outline" size={16} color={accent} />
+              </CircularProgress>
+              <View style={s.statTextGroup}>
+                <Text style={s.statNum}>{daysPassed}<Text style={s.statDenom}>/30</Text></Text>
+                <Text style={s.statLabel}>Geçen Gün</Text>
               </View>
             </View>
           </View>
-
-          {/* Match Progress */}
-          <View style={styles.matchProgress}>
-            <View style={styles.matchProgressRow}>
-              <Text style={styles.matchLabel}>Eşleşme Süreci ({daysPassed}/30 gün)</Text>
-              <Text style={styles.matchDays}>{Math.floor((daysPassed / 30) * 100)}%</Text>
-            </View>
-            <View style={styles.matchTrack}>
-              <View style={[styles.matchFill, {
-                width: `${Math.min((daysPassed / 30) * 100, 100)}%` as any,
-                backgroundColor: accentColor,
-              }]} />
-            </View>
-          </View>
-
-          {/* Today's Progress */}
-          <View style={styles.todayProgress}>
-            <Text style={styles.todayLabel}>Mate bugün:</Text>
-            <Text style={styles.todayCount}>
-              <Text style={{ color: '#2ecc71', fontWeight: '800' }}>{completedToday}</Text>
-              <Text style={{ color: Colors.textSecondary }}>/{mate.routines.length} rutin</Text>
-            </Text>
-          </View>
-
-          <TouchableOpacity
-            style={[styles.profileBtn, { borderColor: accentColor }]}
-            onPress={() => router.push('/mate-profile')}
-          >
-            <Text style={[styles.profileBtnText, { color: accentColor }]}>Profili Gör</Text>
-          </TouchableOpacity>
         </View>
 
-        {/* Routine List (Read-Only) */}
-        <View style={styles.routineSection}>
-          <Text style={styles.sectionTitle}>BUGÜNKÜ RUTİNLER</Text>
-          <Text style={styles.readOnly}>Sadece görüntüleme — değiştiremezsin</Text>
-
-          {mate.routines.map((r) => (
-            <MateRoutineRow key={r.id} routine={r} />
-          ))}
+        {/* Routines list */}
+        <View style={s.sectionHeader}>
+          <Text style={s.sectionTitle}>Rutin Arkadaşım</Text>
         </View>
 
-        {!user.isPro && (
-          <View style={styles.proBanner}>
-            <Text style={styles.proBannerIcon}>🔓</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.proBannerTitle}>Buzları Kaldır</Text>
-              <Text style={styles.proBannerText}>Pro'ya geç, mate'inin fotoğraflarını gör</Text>
-            </View>
-            <View style={[styles.proTag, { backgroundColor: Colors.proGold }]}>
-              <Text style={{ color: '#000', fontSize: 11, fontWeight: '800' }}>PRO</Text>
-            </View>
+        {mate.routines.length === 0 ? (
+          <View style={s.empty}>
+            <Ionicons name="clipboard-outline" size={36} color={TEXT3} />
+            <Text style={s.emptyTxt}>Mate'in rutini yok</Text>
+          </View>
+        ) : (
+          <View style={s.list}>
+            {[...mate.routines]
+              .sort((a, b) => {
+                const aDone = a.completedDates.includes(today);
+                const bDone = b.completedDates.includes(today);
+                return aDone === bDone ? 0 : aDone ? -1 : 1;
+              })
+              .map(r => {
+                const done = r.completedDates.includes(today);
+                return (
+                  <View key={r.id} style={s.row}>
+                    <View style={[s.checkBox, {borderColor: done ? GREEN : GOLD}]}>
+                      {done 
+                        ? <Ionicons name="checkmark" size={14} color={GREEN} />
+                        : <Ionicons name="hourglass-outline" size={10} color={GOLD} />}
+                    </View>
+                    <View style={{flex:1}}>
+                      <Text style={[s.rowName, done && {color: TEXT2}]}>{r.name}</Text>
+                      <Text style={[s.rowMeta, done && {color: TEXT3}]}>{FREQ_LABEL[r.frequency]} · {r.notificationTime}</Text>
+                    </View>
+                  </View>
+                );
+            })}
           </View>
         )}
 
-        <View style={{ height: 40 }} />
+        <View style={{height:80}} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
-    paddingBottom: Spacing.lg,
-  },
-  title: {
-    fontSize: FontSize.xl,
-    color: Colors.text,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-  },
-  matchTimer: {
-    alignItems: 'center',
-    backgroundColor: Colors.card,
-    borderRadius: BorderRadius.md,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderWidth: 0.5,
-    borderColor: Colors.cardBorder,
-  },
-  timerLabel: {
-    fontSize: FontSize.xs,
-    color: Colors.textMuted,
-    fontWeight: '600',
-  },
-  timerDays: {
-    fontSize: FontSize.lg,
-    fontWeight: '800',
-  },
-  mateCard: {
-    marginHorizontal: Spacing.lg,
-    backgroundColor: Colors.card,
-    borderRadius: BorderRadius.xl,
-    padding: Spacing.lg,
-    borderWidth: 0.5,
-    borderColor: Colors.cardBorder,
-    marginBottom: Spacing.lg,
-  },
-  mateTop: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: Spacing.lg,
-  },
-  avatarRing: {
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: Spacing.md,
-  },
-  avatarBase: {
-    overflow: 'hidden',
-  },
-  avatarPlaceholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarInitial: {
-    fontWeight: '700',
-  },
-  mateInfo: {
-    flex: 1,
-  },
-  mateUsername: {
-    fontSize: FontSize.lg,
-    color: Colors.text,
-    fontWeight: '800',
-    marginBottom: 8,
-  },
-  genderBadge: {
-    alignSelf: 'flex-start',
-    borderWidth: 1,
-    borderRadius: BorderRadius.sm,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    marginBottom: 8,
-  },
-  genderText: {
-    fontSize: FontSize.xs,
-    fontWeight: '700',
-  },
-  scoreRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  scoreLabel: {
-    fontSize: FontSize.sm,
-    color: Colors.textSecondary,
-  },
-  scoreValue: {
-    fontSize: FontSize.md,
-    fontWeight: '800',
-  },
-  matchProgress: {
-    marginBottom: Spacing.md,
-  },
-  matchProgressRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  matchLabel: {
-    fontSize: FontSize.xs,
-    color: Colors.textSecondary,
-  },
-  matchDays: {
-    fontSize: FontSize.xs,
-    color: Colors.textMuted,
-    fontWeight: '600',
-  },
-  matchTrack: {
-    height: 3,
-    backgroundColor: Colors.cardBorder,
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  matchFill: {
-    height: 3,
-    borderRadius: 2,
-  },
-  todayProgress: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.md,
-  },
-  todayLabel: {
-    fontSize: FontSize.sm,
-    color: Colors.textSecondary,
-  },
-  todayCount: {
-    fontSize: FontSize.md,
-  },
-  profileBtn: {
-    borderWidth: 1.5,
-    borderRadius: BorderRadius.lg,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  profileBtnText: {
-    fontSize: FontSize.md,
-    fontWeight: '700',
-  },
-  routineSection: {
-    marginHorizontal: Spacing.lg,
-    marginBottom: Spacing.lg,
-  },
-  sectionTitle: {
-    fontSize: FontSize.xs,
-    color: Colors.textMuted,
-    fontWeight: '700',
-    letterSpacing: 1.5,
-    marginBottom: 4,
-  },
-  readOnly: {
-    fontSize: FontSize.xs,
-    color: Colors.textMuted,
-    marginBottom: Spacing.md,
-    fontStyle: 'italic',
-  },
-  mateRoutineRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.card,
-    borderRadius: BorderRadius.md,
-    padding: Spacing.md,
-    marginBottom: Spacing.sm,
-    borderWidth: 0.5,
-    borderColor: Colors.cardBorder,
-  },
-  routineStatus: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: Spacing.sm,
-  },
-  mateRoutineName: {
-    flex: 1,
-    fontSize: FontSize.md,
-    color: Colors.text,
-    fontWeight: '500',
-  },
-  statusBadge: {
-    borderRadius: BorderRadius.sm,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  statusText: {
-    fontSize: FontSize.xs,
-    fontWeight: '700',
-  },
-  proBanner: {
-    marginHorizontal: Spacing.lg,
-    backgroundColor: Colors.proGold + '11',
-    borderRadius: BorderRadius.lg,
-    padding: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.proGold + '33',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: Spacing.lg,
-  },
-  proBannerIcon: {
-    fontSize: 28,
-  },
-  proBannerTitle: {
-    fontSize: FontSize.md,
-    color: Colors.proGold,
-    fontWeight: '800',
-    marginBottom: 2,
-  },
-  proBannerText: {
-    fontSize: FontSize.xs,
-    color: Colors.textSecondary,
-  },
-  proTag: {
-    borderRadius: BorderRadius.sm,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
+const s = StyleSheet.create({
+  container: {flex:1, backgroundColor:BG},
+  header: {flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingHorizontal:16, paddingTop:16, paddingBottom:8},
+  title: {fontSize:24, color:TEXT, fontWeight:'900', letterSpacing:-0.5},
+  
+  headerPro:   { alignItems:'flex-end', justifyContent:'center' },
+  headerProTop:{ flexDirection:'row', alignItems:'center', gap:4 },
+  headerProTxt:{ fontSize:12, color:RED, fontWeight:'800' },
+  headerProSub:{ fontSize:9, color:TEXT3, marginTop:2, fontWeight:'600' },
+  
+  mateCard: {marginHorizontal:16, paddingVertical:20, borderBottomWidth:1, borderBottomColor:BORDER},
+  mateTop: {flexDirection:'row', alignItems:'center', gap:14, marginBottom:24},
+  avatar: {width:56, height:56, borderRadius:28, borderWidth:2, backgroundColor:BG, alignItems:'center', justifyContent:'center'},
+  avatarLetter: {fontSize:24, fontWeight:'900'},
+  mateName: {fontSize:18, color:TEXT, fontWeight:'800'},
+  mateScore: {fontSize:13, fontWeight:'600', marginTop:2},
+  profileBtn: {flexDirection:'row', alignItems:'center', gap:2},
+  profileBtnTxt: {fontSize:13, color:TEXT2, fontWeight:'600'},
+  
+  stats: {flexDirection:'row', justifyContent:'space-between', gap:16, marginTop:16, marginBottom:8, paddingHorizontal:8},
+  statItem: {flexDirection:'row', alignItems:'center', gap:12},
+  statTextGroup: {alignItems:'flex-start'},
+  statNum: {fontSize:16, color:TEXT, fontWeight:'900', letterSpacing:-0.5},
+  statDenom: {fontSize:12, color:TEXT3, fontWeight:'700'},
+  statLabel: {fontSize:10, color:TEXT2, marginTop:0, fontWeight:'700', letterSpacing:1},
+  
+  sectionHeader: {paddingHorizontal:16, paddingTop:24, paddingBottom:10},
+  sectionTitle: {fontSize:22, color:TEXT, fontWeight:'900', letterSpacing:-0.5},
+  list: {paddingHorizontal:16, paddingTop:4},
+  row: {flexDirection:'row', alignItems:'center', gap:10, paddingVertical:12, borderBottomWidth:0.5, borderBottomColor:BORDER},
+  checkBox: {width:20, height:20, borderRadius:10, borderWidth:1, alignItems:'center', justifyContent:'center', backgroundColor:BG},
+  rowName: {fontSize:14, color:TEXT, fontWeight:'500'},
+  rowMeta: {fontSize:11, color:TEXT3, marginTop:1},
+  empty: {alignItems:'center', paddingTop:40, gap:12},
+  emptyTxt: {fontSize:14, color:TEXT2},
 });

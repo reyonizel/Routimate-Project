@@ -1,25 +1,23 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Platform, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
+import * as SystemUI from 'expo-system-ui';
+
+SystemUI.setBackgroundColorAsync('#FFFFFF');
 
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={styles.root}>
-      <StatusBar style="light" backgroundColor="#000000" translucent={false} />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: '#000000' } }}>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <StatusBar style="dark" backgroundColor="#FFFFFF" translucent={false} />
+      <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right', contentStyle: { backgroundColor: '#FFFFFF' } }}>
+        <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-        <Stack.Screen name="debug" options={{ headerShown: false }} />
-        <Stack.Screen name="mate-profile" options={{ headerShown: false }} />
+        <Stack.Screen name="debug" />
+        <Stack.Screen name="mate-profile" />
       </Stack>
     </GestureHandlerRootView>
   );
 }
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: '#000000',
-  },
-});
+const styles = StyleSheet.create({ root: { flex: 1, backgroundColor: '#FFFFFF' } });

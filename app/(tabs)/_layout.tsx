@@ -1,90 +1,74 @@
 import { Tabs } from 'expo-router';
-import { StyleSheet, View, Text } from 'react-native';
-import { useStore } from '../../store/useStore';
-import { Colors } from '../../constants/theme';
-
-interface TabIconProps {
-  name: string;
-  focused: boolean;
-  accentColor: string;
-}
-
-function TabIcon({ name, focused, accentColor }: TabIconProps) {
-  const icons: Record<string, string> = {
-    home: '⬡',
-    mate: '👁',
-    create: '✦',
-    dm: '◈',
-    profile: '◉',
-  };
-
-  return (
-    <View style={styles.iconWrap}>
-      <Text style={[styles.icon, focused && { color: accentColor }]}>
-        {icons[name] ?? '●'}
-      </Text>
-      {focused && <View style={[styles.dot, { backgroundColor: accentColor }]} />}
-    </View>
-  );
-}
+import { StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TabsLayout() {
-  const user = useStore((s) => s.user);
-  const accentColor = user.gender === 'female' ? Colors.female : Colors.male;
+  const insets = useSafeAreaInsets();
+  const bottomInset = insets.bottom ?? 0;
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarStyle: styles.tabBar,
-        tabBarActiveTintColor: accentColor,
-        tabBarInactiveTintColor: Colors.textMuted,
-        tabBarShowLabel: true,
-        tabBarLabelStyle: styles.label,
+        tabBarShowLabel: false,
+        tabBarHideOnKeyboard: true,
+        animation: 'shift',
+        tabBarStyle: {
+          backgroundColor: '#FFFFFF',
+          borderTopWidth: 0.5,
+          borderTopColor: '#E8E8E8',
+          height: 52 + bottomInset,
+          paddingBottom: bottomInset,
+          paddingTop: 0,
+          elevation: 0,
+          shadowOpacity: 0,
+        },
+        tabBarActiveTintColor: '#111111',
+        tabBarInactiveTintColor: '#ABABAB',
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
           tabBarIcon: ({ focused }) => (
-            <TabIcon name="home" focused={focused} accentColor={accentColor} />
+            <Ionicons name={focused ? 'home' : 'home-outline'} size={25} color={focused ? '#111' : '#ABABAB'} />
           ),
         }}
       />
       <Tabs.Screen
         name="mate"
         options={{
-          title: 'Mate',
           tabBarIcon: ({ focused }) => (
-            <TabIcon name="mate" focused={focused} accentColor={accentColor} />
+            <Ionicons name={focused ? 'eye' : 'eye-outline'} size={25} color={focused ? '#111' : '#ABABAB'} />
           ),
         }}
       />
       <Tabs.Screen
         name="create"
         options={{
-          title: 'Create',
           tabBarIcon: ({ focused }) => (
-            <TabIcon name="create" focused={focused} accentColor={accentColor} />
+            <Ionicons
+              name={focused ? 'add-circle' : 'add-circle-outline'}
+              size={32}
+              color={focused ? '#E60023' : '#ABABAB'}
+            />
           ),
         }}
       />
       <Tabs.Screen
         name="dm"
         options={{
-          title: 'DM',
           tabBarIcon: ({ focused }) => (
-            <TabIcon name="dm" focused={focused} accentColor={accentColor} />
+            <Ionicons name={focused ? 'chatbubble-ellipses' : 'chatbubble-ellipses-outline'} size={24} color={focused ? '#111' : '#ABABAB'} />
           ),
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
           tabBarIcon: ({ focused }) => (
-            <TabIcon name="profile" focused={focused} accentColor={accentColor} />
+            <Ionicons name={focused ? 'person-circle' : 'person-circle-outline'} size={26} color={focused ? '#111' : '#ABABAB'} />
           ),
         }}
       />
@@ -92,35 +76,4 @@ export default function TabsLayout() {
   );
 }
 
-const styles = StyleSheet.create({
-  tabBar: {
-    backgroundColor: '#0A0A0A',
-    borderTopColor: '#1E1E1E',
-    borderTopWidth: 0.5,
-    height: 72,
-    paddingBottom: 10,
-    paddingTop: 8,
-  },
-  label: {
-    fontSize: 10,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    marginTop: 2,
-  },
-  iconWrap: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 32,
-    height: 28,
-  },
-  icon: {
-    fontSize: 20,
-    color: '#5A5A5A',
-  },
-  dot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    marginTop: 2,
-  },
-});
+const styles = StyleSheet.create({});

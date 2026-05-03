@@ -5,10 +5,13 @@ export type Gender = 'male' | 'female';
 export interface Routine {
   id: string;
   name: string;
+  description?: string;
   frequency: 'daily' | 'weekly' | 'monthly';
   notificationTime: string; // "HH:MM"
   completedDates: string[]; // ISO date strings
   createdAt: string;
+  targetDays?: number[];    // weekly: which days of week (0=Sun…6=Sat)
+  monthlyDays?: number[];   // monthly: which days of month (1-31)
 }
 
 export interface Photo {
@@ -33,7 +36,8 @@ export interface User {
   routines: Routine[];
   photos: Photo[];
   achievementScore: number;
-  matchedSince: string; // ISO date string
+  matchedSince: string;
+  restDays: string[]; // ISO date strings marked as rest days
 }
 
 export interface Mate {
@@ -54,13 +58,16 @@ interface AppState {
   // Actions
   toggleRoutineComplete: (routineId: string, date: string) => void;
   addRoutine: (routine: Routine) => void;
+  addRoutines: (routines: Routine[]) => void;
   deleteRoutine: (routineId: string) => void;
   updateUser: (updates: Partial<User>) => void;
   togglePro: () => void;
   addPhoto: (photo: Photo) => void;
   sendMessage: (text: string) => void;
+  deleteMessage: (id: string) => void;
   forceNewMatch: () => void;
   generateMockStats: () => void;
+  toggleRestDay: (date: string) => void;
 }
 
 const MOCK_MATE: Mate = {
@@ -141,6 +148,7 @@ const INITIAL_USER: User = {
     },
   ],
   photos: [],
+  restDays: [],
 };
 
 const INITIAL_MESSAGES: Message[] = [
@@ -183,10 +191,13 @@ export const useStore = create<AppState>((set, get) => ({
 
   addRoutine: (routine) => {
     set((state) => ({
-      user: {
-        ...state.user,
-        routines: [...state.user.routines, routine],
-      },
+      user: { ...state.user, routines: [...state.user.routines, routine] },
+    }));
+  },
+
+  addRoutines: (routines) => {
+    set((state) => ({
+      user: { ...state.user, routines: [...state.user.routines, ...routines] },
     }));
   },
 
@@ -220,12 +231,30 @@ export const useStore = create<AppState>((set, get) => ({
 
   sendMessage: (text) => {
     const msg: Message = {
-      id: Date.now().toString(),
-      text,
-      sentByMe: true,
+      id: Date.now().toString(), text, sentByMe: true,
       timestamp: new Date().toISOString(),
     };
     set((state) => ({ messages: [...state.messages, msg] }));
+  },
+
+  deleteMessage: (id) => {
+    set((state) => ({
+      messages: state.messages.filter((m) => m.id !== id),
+    }));
+  },
+
+  toggleRestDay: (date) => {
+    set((state) => {
+      const already = state.user.restDays.includes(date);
+      return {
+        user: {
+          ...state.user,
+          restDays: already
+            ? state.user.restDays.filter((d) => d !== date)
+            : [...state.user.restDays, date],
+        },
+      };
+    });
   },
 
   forceNewMatch: () => {
