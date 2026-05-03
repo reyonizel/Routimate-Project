@@ -18,6 +18,7 @@ export interface Photo {
   id: string;
   uri: string;
   uploadedAt: string;
+  isPinned?: boolean;
 }
 
 export interface Message {
@@ -30,9 +31,14 @@ export interface Message {
 export interface User {
   id: string;
   username: string;
+  fullName?: string;
+  bio?: string;
+  birthDate?: string;
+  locationName?: string;
   gender: Gender;
   avatarUri: string | null;
   isPro: boolean;
+  interests?: string[];
   routines: Routine[];
   photos: Photo[];
   achievementScore: number;
@@ -54,20 +60,25 @@ interface AppState {
   user: User;
   mate: Mate;
   messages: Message[];
+  isLoggedIn: boolean;
 
   // Actions
   toggleRoutineComplete: (routineId: string, date: string) => void;
   addRoutine: (routine: Routine) => void;
   addRoutines: (routines: Routine[]) => void;
   deleteRoutine: (routineId: string) => void;
+  updateRoutine: (id: string, updates: Partial<Routine>) => void;
   updateUser: (updates: Partial<User>) => void;
   togglePro: () => void;
   addPhoto: (photo: Photo) => void;
+  deletePhoto: (id: string) => void;
+  pinPhoto: (id: string) => void;
   sendMessage: (text: string) => void;
   deleteMessage: (id: string) => void;
   forceNewMatch: () => void;
   generateMockStats: () => void;
   toggleRestDay: (date: string) => void;
+  setLoggedIn: (value: boolean) => void;
 }
 
 const MOCK_MATE: Mate = {
@@ -111,6 +122,7 @@ const INITIAL_USER: User = {
   gender: 'male',
   avatarUri: null,
   isPro: false,
+  interests: [],
   achievementScore: 74,
   matchedSince: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
   routines: [
@@ -170,6 +182,7 @@ export const useStore = create<AppState>((set, get) => ({
   user: INITIAL_USER,
   mate: MOCK_MATE,
   messages: INITIAL_MESSAGES,
+  isLoggedIn: false,
 
   toggleRoutineComplete: (routineId, date) => {
     set((state) => ({
@@ -210,6 +223,17 @@ export const useStore = create<AppState>((set, get) => ({
     }));
   },
 
+  updateRoutine: (id, updates) => {
+    set((state) => ({
+      user: {
+        ...state.user,
+        routines: state.user.routines.map((r) =>
+          r.id === id ? { ...r, ...updates } : r
+        ),
+      },
+    }));
+  },
+
   updateUser: (updates) => {
     set((state) => ({ user: { ...state.user, ...updates } }));
   },
@@ -227,6 +251,32 @@ export const useStore = create<AppState>((set, get) => ({
         photos: [...state.user.photos, photo],
       },
     }));
+  },
+
+  deletePhoto: (id) => {
+    set((state) => ({
+      user: {
+        ...state.user,
+        photos: state.user.photos.filter((p) => p.id !== id),
+      },
+    }));
+  },
+
+  pinPhoto: (id) => {
+    set((state) => {
+      const photos = [...state.user.photos];
+      const idx = photos.findIndex(p => p.id === id);
+      if (idx > -1) {
+        const [pinned] = photos.splice(idx, 1);
+        pinned.isPinned = !pinned.isPinned;
+        if (pinned.isPinned) {
+          photos.unshift(pinned);
+        } else {
+          photos.push(pinned);
+        }
+      }
+      return { user: { ...state.user, photos } };
+    });
   },
 
   sendMessage: (text) => {
@@ -312,4 +362,6 @@ export const useStore = create<AppState>((set, get) => ({
       user: { ...state.user, routines, achievementScore: score },
     }));
   },
+
+  setLoggedIn: (value) => set({ isLoggedIn: value }),
 }));

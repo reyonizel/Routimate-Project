@@ -12,10 +12,11 @@ const BORDER = '#E8E8E8'; const PILL = 999;
 
 type ActionColor = string;
 const ACTIONS: { icon: React.ComponentProps<typeof Ionicons>['name']; label: string; sub: string; color: ActionColor; key: string }[] = [
-  { icon: 'shuffle-outline',   label: 'Yeni Eşleşme Zorla', sub: '30 günlük sayacı sıfırlar',       color: BLUE,  key: 'match' },
-  { icon: 'star-outline',      label: 'Pro Toggle',          sub: 'Pro durumunu tersine çevirir',    color: GOLD,  key: 'pro' },
-  { icon: 'flask-outline',     label: 'Mock Rutin Ekle',     sub: '4 örnek günlük rutin ekler',      color: GREEN, key: 'mock' },
+  { icon: 'shuffle-outline',   label: 'Yeni Eşleşme Zorla', sub: '30 günlük sayacı sıfırlar',        color: BLUE,  key: 'match' },
+  { icon: 'star-outline',      label: 'Pro Toggle',          sub: 'Pro durumunu tersine çevirir',     color: GOLD,  key: 'pro' },
+  { icon: 'flask-outline',     label: 'Mock Rutin Ekle',     sub: '4 örnek günlük rutin ekler',       color: GREEN, key: 'mock' },
   { icon: 'trash-outline',     label: 'Rutinleri Temizle',   sub: 'Tüm rutinleri siler (simülasyon)', color: RED,   key: 'clear' },
+  { icon: 'log-out-outline',   label: 'Auth Akışını Sıfırla', sub: 'Welcome ekranına yönlendir',      color: '#7C3AED', key: 'logout' },
 ];
 
 export default function DebugScreen() {
@@ -25,6 +26,7 @@ export default function DebugScreen() {
   const forceNewMatch = useStore((s) => s.forceNewMatch);
   const togglePro = useStore((s) => s.togglePro);
   const addRoutine = useStore((s) => s.addRoutine);
+  const setLoggedIn = useStore((s) => s.setLoggedIn);
 
   const handleAction = (key: string) => {
     switch (key) {
@@ -51,6 +53,10 @@ export default function DebugScreen() {
       }
       case 'clear':
         Alert.alert('Simülasyon', 'Store reset yakında eklenecek.');
+        break;
+      case 'logout':
+        setLoggedIn(false);
+        router.replace('/welcome' as any);
         break;
     }
   };
@@ -110,6 +116,35 @@ export default function DebugScreen() {
                 <Text style={styles.actionSub}>{a.sub}</Text>
               </View>
               <Ionicons name="play-circle-outline" size={22} color={a.color} />
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Screen Navigation */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionSub}>Auth & Onboarding</Text>
+          <Text style={styles.sectionTitle}>Ekranlar</Text>
+        </View>
+        <View style={[styles.actionList, { marginBottom: 8 }]}>
+          {[
+            { label: 'Welcome Ekranı', sub: 'Karşılama / Landing', icon: 'rocket-outline' as const, color: '#7C3AED', route: '/welcome' },
+            { label: 'Auth Ekranı', sub: 'Kayıt Ol / Giriş Yap', icon: 'key-outline' as const, color: '#2563EB', route: '/auth' },
+            { label: 'Onboarding', sub: '3 adımlı kurulum akışı', icon: 'person-add-outline' as const, color: GREEN, route: '/onboarding' },
+          ].map(item => (
+            <TouchableOpacity
+              key={item.route}
+              style={styles.actionRow}
+              onPress={() => router.push(item.route as any)}
+              activeOpacity={0.75}
+            >
+              <View style={[styles.actionIcon, { backgroundColor: item.color + '15' }]}>
+                <Ionicons name={item.icon} size={21} color={item.color} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.actionLabel, { color: item.color }]}>{item.label}</Text>
+                <Text style={styles.actionSub}>{item.sub}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={item.color} />
             </TouchableOpacity>
           ))}
         </View>

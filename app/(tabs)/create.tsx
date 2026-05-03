@@ -4,6 +4,7 @@ import {
   ScrollView, Alert, Platform, Animated, Dimensions
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useStore, Routine } from '../../store/useStore';
@@ -27,6 +28,7 @@ type WeekDayTask = { title: string; desc: string; hour: string; min: string };
 export default function CreateScreen() {
   const addRoutine  = useStore(s => s.addRoutine);
   const addRoutines = useStore(s => s.addRoutines);
+  const router = useRouter();
 
   const [freq, setFreq] = useState<Freq>('daily');
   const slideAnim = React.useRef(new Animated.Value(0)).current;
@@ -43,6 +45,9 @@ export default function CreateScreen() {
 
   const TAB_DATA: [Freq, string][] = [['daily','Günlük'],['weekly','Haftalık'],['monthly','Aylık']];
   const tabWidth = (Dimensions.get('window').width - 32) / 3;
+
+  const TR_MONTHS = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
+  const currentMonthStr = TR_MONTHS[new Date().getMonth()];
 
   // ── DAILY ──────────────────────────────────────────────────────────
   const [dailyName, setDailyName] = useState('');
@@ -64,7 +69,9 @@ export default function CreateScreen() {
 
   // ── MONTHLY ────────────────────────────────────────────────────────
   const [monthTasks, setMonthTasks] = useState<{ [day: number]: WeekDayTask }>({});
-  const [activeMonthDay, setActiveMonthDay] = useState<number>(1);
+  const today = new Date();
+  const [activeMonthDay, setActiveMonthDay] = useState<number>(today.getDate());
+  const [displayedMonth, setDisplayedMonth] = useState(new Date());
   const updateMonthTask = (day: number, key: keyof WeekDayTask, val: string) => {
     setMonthTasks(prev => {
       const existing = prev[day] || { title: '', desc: '', hour: '09', min: '00' };
@@ -83,10 +90,9 @@ export default function CreateScreen() {
 
   // Helpers...
 
-
-
   // ── SAVE ───────────────────────────────────────────────────────────
   const handleSave = () => {
+
     if (freq === 'daily') {
       if (!dailyName.trim()) return;
       addRoutine({
@@ -260,18 +266,75 @@ export default function CreateScreen() {
         {/* ─── MONTHLY ────────────────────────────────────── */}
         {freq === 'monthly' && (
           <>
-            <View style={[s.field, { marginHorizontal: 0 }]}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.monthCarousel}>
-                {Array.from({length:31}, (_,i) => i+1).map(d => {
-                  const isActive = activeMonthDay === d;
-                  const hasTask = (monthTasks[d]?.title || '').trim().length > 0;
-                  return (
-                    <TouchableOpacity key={d} style={[s.monthChip, isActive && s.monthChipActive]} onPress={() => setActiveMonthDay(d)}>
-                      <Text style={[s.monthChipText, isActive && {color:'#fff'}]}>{d}</Text>
-                      {hasTask && !isActive && <View style={s.weekDayDotMini} />}
+            <View style={[s.field, { marginBottom: 8 }]}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 4, gap: 8, flexDirection: 'row', alignItems: 'center' }}>
+                {(() => {
+                  const y = displayedMonth.getFullYear();
+                  const m = displayedMonth.getMonth();
+                  const daysInMonth = new Date(y, m + 1, 0).getDate();
+                  const monthAbbr = TR_MONTHS[m];
+                  const nextMonthAbbr = TR_MONTHS[(m + 1) % 12];
+                  const prevMonthAbbr = TR_MONTHS[(m - 1 + 12) % 12];
+
+                  // Is this the current month? If so, days before today are past.
+                  const isCurrentMonth = y === today.getFullYear() && m === today.getMonth();
+                  const startDay = isCurrentMonth ? today.getDate() : 1;
+
+                  const chips = [];
+
+                  // Prev month nav chip — only if we're in a future month
+                  if (!isCurrentMonth) {
+                    chips.push(
+                      <TouchableOpacity
+                        key="prev-month"
+                        style={s.mChipNav}
+                        onPress={() => {
+                          const prevDate = new Date(y, m - 1, 1);
+                          setDisplayedMonth(prevDate);
+                          // If going back to current month, select today; else select day 1
+                          const prevIsCurrentMonth = prevDate.getFullYear() === today.getFullYear() && prevDate.getMonth() === today.getMonth();
+                          setActiveMonthDay(prevIsCurrentMonth ? today.getDate() : 1);
+                        }}
+                      >
+                        <Ionicons name="chevron-back" size={14} color={RED} />
+                        <Text style={s.mChipNavTxt}>{prevMonthAbbr}</Text>
+                      </TouchableOpacity>
+                    );
+                  }
+
+                  for (let d = startDay; d <= daysInMonth; d++) {
+                    const isActive = activeMonthDay === d;
+                    const hasTask = (monthTasks[d]?.title || '').trim().length > 0;
+                    chips.push(
+                      <TouchableOpacity 
+                        key={`${m}-${d}`}
+                        style={[s.mChip, isActive && s.mChipActive]}
+                        onPress={() => setActiveMonthDay(d)}
+                      >
+                        <Text style={[s.mChipDay, isActive && { color: '#fff' }]}>{d}</Text>
+                        <Text style={[s.mChipMonth, isActive && { color: 'rgba(255,255,255,0.75)' }]}>{monthAbbr}</Text>
+                        {hasTask && !isActive && <View style={s.mChipDot} />}
+                      </TouchableOpacity>
+                    );
+                  }
+
+                  // Next month nav chip
+                  chips.push(
+                    <TouchableOpacity
+                      key="next-month"
+                      style={s.mChipNav}
+                      onPress={() => {
+                        setDisplayedMonth(new Date(y, m + 1, 1));
+                        setActiveMonthDay(1);
+                      }}
+                    >
+                      <Text style={s.mChipNavTxt}>{nextMonthAbbr}</Text>
+                      <Ionicons name="chevron-forward" size={14} color={RED} />
                     </TouchableOpacity>
                   );
-                })}
+
+                  return chips;
+                })()}
               </ScrollView>
             </View>
 
@@ -280,7 +343,7 @@ export default function CreateScreen() {
                 <TextInput style={s.input} 
                   value={monthTasks[activeMonthDay]?.title || ''} 
                   onChangeText={t => updateMonthTask(activeMonthDay, 'title', t.slice(0,60))}
-                  placeholder={`Ayın ${activeMonthDay}. günü için başlık`} 
+                  placeholder={`${activeMonthDay} ${TR_MONTHS[displayedMonth.getMonth()]} için başlık`} 
                   placeholderTextColor={TEXT3} maxLength={60} />
               </View>
             </View>
@@ -320,7 +383,7 @@ export default function CreateScreen() {
 
 // ─── Sub-components ──────────────────────────────────────────────────
 
-function TimeField({label, hour, min, onTimeChange, weekMode, weekHour, weekMin, onWeekTimeChange}: any) {
+export function TimeField({label, hour, min, onTimeChange, weekMode, weekHour, weekMin, onWeekTimeChange}: any) {
   const [show, setShow] = useState(false);
 
   const h = weekMode ? weekHour : hour;
@@ -417,6 +480,7 @@ const s = StyleSheet.create({
   headerTitle: {fontSize:24, color:TEXT, fontWeight:'900', letterSpacing:-0.5},
   field: {marginHorizontal:16, marginBottom:24},
   label: {fontSize:11, color:TEXT3, fontWeight:'700', letterSpacing:1.5, marginBottom:10},
+  calHint: {fontSize:12, color:TEXT3, marginBottom:12},
   inputRow: {flexDirection:'row', alignItems:'center', borderBottomWidth:1, borderBottomColor:BORDER},
   input: {flex:1, fontSize:22, fontWeight:'600', color:TEXT, paddingVertical:12},
   
@@ -430,11 +494,14 @@ const s = StyleSheet.create({
   // Weekly schedule
   weekDayDotMini: {width:6, height:6, borderRadius:3, backgroundColor:RED, position:'absolute', top:4, right:4},
 
-  // Monthly calendar
-  monthCarousel: {flexDirection:'row', gap:8, paddingHorizontal:16},
-  monthChip: {width:44, height:44, borderRadius:22, backgroundColor:CARD, alignItems:'center', justifyContent:'center'},
-  monthChipActive: {backgroundColor:TEXT},
-  monthChipText: {fontSize:14, color:TEXT, fontWeight:'700'},
+  // Monthly carousel chips
+  mChip:       { width: 52, height: 60, borderRadius: 14, backgroundColor: CARD, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  mChipActive: { backgroundColor: RED },
+  mChipDay:    { fontSize: 18, fontWeight: '700', color: TEXT },
+  mChipMonth:  { fontSize: 11, color: TEXT3, fontWeight: '600', marginTop: 2 },
+  mChipDot:    { position: 'absolute', top: 6, right: 6, width: 6, height: 6, borderRadius: 3, backgroundColor: RED },
+  mChipNav:    { height: 60, paddingHorizontal: 14, borderRadius: 14, backgroundColor: 'rgba(230,0,35,0.1)', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 4, borderWidth: 1.5, borderColor: 'rgba(230,0,35,0.25)' },
+  mChipNavTxt: { fontSize: 14, fontWeight: '700', color: RED },
 
   // Time
   timePadAndroid: {flexDirection:'row', alignItems:'center', paddingVertical:10, borderBottomWidth:1, borderBottomColor:BORDER},

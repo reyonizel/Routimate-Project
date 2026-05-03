@@ -1,9 +1,10 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
-  ScrollView, Dimensions, Alert, Image, Animated
+  ScrollView, Dimensions, Alert, Image, Animated,
+  KeyboardAvoidingView, Platform, Modal, Keyboard
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { useStore } from '../../store/useStore';
 
@@ -12,49 +13,72 @@ const TEXT='#111111'; const TEXT2='#767676'; const TEXT3='#ABABAB';
 const RED='#E60023'; const GOLD='#D4860A'; const BORDER='#E8E8E8'; const PILL=999;
 
 const QUESTIONS = [
-  'Bugün rutinlerini tamamladın mı? 👀',
-  'Neden geciktiriyorsun, hesap ver!',
-  'Hangi rutini bu hafta es geçtin?',
-  'Motivasyon kaynağın nedir?',
-  'Bu haftaki hedefin ne?',
-  'Kaç gündür aralıksız gidiyorsun?',
-  'Sabah rutinine sadık kalabiliyor musun?',
-  'Zor günlerde nasıl devam ediyorsun?',
-  'Hangi rutini en çok kaçırmak istiyorsun?',
-  'Bu ay neyi değiştirdin?',
-  'Spor mu yoksa meditasyon mu daha zor?',
-  'Uyku düzenin nasıl gidiyor?',
-  'Sıradaki hedefin ne?',
-  'Hangi alışkanlığından en çok gurur duyuyorsun?',
-  'Bugün ekstra bir şey yaptın mı?',
-  'Hangi gün en çok zorlanıyorsun?',
-  'Haftasonu rutinlerin var mı?',
-  'Kendine ne vaadin var?',
-  'Yıl sonuna kadar nerede olmak istiyorsun?',
-  'Bu rutini bırakmayı düşündün mü hiç?',
+  'Bugün tüm rutinlerini tamamladın mı? 👀',
+  'Bugün hiç rutin aksattın mı, dürüst ol!',
+  'Neden hala başlamadın, hesap ver! 🤨',
+  'Bu haftaki gidişatın nasıl, hedefte miyiz?',
+  'Son günlerde motivasyonunu nasıl hissediyorsun?',
+  'Bugün kendini dünküne göre nasıl hissediyorsun?',
+  'Zorlandığın anlarda pes etmeyi düşündün mü?',
+  'En çok hangi rutininde zorlanıyorsun?',
+  'Dün akşamki rutinleri eksiksiz yaptın mı?',
+  'Uyku düzenin bu aralar nasıl gidiyor?',
+  'Sıradaki büyük başarın ne olacak sence?',
+  'Bugün rutinlerinin dışına çıkıp ekstra bir şey yaptın mı?',
+  'Hafta sonları da rutinlerine sadık kalabiliyor musun?',
+  'Seni bu yolda en çok ne motive ediyor?',
+  'Bugünlük rutinlerine ara verip dinlenmek ister misin?',
+  'Kendinle en çok gurur duyduğun an hangisiydi?',
+  'Bir rutini tamamen hayatından çıkarsan hangisi olurdu?',
+  'Bugün için kendine 10 üzerinden kaç puan verirsin?',
+  'Yarın için özel bir planın veya hedefin var mı?',
+  'Benim performansımı nasıl buluyorsun, iyi miyim?'
 ];
 
-const ANSWERS = [
-  'Evet, hepsini tamamladım! 💪',
-  'Hayır, bugün dinlenme günüm.',
-  'Biraz gecikmeli ama devam ediyorum.',
-  'Yarın kesinlikle telafi edeceğim!',
-  'Zaten yaptım, sen takipte kal!',
-  'Motivasyonum biraz düşük şu an.',
-  'Biraz zorlandım ama yaptım.',
-  'Beklenmedik bir şey çıktı, affet!',
-  '%80 tamamladım, fena değil!',
-  'Tamamen unuttum, özür dilerim!',
-  'Harika gidiyorum, endişelenme!',
-  'Enerji seviyem çok yüksek bugün!',
-  'Bu hafta rekoru kırdım! 🏆',
-  'Her şey planlandığı gibi.',
-  'Dün çift yaptım, bugün dinleniyorum.',
-  'Sabahları zorlanıyorum, geceleri telafi!',
-  'Adım adım ilerliyorum!',
-  'Senin sayende motive oldum! ❤️',
-  'Bugün ekstra 1 saat daha çalıştım!',
-  'Hep böyle olursa süper olur!',
+const ANSWERS_POS = [
+  'Evet, hepsini eksiksiz tamamladım! 💪',
+  'Bugün harikaydım, sıfır hata!',
+  'Hemen şimdi başlıyorum, bekle!',
+  'Haftalık hedeflerime tam gaz ilerliyorum! 🚀',
+  'Motivasyonum şu an tavan yapmış durumda! 🔥',
+  'Bugün dünden çok daha enerjik ve odaklıyım!',
+  'Asla pes etmem, üstesinden geliyorum!',
+  'Zorlansam da sonunda başarıyorum.',
+  'Dün akşamki rutinleri harika şekilde bitirdim.',
+  'Uyku düzenimi nihayet rayına oturttum.',
+  'Mevcut serimi 30 güne tamamlamak! 🏆',
+  'Evet, bugün ekstra olarak yürüyüş yaptım.',
+  'Hafta sonları da rutinlere tam uyum sağlıyorum.',
+  'Gelişimimi görmek en büyük motivasyonum! ❤️',
+  'Dinlenmeye niyetim yok, çalışmaya devam!',
+  'Zorlanırken bile pes etmeden başardığım an!',
+  'Hepsi çok faydalı, hiçbirini çıkarmam.',
+  'Bugün performansım harikaydı, tam 10 puan! 🌟',
+  'Yarın çok daha erken kalkmayı planlıyorum.',
+  'Harika gidiyorsun, beni de gaza getiriyorsun! 🤝'
+];
+
+const ANSWERS_NEG = [
+  'Maalesef bugün hiçbirini yapamadım. 😔',
+  'Bugün bir rutinimi es geçmek zorunda kaldım.',
+  'Bugün hiç enerjim yok, yarına kaldı.',
+  'Hedeflerin biraz gerisinde kaldım bu hafta.',
+  'Bugün motivasyonum gerçekten çok düşük.',
+  'Düne göre daha yorgun ve halsizim.',
+  'Açıkçası bugün pes etmenin eşiğinden döndüm.',
+  'Sabah erken kalkma rutini beni çok zorluyor.',
+  'Dün akşam beklenmedik bir işim çıktı, yapamadım.',
+  'Uyku düzenim darmadağın oldu maalesef.',
+  'Şu an tek başarım günü zararsız atlatmak.',
+  'Bugün ekstra bir şey yapacak halim kalmadı.',
+  'Hafta sonları maalesef çok fazla salıyorum.',
+  'Şu sıralar hiçbir şey beni motive etmiyor.',
+  'Bugün kesinlikle dinlenmeye ihtiyacım var.',
+  'Gurur duyacak bir şey yapamadım henüz.',
+  'Şu diyet işini hayatımdan çıkarsam keşke.',
+  'Bugün maalesef 10 üzerinden ancak 3 veririm.',
+  'Yarın sadece günü kurtarmaya çalışacağım.',
+  'İkimiz de biraz saldık galiba bu aralar. 😅'
 ];
 
 type QATab = 'ask' | 'answer';
@@ -75,11 +99,20 @@ export default function DMScreen() {
   const sendMessage = useStore(s => s.sendMessage);
   const deleteMessage = useStore(s => s.deleteMessage);
   const accent      = user.gender === 'female' ? '#e91e63' : '#3498db';
+  const mateAccent  = mate.gender === 'female' ? '#e91e63' : '#3498db';
 
   const [input, setInput] = useState('');
   const [tab, setTab]     = useState<QATab>('ask');
+  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+  const insets = useSafeAreaInsets();
   const slideAnim = useRef(new Animated.Value(0)).current;
   const msgRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', () => setKeyboardVisible(false));
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
 
   const handleTabPress = (val: QATab, idx: number) => {
     setTab(val);
@@ -94,32 +127,85 @@ export default function DMScreen() {
   const TAB_DATA: [QATab, string][] = [['ask', 'Soru Sor'], ['answer', 'Cevap Ver']];
   const tabWidth = Dimensions.get('window').width / 2;
 
+  const [sheetConfig, setSheetConfig] = useState<{ title?: string; message?: string; options: { text: string; destructive?: boolean; onPress?: () => void }[] } | null>(null);
+
   const send = (text: string) => {
     sendMessage(text);
     setTimeout(() => msgRef.current?.scrollToEnd({ animated: true }), 80);
   };
 
   const handleLongPress = (m: typeof messages[0]) => {
+    Keyboard.dismiss();
     if (!m.sentByMe) return;
     const diff = Date.now() - new Date(m.timestamp).getTime();
     if (diff <= 30000) {
-      Alert.alert('Mesajı Sil', 'Bu mesajı silmek istiyor musun?', [
-        { text: 'İptal', style: 'cancel' },
-        { text: 'Sil', style: 'destructive', onPress: () => deleteMessage(m.id) }
-      ]);
+      setSheetConfig({
+        title: 'Mesajı Sil',
+        message: 'Bu mesajı silmek istiyor musun?',
+        options: [
+          { text: 'Mesajı Sil', destructive: true, onPress: () => deleteMessage(m.id) }
+        ]
+      });
     } else {
-      Alert.alert('Süre Doldu', 'Sadece ilk 30 saniye içinde mesaj silebilirsin.');
+      setSheetConfig({
+        title: 'Süre Doldu',
+        message: 'Sadece ilk 30 saniye içinde gönderdiğiniz mesajları silebilirsiniz.',
+        options: []
+      });
     }
   };
 
+  const handleUnmatch = () => {
+    setSheetConfig({
+      title: 'Eşleşme Bitirildi',
+      message: 'Bu kullanıcı ile iletişiminiz kesildi. Yeni bir RoutinMate bulmak için ana ekrana dönebilirsiniz.',
+      options: []
+    });
+  };
 
+  const confirmReport = () => {
+    setSheetConfig({
+      title: 'Şikayet Alındı',
+      message: 'Bildiriminiz moderasyon ekibine iletildi. Güvenliğiniz için bu kullanıcıyla eşleşmeyi bitirmek ister misiniz?',
+      options: [
+        { text: 'Eşleşmeyi Bitir', destructive: true, onPress: handleUnmatch }
+      ]
+    });
+  };
+
+  const handleReport = () => {
+    setSheetConfig({
+      title: 'Şikayet Nedeni',
+      message: 'Lütfen şikayet nedeninizi seçin:',
+      options: [
+        { text: 'Spam veya Reklam', onPress: confirmReport },
+        { text: 'Uygunsuz Dil / Davranış', onPress: confirmReport },
+        { text: 'Sahte veya Şüpheli Profil', onPress: confirmReport }
+      ]
+    });
+  };
+
+  const handleMateOptions = () => {
+    Keyboard.dismiss();
+    setSheetConfig({
+      title: 'Kullanıcı Seçenekleri',
+      message: `${mate.username} ile ilgili ne yapmak istiyorsun?`,
+      options: [
+        { text: 'Şikayet Et', onPress: handleReport },
+        { text: 'Eşleşmeyi Bitir / Engelle', destructive: true, onPress: handleUnmatch }
+      ]
+    });
+  };
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
-
-      {/* ── Header ── */}
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+      >
+        {/* ── Header ── */}
       <View style={s.header}>
-        <View style={[s.avatar, { overflow: 'hidden' }]}>
+        <View style={[s.avatar, { overflow: 'hidden', borderWidth: 2, borderColor: mateAccent }]}>
           <Image 
             source={{ uri: `https://i.pravatar.cc/150?u=${mate.username}` }} 
             style={{ width: '100%', height: '100%' }}
@@ -133,7 +219,13 @@ export default function DMScreen() {
           </View>
         </View>
         {!user.isPro && (
-          <TouchableOpacity style={s.headerPro} activeOpacity={0.7} onPress={() => Alert.alert('Pro Özellik', 'Serbest mesajlaşmak için Pro üyeliğe geçiş yapmalısın.')}>
+          <TouchableOpacity style={s.headerPro} activeOpacity={0.7} onPress={() => {
+            setSheetConfig({
+              title: 'Pro Özellik',
+              message: 'Serbest mesajlaşmak için Pro üyeliğe geçiş yapmalısın.',
+              options: []
+            });
+          }}>
             <View style={s.headerProTop}>
               <FontAwesome5 name="crown" size={10} color={RED} />
               <Text style={s.headerProTxt}>Pro'ya Geç</Text>
@@ -141,17 +233,26 @@ export default function DMScreen() {
             <Text style={s.headerProSub}>serbest mesajlaş</Text>
           </TouchableOpacity>
         )}
+        <TouchableOpacity style={{ marginLeft: 16, padding: 4 }} onPress={handleMateOptions} activeOpacity={0.6}>
+          <Ionicons name="ellipsis-vertical" size={20} color={TEXT2} />
+        </TouchableOpacity>
       </View>
 
       {/* ── Messages ── */}
-      <ScrollView ref={msgRef} style={s.messages} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        ref={msgRef} 
+        style={s.messages} 
+        showsVerticalScrollIndicator={false}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={s.datePill}><Text style={s.dateTxt}>Bugün</Text></View>
         {messages.map(m => {
           const t = new Date(m.timestamp).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
           return (
             <View key={m.id} style={[s.bubbleRow, m.sentByMe && { justifyContent: 'flex-end' }]}>
               {!m.sentByMe && (
-                <View style={[s.bubbleAvatar, { overflow: 'hidden' }]}>
+                <View style={[s.bubbleAvatar, { overflow: 'hidden', borderWidth: 1.5, borderColor: mateAccent }]}>
                   <Image 
                     source={{ uri: `https://i.pravatar.cc/150?u=${mate.username}` }} 
                     style={{ width: '100%', height: '100%' }}
@@ -176,7 +277,7 @@ export default function DMScreen() {
 
       {/* ─── Quick Reply Section (non-Pro) ─── */}
       {!user.isPro && (
-        <View style={s.quickWrap}>
+        <View style={[s.quickWrap, { paddingBottom: isKeyboardVisible ? 8 : Math.max(insets.bottom, 12) }]}>
 
           {/* Tab bar — elegant style */}
         <View style={s.tabs}>
@@ -206,41 +307,58 @@ export default function DMScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={s.chipScroll}
         >
-          {toPairs(tab === 'ask' ? QUESTIONS : ANSWERS).map(([top, bottom], idx) => (
-            <View key={idx} style={s.chipCol}>
-              <TouchableOpacity
-                style={s.chip}
-                onPress={() => send(top)}
-                activeOpacity={0.7}
-              >
-                <Text style={s.chipTxt} numberOfLines={2}>{top}</Text>
-              </TouchableOpacity>
-              {bottom && (
-                <TouchableOpacity
-                  style={s.chip}
-                  onPress={() => send(bottom)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={s.chipTxt} numberOfLines={2}>{bottom}</Text>
+          {tab === 'ask' 
+            ? toPairs(QUESTIONS).map(([top, bottom], idx) => (
+              <View key={`ask-${idx}`} style={s.chipCol}>
+                <TouchableOpacity style={s.chip} onPress={() => send(top)} activeOpacity={0.7}>
+                  <Text style={s.chipTxt} numberOfLines={2}>{top}</Text>
                 </TouchableOpacity>
-              )}
-            </View>
-          ))}
-          </ScrollView>
+                {bottom && (
+                  <TouchableOpacity style={s.chip} onPress={() => send(bottom)} activeOpacity={0.7}>
+                    <Text style={s.chipTxt} numberOfLines={2}>{bottom}</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ))
+            : ANSWERS_POS.map((pos, idx) => {
+              const neg = ANSWERS_NEG[idx];
+              return (
+                <View key={`ans-${idx}`} style={s.chipCol}>
+                  <TouchableOpacity 
+                    style={[s.chip, { borderColor: '#C6F6D5', backgroundColor: '#F0FFF4' }]} 
+                    onPress={() => send(pos)} 
+                    activeOpacity={0.7}
+                  >
+                    <Text style={s.chipTxt} numberOfLines={2}>{pos}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[s.chip, { borderColor: '#FED7D7', backgroundColor: '#FFF5F5' }]} 
+                    onPress={() => send(neg)} 
+                    activeOpacity={0.7}
+                  >
+                    <Text style={s.chipTxt} numberOfLines={2}>{neg}</Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            })
+          }
+        </ScrollView>
         </View>
       )}
 
       {/* ── Input ── */}
       {user.isPro && (
-        <View style={s.inputBar}>
+        <View style={[s.inputBar, { paddingBottom: isKeyboardVisible ? 12 : Math.max(insets.bottom, 12) }]}>
           <TextInput
-            style={[s.textInput, input.length > 0 && { borderColor: TEXT }]}
+            style={s.textInput}
             value={input}
             onChangeText={setInput}
             placeholder="Mesaj yaz..."
             placeholderTextColor={TEXT3}
             multiline
             maxLength={500}
+            textAlignVertical="center"
+            disableFullscreenUI={true}
           />
           <TouchableOpacity
             style={[s.sendBtn, !!input.trim() && s.sendBtnOn]}
@@ -251,6 +369,48 @@ export default function DMScreen() {
         </View>
       )}
 
+      {/* Custom Bottom Action Sheet (RoutinMate Style) */}
+      {sheetConfig && (
+        <Modal transparent visible animationType="slide" onRequestClose={() => setSheetConfig(null)}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setSheetConfig(null)}>
+            <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} />
+          </TouchableOpacity>
+          <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#FFFFFF', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: 40, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 10 }}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <View style={{ flex: 1, paddingRight: 16 }}>
+                {sheetConfig.title && <Text style={{ fontSize: 18, fontWeight: 'bold', color: TEXT }}>{sheetConfig.title}</Text>}
+                {sheetConfig.message && <Text style={{ fontSize: 13, color: TEXT2, marginTop: 4 }}>{sheetConfig.message}</Text>}
+              </View>
+              <TouchableOpacity onPress={() => setSheetConfig(null)} style={{ padding: 4 }}>
+                <Ionicons name="close" size={24} color={TEXT} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Options */}
+            <View>
+              {sheetConfig.options.map((opt, i) => (
+                <TouchableOpacity 
+                  key={i} 
+                  style={{ 
+                    paddingVertical: 14, 
+                    borderBottomWidth: i === sheetConfig.options.length - 1 ? 0 : 1.5, 
+                    borderBottomColor: BORDER,
+                    flexDirection: 'row',
+                    alignItems: 'center'
+                  }}
+                  onPress={() => { setSheetConfig(null); setTimeout(() => { if (opt.onPress) opt.onPress(); }, 100); }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={{ fontSize: 16, color: opt.destructive ? RED : TEXT, fontWeight: '600' }}>{opt.text}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -274,8 +434,8 @@ const s = StyleSheet.create({
   messages:    { flex:1, paddingHorizontal:14 },
   datePill:    { alignItems:'center', paddingVertical:16 },
   dateTxt:     { fontSize:11, color:TEXT3, fontWeight:'600' },
-  bubbleRow:   { flexDirection:'row', alignItems:'flex-end', marginBottom:8, gap:7 },
-  bubbleAvatar:{ width:26, height:26, borderRadius:13, alignItems:'center', justifyContent:'center' },
+  bubbleRow:   { flexDirection:'row', alignItems:'flex-start', marginBottom:8, gap:7 },
+  bubbleAvatar:{ width:26, height:26, borderRadius:13, alignItems:'center', justifyContent:'center', marginTop: 2 },
   bubble:      { maxWidth:'75%', borderRadius:20, paddingHorizontal:14, paddingVertical:10 },
   bubbleMine:  { backgroundColor:RED },
   bubbleMate:  { backgroundColor:CARD },
@@ -308,8 +468,8 @@ const s = StyleSheet.create({
   chipTxt:     { fontSize:12, fontWeight:'500', lineHeight:16, color:TEXT },
 
   // Input
-  inputBar:   { flexDirection:'row', alignItems:'center', gap:10, paddingHorizontal:16, paddingVertical:10, borderTopWidth:0.5, borderTopColor:BORDER },
-  textInput:  { flex:1, backgroundColor:CARD, borderRadius:22, paddingHorizontal:20, paddingTop:12, paddingBottom:12, fontSize:15, color:TEXT, maxHeight:90 },
-  sendBtn:    { width:44, height:44, borderRadius:22, backgroundColor:SURFACE, alignItems:'center', justifyContent:'center' },
+  inputBar:   { flexDirection:'row', alignItems:'center', gap:10, paddingHorizontal:16, paddingVertical:12, borderTopWidth:0.5, borderTopColor:BORDER, backgroundColor: BG },
+  textInput:  { flex:1, backgroundColor:CARD, borderRadius:24, paddingHorizontal:20, paddingTop:12, paddingBottom:12, fontSize:15, color:TEXT, maxHeight:120, minHeight:48, borderWidth: 1, borderColor: 'transparent' },
+  sendBtn:    { width:48, height:48, borderRadius:24, backgroundColor:SURFACE, alignItems:'center', justifyContent:'center' },
   sendBtnOn:  { backgroundColor:RED },
 });

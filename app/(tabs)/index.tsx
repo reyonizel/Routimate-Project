@@ -1,9 +1,11 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Dimensions, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useStore } from '../../store/useStore';
+import { TimeField } from './create';
 
 const { height: SH } = Dimensions.get('window');
 const today = new Date().toISOString().split('T')[0];
@@ -22,6 +24,8 @@ export default function HomeScreen() {
   const user = useStore(s => s.user);
   const toggleRoutineComplete = useStore(s => s.toggleRoutineComplete);
   const toggleRestDay = useStore(s => s.toggleRestDay);
+  const deleteRoutine = useStore(s => s.deleteRoutine);
+  const updateRoutine = useStore(s => s.updateRoutine);
   const router = useRouter();
   const accent = user.gender === 'female' ? '#e91e63' : '#3498db';
   const isRestDay = user.restDays.includes(today);
@@ -30,6 +34,29 @@ export default function HomeScreen() {
   const [calMonth, setCalMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string|null>(null);
   const [sheetVisible, setSheetVisible] = useState(false);
+  const [expandedRoutineId, setExpandedRoutineId] = useState<string | null>(null);
+
+  const [quickEditRoutineId, setQuickEditRoutineId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editDesc, setEditDesc] = useState('');
+  const [editHour, setEditHour] = useState('');
+  const [editMin, setEditMin] = useState('');
+
+  const toggleExpand = (id: string) => {
+    setExpandedRoutineId(prev => prev === id ? null : id);
+  };
+
+  const routineRefs = React.useRef<{ [id: string]: any }>({});
+  const [popover, setPopover] = useState<{ id: string, x: number, y: number, w: number, h: number } | null>(null);
+
+  const handleLongPress = (id: string) => {
+    const ref = routineRefs.current[id];
+    if (ref && ref.measureInWindow) {
+      ref.measureInWindow((x: number, y: number, w: number, h: number) => {
+        setPopover({ id, x, y, w, h });
+      });
+    }
+  };
 
   // Get routines applicable on a date
   const getApplicable = useCallback((dateStr: string) => {
@@ -173,18 +200,52 @@ export default function HomeScreen() {
                   })
                   .map(r => {
                   const done = r.completedDates.includes(today);
+                  const isExpanded = expandedRoutineId === r.id;
                   return (
-                    <TouchableOpacity key={r.id} style={s.row} onPress={() => toggleRoutineComplete(r.id, today)} activeOpacity={0.7}>
-                      <View style={[s.check, {borderColor: done ? GREEN : GOLD}]}>
-                        {done 
-                          ? <Ionicons name="checkmark" size={14} color={GREEN} />
-                          : <Ionicons name="hourglass-outline" size={10} color={GOLD} />}
+                    <Animated.View layout={LinearTransition} key={r.id} style={{ borderBottomWidth: 0.5, borderBottomColor: BORDER }}>
+                      <View 
+                        ref={el => { routineRefs.current[r.id] = el; }}
+                        style={[s.row, { borderBottomWidth: 0, paddingVertical: 0 }]} 
+                      >
+                        <TouchableOpacity 
+                          style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingVertical: 12 }}
+                          onPress={() => toggleRoutineComplete(r.id, today)} 
+                          onLongPress={() => handleLongPress(r.id)}
+                          delayLongPress={200}
+                          activeOpacity={0.7}
+                        >
+                          <View style={[s.check, {borderColor: done ? GREEN : GOLD, marginRight: 10}]}>
+                            {done 
+                              ? <Ionicons name="checkmark" size={14} color={GREEN} />
+                              : <Ionicons name="hourglass-outline" size={10} color={GOLD} />}
+                          </View>
+                          <View style={{flex:1}}>
+                            <Text style={[s.rowName, done && {color: TEXT2}]}>{r.name}</Text>
+                            <Text style={[s.rowMeta, done && {color: TEXT3}]}>{FREQ_LABEL[r.frequency]} · {r.notificationTime}</Text>
+                          </View>
+                        </TouchableOpacity>
+                        
+                        {r.description ? (
+                          <TouchableOpacity 
+                            style={{ paddingVertical: 12, paddingLeft: 12, paddingRight: 4 }} 
+                            onPress={() => toggleExpand(r.id)}
+                            activeOpacity={0.6}
+                          >
+                            <Ionicons 
+                              name={isExpanded ? "chevron-up" : "chevron-down"} 
+                              size={18} 
+                              color={TEXT3} 
+                            />
+                          </TouchableOpacity>
+                        ) : null}
                       </View>
-                      <View style={{flex:1}}>
-                        <Text style={[s.rowName, done && {color: TEXT2}]}>{r.name}</Text>
-                        <Text style={[s.rowMeta, done && {color: TEXT3}]}>{FREQ_LABEL[r.frequency]} · {r.notificationTime}</Text>
-                      </View>
-                    </TouchableOpacity>
+                      
+                      {isExpanded && r.description ? (
+                        <Animated.View entering={FadeIn} exiting={FadeOut} style={{ paddingLeft: 30, paddingRight: 16, paddingBottom: 14, marginTop: -4 }}>
+                          <Text style={{ fontSize: 13, color: TEXT2, lineHeight: 18 }}>{r.description}</Text>
+                        </Animated.View>
+                      ) : null}
+                    </Animated.View>
                   );
                 })}
               </View>
@@ -307,24 +368,48 @@ export default function HomeScreen() {
                   .map(r => {
                 const done = selectedDate ? r.completedDates.includes(selectedDate) : false;
                 const canToggle = isToday;
+                const isExpanded = expandedRoutineId === r.id;
                 return (
-                  <TouchableOpacity
-                    key={r.id}
-                    style={s.sheetRow}
-                    onPress={() => canToggle && selectedDate && toggleRoutineComplete(r.id, selectedDate)}
-                    activeOpacity={canToggle ? 0.7 : 1}
-                  >
-                    <View style={[s.check, {borderColor: done ? GREEN : GOLD}, !canToggle && s.checkLocked]}>
-                      {done 
-                        ? <Ionicons name="checkmark" size={14} color={!canToggle ? TEXT3 : GREEN} />
-                        : <Ionicons name="hourglass-outline" size={10} color={!canToggle ? TEXT3 : GOLD} />}
+                  <Animated.View layout={LinearTransition} key={r.id} style={{ borderBottomWidth: 0.5, borderBottomColor: BORDER }}>
+                    <View style={[s.sheetRow, { borderBottomWidth: 0, paddingVertical: 0 }]}>
+                      <TouchableOpacity
+                        style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingVertical: 12 }}
+                        onPress={() => canToggle && selectedDate && toggleRoutineComplete(r.id, selectedDate)}
+                        activeOpacity={canToggle ? 0.7 : 1}
+                      >
+                        <View style={[s.check, {borderColor: done ? GREEN : GOLD, marginRight: 10}, !canToggle && s.checkLocked]}>
+                          {done 
+                            ? <Ionicons name="checkmark" size={14} color={!canToggle ? TEXT3 : GREEN} />
+                            : <Ionicons name="hourglass-outline" size={10} color={!canToggle ? TEXT3 : GOLD} />}
+                        </View>
+                        <View style={{flex:1}}>
+                          <Text style={[s.rowName, done && {color: TEXT2}, !canToggle && {opacity:0.6}]}>{r.name}</Text>
+                          <Text style={[s.rowMeta, done && {color: TEXT3}]}>{FREQ_LABEL[r.frequency]} · {r.notificationTime}</Text>
+                        </View>
+                        {!canToggle && <Ionicons name="lock-closed" size={14} color={TEXT3} style={{ marginRight: r.description ? 10 : 0 }} />}
+                      </TouchableOpacity>
+                      
+                      {r.description ? (
+                        <TouchableOpacity 
+                          style={{ paddingVertical: 12, paddingLeft: 12, paddingRight: 4 }} 
+                          onPress={() => toggleExpand(r.id)}
+                          activeOpacity={0.6}
+                        >
+                          <Ionicons 
+                            name={isExpanded ? "chevron-up" : "chevron-down"} 
+                            size={18} 
+                            color={TEXT3} 
+                          />
+                        </TouchableOpacity>
+                      ) : null}
                     </View>
-                    <View style={{flex:1}}>
-                      <Text style={[s.rowName, done && {color: TEXT2}, !canToggle && {opacity:0.6}]}>{r.name}</Text>
-                      <Text style={[s.rowMeta, done && {color: TEXT3}]}>{FREQ_LABEL[r.frequency]} · {r.notificationTime}</Text>
-                    </View>
-                    {!canToggle && <Ionicons name="lock-closed" size={14} color={TEXT3} />}
-                  </TouchableOpacity>
+
+                    {isExpanded && r.description ? (
+                      <Animated.View entering={FadeIn} exiting={FadeOut} style={{ paddingLeft: 30, paddingRight: 16, paddingBottom: 14, marginTop: -4 }}>
+                        <Text style={{ fontSize: 13, color: TEXT2, lineHeight: 18, opacity: canToggle ? 1 : 0.6 }}>{r.description}</Text>
+                      </Animated.View>
+                    ) : null}
+                  </Animated.View>
                 );
               })
             }
@@ -332,6 +417,162 @@ export default function HomeScreen() {
           </ScrollView>
         </View>
       </Modal>
+
+      {/* Popover Menu */}
+      {popover && (
+        <Modal transparent visible={true} animationType="fade" onRequestClose={() => setPopover(null)}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setPopover(null)}>
+            <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' }} />
+          </TouchableOpacity>
+
+          {(() => {
+            const tipX = popover.x + popover.w / 2;
+            const isAbove = popover.y > Dimensions.get('window').height / 2;
+            const MENU_W = 180;
+            const MENU_H = 100;
+            
+            let left = tipX - MENU_W / 2;
+            if (left < 16) left = 16;
+            if (left + MENU_W > Dimensions.get('window').width - 16) left = Dimensions.get('window').width - 16 - MENU_W;
+
+            const arrowLeft = tipX - left - 8;
+
+            return (
+              <View style={{
+                position: 'absolute',
+                left,
+                top: isAbove ? popover.y - MENU_H - 12 : popover.y + popover.h + 12,
+                width: MENU_W,
+                backgroundColor: '#fff',
+                borderRadius: 14,
+                shadowColor: '#000', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.2, shadowRadius: 15, elevation: 15
+              }}>
+                {/* Arrow */}
+                <View style={{
+                  position: 'absolute',
+                  left: arrowLeft,
+                  [isAbove ? 'bottom' : 'top']: -8,
+                  width: 0, height: 0,
+                  borderLeftWidth: 8, borderRightWidth: 8,
+                  borderStyle: 'solid',
+                  backgroundColor: 'transparent',
+                  borderLeftColor: 'transparent', borderRightColor: 'transparent',
+                  ...(isAbove 
+                    ? { borderTopWidth: 8, borderTopColor: '#fff', borderBottomWidth: 0 }
+                    : { borderBottomWidth: 8, borderBottomColor: '#fff', borderTopWidth: 0 })
+                }} />
+
+                <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', padding: 14, borderBottomWidth: 0.5, borderBottomColor: '#E8E8E8' }} onPress={() => { 
+                  const r = user.routines.find(rt => rt.id === popover.id);
+                  if (r) {
+                    setEditName(r.name);
+                    setEditDesc(r.description || '');
+                    const [h, m] = r.notificationTime.split(':');
+                    setEditHour(h);
+                    setEditMin(m);
+                    setQuickEditRoutineId(r.id);
+                  }
+                  setPopover(null); 
+                }}>
+                  <Ionicons name="pencil" size={18} color={TEXT} style={{ marginRight: 10 }} />
+                  <Text style={{ fontSize: 15, color: TEXT, fontWeight: '600' }}>Düzenle</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', padding: 14 }} onPress={() => { deleteRoutine(popover.id); setPopover(null); }}>
+                  <Ionicons name="trash" size={18} color={RED} style={{ marginRight: 10 }} />
+                  <Text style={{ fontSize: 15, color: RED, fontWeight: '600' }}>Rutini Sil</Text>
+                </TouchableOpacity>
+              </View>
+            );
+          })()}
+        </Modal>
+      )}
+
+      {/* Quick Edit Modal */}
+      {quickEditRoutineId && (
+        <Modal transparent visible={true} animationType="slide" onRequestClose={() => setQuickEditRoutineId(null)}>
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
+            <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setQuickEditRoutineId(null)} activeOpacity={1} />
+            <View style={{ backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40, shadowColor: '#000', shadowOffset: { width: 0, height: -5 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 10 }}>
+              
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+                <Text style={{ fontSize: 20, fontWeight: '800', color: TEXT }}>Rutini Düzenle</Text>
+                <TouchableOpacity onPress={() => setQuickEditRoutineId(null)}>
+                  <Ionicons name="close-circle" size={24} color={TEXT3} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={{ marginBottom: 24 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: BORDER }}>
+                  <TextInput 
+                    style={{ flex: 1, fontSize: 22, fontWeight: '600', color: TEXT, paddingVertical: 12 }}
+                    value={editName}
+                    onChangeText={setEditName}
+                    placeholder="Başlık (örn: Sabah Koşusu)"
+                    placeholderTextColor={TEXT3}
+                  />
+                  {editName.length > 0 && (
+                    <TouchableOpacity onPress={() => setEditName('')}>
+                      <Ionicons name="close-circle" size={18} color={TEXT3} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+
+              <View style={{ marginBottom: 24 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start', borderBottomWidth: 1, borderBottomColor: BORDER }}>
+                  <TextInput 
+                    style={{ flex: 1, fontSize: 16, fontWeight: '400', color: TEXT, paddingVertical: 12, minHeight: 60, textAlignVertical: 'top' }}
+                    value={editDesc}
+                    onChangeText={setEditDesc}
+                    placeholder="Açıklama (opsiyonel)"
+                    placeholderTextColor={TEXT3}
+                    multiline
+                  />
+                  {editDesc.length > 0 && (
+                    <TouchableOpacity onPress={() => setEditDesc('')} style={{ marginTop: 14 }}>
+                      <Ionicons name="close-circle" size={18} color={TEXT3} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+
+              <View style={{ marginBottom: 32, marginHorizontal: -16 }}>
+                <TimeField 
+                  label=""
+                  hour={editHour}
+                  min={editMin}
+                  onTimeChange={(h: string, m: string) => {
+                    setEditHour(h);
+                    setEditMin(m);
+                  }}
+                />
+              </View>
+
+              <TouchableOpacity 
+                style={{ backgroundColor: RED, borderRadius: 8, paddingVertical: 14, alignItems: 'center' }}
+                activeOpacity={0.8}
+                onPress={() => {
+                  let h = parseInt(editHour || '0');
+                  let m = parseInt(editMin || '0');
+                  if (h > 23) h = 23;
+                  if (m > 59) m = 59;
+                  const formattedTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+
+                  updateRoutine(quickEditRoutineId, {
+                    name: editName.trim() || 'İsimsiz Rutin',
+                    description: editDesc.trim() || undefined,
+                    notificationTime: formattedTime
+                  });
+                  setQuickEditRoutineId(null);
+                }}
+              >
+                <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold' }}>Güncelle</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 }

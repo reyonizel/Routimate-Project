@@ -11,10 +11,14 @@ export default function RootLayout() {
     <GestureHandlerRootView style={styles.root}>
       <StatusBar style="dark" backgroundColor="#FFFFFF" translucent={false} />
       <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right', contentStyle: { backgroundColor: '#FFFFFF' } }}>
+        <Stack.Screen name="index" options={{ animation: 'none' }} />
         <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
         <Stack.Screen name="debug" />
         <Stack.Screen name="mate-profile" />
+        <Stack.Screen name="welcome" options={{ animation: 'fade' }} />
+        <Stack.Screen name="auth" options={{ animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="onboarding" options={{ animation: 'slide_from_right', gestureEnabled: false }} />
       </Stack>
     </GestureHandlerRootView>
   );

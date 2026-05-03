@@ -1,11 +1,14 @@
 import { Tabs } from 'expo-router';
-import { StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { StyleSheet, View, Image } from 'react-native';
+import { Ionicons, MaterialCommunityIcons, SimpleLineIcons } from '@expo/vector-icons';
+import Octicons from '@expo/vector-icons/Octicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useStore } from '../../store/useStore';
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
   const bottomInset = insets.bottom ?? 0;
+  const avatarUri = useStore(s => s.user.avatarUri);
 
   return (
     <Tabs
@@ -32,7 +35,7 @@ export default function TabsLayout() {
         name="index"
         options={{
           tabBarIcon: ({ focused }) => (
-            <Ionicons name={focused ? 'home' : 'home-outline'} size={25} color={focused ? '#111' : '#ABABAB'} />
+            <Octicons name="home" size={24} color={focused ? '#111' : '#ABABAB'} />
           ),
         }}
       />
@@ -40,7 +43,7 @@ export default function TabsLayout() {
         name="mate"
         options={{
           tabBarIcon: ({ focused }) => (
-            <Ionicons name={focused ? 'eye' : 'eye-outline'} size={25} color={focused ? '#111' : '#ABABAB'} />
+            <Ionicons name={focused ? 'people' : 'people-outline'} size={26} color={focused ? '#111' : '#ABABAB'} />
           ),
         }}
       />
@@ -48,11 +51,22 @@ export default function TabsLayout() {
         name="create"
         options={{
           tabBarIcon: ({ focused }) => (
-            <Ionicons
-              name={focused ? 'add-circle' : 'add-circle-outline'}
-              size={32}
-              color={focused ? '#E60023' : '#ABABAB'}
-            />
+            <View style={{
+              backgroundColor: '#E60023',
+              width: 44,
+              height: 32,
+              borderRadius: 10,
+              justifyContent: 'center',
+              alignItems: 'center',
+              opacity: focused ? 0.8 : 1
+            }}>
+              <Ionicons
+                name="add"
+                size={26}
+                color="#FFFFFF"
+                style={{ fontWeight: 'bold' }}
+              />
+            </View>
           ),
         }}
       />
@@ -60,7 +74,7 @@ export default function TabsLayout() {
         name="dm"
         options={{
           tabBarIcon: ({ focused }) => (
-            <Ionicons name={focused ? 'chatbubble-ellipses' : 'chatbubble-ellipses-outline'} size={24} color={focused ? '#111' : '#ABABAB'} />
+            <Ionicons name={focused ? 'chatbubble' : 'chatbubble-outline'} size={24} color={focused ? '#111' : '#ABABAB'} />
           ),
         }}
       />
@@ -68,7 +82,21 @@ export default function TabsLayout() {
         name="profile"
         options={{
           tabBarIcon: ({ focused }) => (
-            <Ionicons name={focused ? 'person-circle' : 'person-circle-outline'} size={26} color={focused ? '#111' : '#ABABAB'} />
+            avatarUri ? (
+              <Image 
+                source={{ uri: avatarUri }} 
+                style={{ 
+                  width: 26, 
+                  height: 26, 
+                  borderRadius: 13, 
+                  borderWidth: focused ? 2 : 0, 
+                  borderColor: '#111',
+                  opacity: focused ? 1 : 0.8 
+                }} 
+              />
+            ) : (
+              <Ionicons name={focused ? 'person-circle' : 'person-circle-outline'} size={28} color={focused ? '#111' : '#ABABAB'} />
+            )
           ),
         }}
       />
