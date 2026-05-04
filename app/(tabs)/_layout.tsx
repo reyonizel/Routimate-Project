@@ -43,7 +43,7 @@ export default function TabsLayout() {
         name="mate"
         options={{
           tabBarIcon: ({ focused }) => (
-            <Ionicons name={focused ? 'people' : 'people-outline'} size={26} color={focused ? '#111' : '#ABABAB'} />
+            <Ionicons name={focused ? 'search' : 'search-outline'} size={24} color={focused ? '#111' : '#ABABAB'} />
           ),
         }}
       />

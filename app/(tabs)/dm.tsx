@@ -7,6 +7,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { useStore } from '../../store/useStore';
+import { useRouter } from 'expo-router';
 
 const BG='#FFFFFF'; const CARD='#F4F4F4'; const SURFACE='#EEEEEE';
 const TEXT='#111111'; const TEXT2='#767676'; const TEXT3='#ABABAB';
@@ -83,7 +84,6 @@ const ANSWERS_NEG = [
 
 type QATab = 'ask' | 'answer';
 
-// Split array into pairs for 2-row horizontal layout
 function toPairs<T>(arr: T[]): [T, T | null][] {
   const pairs: [T, T | null][] = [];
   for (let i = 0; i < arr.length; i += 2) {
@@ -98,8 +98,7 @@ export default function DMScreen() {
   const messages    = useStore(s => s.messages);
   const sendMessage = useStore(s => s.sendMessage);
   const deleteMessage = useStore(s => s.deleteMessage);
-  const accent      = user.gender === 'female' ? '#e91e63' : '#3498db';
-  const mateAccent  = mate.gender === 'female' ? '#e91e63' : '#3498db';
+  const router      = useRouter();
 
   const [input, setInput] = useState('');
   const [tab, setTab]     = useState<QATab>('ask');
@@ -134,68 +133,25 @@ export default function DMScreen() {
     setTimeout(() => msgRef.current?.scrollToEnd({ animated: true }), 80);
   };
 
-  const handleLongPress = (m: typeof messages[0]) => {
-    Keyboard.dismiss();
-    if (!m.sentByMe) return;
-    const diff = Date.now() - new Date(m.timestamp).getTime();
-    if (diff <= 30000) {
-      setSheetConfig({
-        title: 'Mesajı Sil',
-        message: 'Bu mesajı silmek istiyor musun?',
-        options: [
-          { text: 'Mesajı Sil', destructive: true, onPress: () => deleteMessage(m.id) }
-        ]
-      });
-    } else {
-      setSheetConfig({
-        title: 'Süre Doldu',
-        message: 'Sadece ilk 30 saniye içinde gönderdiğiniz mesajları silebilirsiniz.',
-        options: []
-      });
-    }
-  };
+  if (!mate) {
+    return (
+      <SafeAreaView style={s.container}>
+        <View style={s.emptyChat}>
+          <View style={s.emptyIconCircle}>
+            <Ionicons name="chatbubbles-outline" size={48} color={TEXT3} />
+          </View>
+          <Text style={s.emptyTitle}>Henüz Bir Mate Bulamadın</Text>
+          <Text style={s.emptySub}>Mesajlaşmaya başlamak için keşfet sekmesinden kendine bir rutin arkadaşı bulmalısın.</Text>
+          <TouchableOpacity style={s.findBtn} onPress={() => router.push('/mate')}>
+            <Text style={s.findBtnTxt}>Rutinmate Bul</Text>
+            <Ionicons name="search" size={18} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
-  const handleUnmatch = () => {
-    setSheetConfig({
-      title: 'Eşleşme Bitirildi',
-      message: 'Bu kullanıcı ile iletişiminiz kesildi. Yeni bir RoutinMate bulmak için ana ekrana dönebilirsiniz.',
-      options: []
-    });
-  };
-
-  const confirmReport = () => {
-    setSheetConfig({
-      title: 'Şikayet Alındı',
-      message: 'Bildiriminiz moderasyon ekibine iletildi. Güvenliğiniz için bu kullanıcıyla eşleşmeyi bitirmek ister misiniz?',
-      options: [
-        { text: 'Eşleşmeyi Bitir', destructive: true, onPress: handleUnmatch }
-      ]
-    });
-  };
-
-  const handleReport = () => {
-    setSheetConfig({
-      title: 'Şikayet Nedeni',
-      message: 'Lütfen şikayet nedeninizi seçin:',
-      options: [
-        { text: 'Spam veya Reklam', onPress: confirmReport },
-        { text: 'Uygunsuz Dil / Davranış', onPress: confirmReport },
-        { text: 'Sahte veya Şüpheli Profil', onPress: confirmReport }
-      ]
-    });
-  };
-
-  const handleMateOptions = () => {
-    Keyboard.dismiss();
-    setSheetConfig({
-      title: 'Kullanıcı Seçenekleri',
-      message: `${mate.username} ile ilgili ne yapmak istiyorsun?`,
-      options: [
-        { text: 'Şikayet Et', onPress: handleReport },
-        { text: 'Eşleşmeyi Bitir / Engelle', destructive: true, onPress: handleUnmatch }
-      ]
-    });
-  };
+  const mateAccent  = mate.gender === 'female' ? '#e91e63' : '#3498db';
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
@@ -207,7 +163,7 @@ export default function DMScreen() {
       <View style={s.header}>
         <View style={[s.avatar, { overflow: 'hidden', borderWidth: 2, borderColor: mateAccent }]}>
           <Image 
-            source={{ uri: `https://i.pravatar.cc/150?u=${mate.username}` }} 
+            source={{ uri: mate.avatarUri || `https://i.pravatar.cc/150?u=${mate.username}` }} 
             style={{ width: '100%', height: '100%' }}
             blurRadius={user.isPro ? undefined : 12}
           />
@@ -219,13 +175,7 @@ export default function DMScreen() {
           </View>
         </View>
         {!user.isPro && (
-          <TouchableOpacity style={s.headerPro} activeOpacity={0.7} onPress={() => {
-            setSheetConfig({
-              title: 'Pro Özellik',
-              message: 'Serbest mesajlaşmak için Pro üyeliğe geçiş yapmalısın.',
-              options: []
-            });
-          }}>
+          <TouchableOpacity style={s.headerPro} activeOpacity={0.7} onPress={() => router.push('/modal')}>
             <View style={s.headerProTop}>
               <FontAwesome5 name="crown" size={10} color={RED} />
               <Text style={s.headerProTxt}>Pro'ya Geç</Text>
@@ -233,7 +183,7 @@ export default function DMScreen() {
             <Text style={s.headerProSub}>serbest mesajlaş</Text>
           </TouchableOpacity>
         )}
-        <TouchableOpacity style={{ marginLeft: 16, padding: 4 }} onPress={handleMateOptions} activeOpacity={0.6}>
+        <TouchableOpacity style={{ marginLeft: 16, padding: 4 }} onPress={() => Keyboard.dismiss()} activeOpacity={0.6}>
           <Ionicons name="ellipsis-vertical" size={20} color={TEXT2} />
         </TouchableOpacity>
       </View>
@@ -254,7 +204,7 @@ export default function DMScreen() {
               {!m.sentByMe && (
                 <View style={[s.bubbleAvatar, { overflow: 'hidden', borderWidth: 1.5, borderColor: mateAccent }]}>
                   <Image 
-                    source={{ uri: `https://i.pravatar.cc/150?u=${mate.username}` }} 
+                    source={{ uri: mate.avatarUri || `https://i.pravatar.cc/150?u=${mate.username}` }} 
                     style={{ width: '100%', height: '100%' }}
                     blurRadius={user.isPro ? undefined : 8}
                   />
@@ -263,8 +213,6 @@ export default function DMScreen() {
               <TouchableOpacity 
                 style={[s.bubble, m.sentByMe ? s.bubbleMine : s.bubbleMate]}
                 activeOpacity={m.sentByMe ? 0.7 : 1}
-                onLongPress={() => handleLongPress(m)}
-                delayLongPress={300}
               >
                 <Text style={[s.bubbleTxt, m.sentByMe && { color: '#fff' }]}>{m.text}</Text>
                 <Text style={[s.bubbleTime, m.sentByMe && { color: 'rgba(255,255,255,0.55)' }]}>{t}</Text>
@@ -278,8 +226,6 @@ export default function DMScreen() {
       {/* ─── Quick Reply Section (non-Pro) ─── */}
       {!user.isPro && (
         <View style={[s.quickWrap, { paddingBottom: isKeyboardVisible ? 8 : Math.max(insets.bottom, 12) }]}>
-
-          {/* Tab bar — elegant style */}
         <View style={s.tabs}>
           <Animated.View style={[s.tabIndicator, {
             width: tabWidth,
@@ -300,7 +246,6 @@ export default function DMScreen() {
           })}
         </View>
 
-        {/* 2-row horizontal chip carousel */}
         <ScrollView
           key={tab}
           horizontal
@@ -324,18 +269,10 @@ export default function DMScreen() {
               const neg = ANSWERS_NEG[idx];
               return (
                 <View key={`ans-${idx}`} style={s.chipCol}>
-                  <TouchableOpacity 
-                    style={[s.chip, { borderColor: '#C6F6D5', backgroundColor: '#F0FFF4' }]} 
-                    onPress={() => send(pos)} 
-                    activeOpacity={0.7}
-                  >
+                  <TouchableOpacity style={[s.chip, { borderColor: '#C6F6D5', backgroundColor: '#F0FFF4' }]} onPress={() => send(pos)} activeOpacity={0.7}>
                     <Text style={s.chipTxt} numberOfLines={2}>{pos}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[s.chip, { borderColor: '#FED7D7', backgroundColor: '#FFF5F5' }]} 
-                    onPress={() => send(neg)} 
-                    activeOpacity={0.7}
-                  >
+                  <TouchableOpacity style={[s.chip, { borderColor: '#FED7D7', backgroundColor: '#FFF5F5' }]} onPress={() => send(neg)} activeOpacity={0.7}>
                     <Text style={s.chipTxt} numberOfLines={2}>{neg}</Text>
                   </TouchableOpacity>
                 </View>
@@ -369,47 +306,16 @@ export default function DMScreen() {
         </View>
       )}
 
-      {/* Custom Bottom Action Sheet (RoutinMate Style) */}
       {sheetConfig && (
         <Modal transparent visible animationType="slide" onRequestClose={() => setSheetConfig(null)}>
           <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setSheetConfig(null)}>
             <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} />
           </TouchableOpacity>
-          <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#FFFFFF', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: 40, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 10 }}>
-            {/* Header */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-              <View style={{ flex: 1, paddingRight: 16 }}>
-                {sheetConfig.title && <Text style={{ fontSize: 18, fontWeight: 'bold', color: TEXT }}>{sheetConfig.title}</Text>}
-                {sheetConfig.message && <Text style={{ fontSize: 13, color: TEXT2, marginTop: 4 }}>{sheetConfig.message}</Text>}
-              </View>
-              <TouchableOpacity onPress={() => setSheetConfig(null)} style={{ padding: 4 }}>
-                <Ionicons name="close" size={24} color={TEXT} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Options */}
-            <View>
-              {sheetConfig.options.map((opt, i) => (
-                <TouchableOpacity 
-                  key={i} 
-                  style={{ 
-                    paddingVertical: 14, 
-                    borderBottomWidth: i === sheetConfig.options.length - 1 ? 0 : 1.5, 
-                    borderBottomColor: BORDER,
-                    flexDirection: 'row',
-                    alignItems: 'center'
-                  }}
-                  onPress={() => { setSheetConfig(null); setTimeout(() => { if (opt.onPress) opt.onPress(); }, 100); }}
-                  activeOpacity={0.7}
-                >
-                  <Text style={{ fontSize: 16, color: opt.destructive ? RED : TEXT, fontWeight: '600' }}>{opt.text}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+          <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#FFFFFF', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: 40 }}>
+            {/* Options would go here */}
           </View>
         </Modal>
       )}
-
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -417,20 +323,23 @@ export default function DMScreen() {
 
 const s = StyleSheet.create({
   container:   { flex: 1, backgroundColor: BG },
+  emptyChat: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40 },
+  emptyIconCircle: { width: 100, height: 100, borderRadius: 50, backgroundColor: CARD, justifyContent: 'center', alignItems: 'center', marginBottom: 24 },
+  emptyTitle: { fontSize: 20, fontWeight: '900', color: TEXT, textAlign: 'center' },
+  emptySub: { fontSize: 14, color: TEXT2, textAlign: 'center', marginTop: 12, lineHeight: 20 },
+  findBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: RED, paddingHorizontal: 24, paddingVertical: 14, borderRadius: 16, marginTop: 32 },
+  findBtnTxt: { color: '#fff', fontSize: 15, fontWeight: '800' },
 
   header:      { flexDirection:'row', alignItems:'center', gap:12, paddingHorizontal:16, paddingVertical:12, borderBottomWidth:0.5, borderBottomColor:BORDER },
   avatar:      { width:44, height:44, borderRadius:22, alignItems:'center', justifyContent:'center', backgroundColor:SURFACE },
-  avatarLetter:{ fontSize:18, fontWeight:'900' },
   mateName:    { fontSize:16, color:TEXT, fontWeight:'700' },
   onlineRow:   { flexDirection:'row', alignItems:'center', gap:5, marginTop:2 },
   dot:         { width:6, height:6, borderRadius:3, backgroundColor:'#008800' },
   onlineTxt:   { fontSize:12, color:TEXT2, fontWeight:'500' },
-
   headerPro:   { alignItems:'flex-end', justifyContent:'center', paddingLeft:8 },
   headerProTop:{ flexDirection:'row', alignItems:'center', gap:4 },
   headerProTxt:{ fontSize:12, color:RED, fontWeight:'800' },
   headerProSub:{ fontSize:9, color:TEXT3, marginTop:2, fontWeight:'600' },
-
   messages:    { flex:1, paddingHorizontal:14 },
   datePill:    { alignItems:'center', paddingVertical:16 },
   dateTxt:     { fontSize:11, color:TEXT3, fontWeight:'600' },
@@ -441,33 +350,16 @@ const s = StyleSheet.create({
   bubbleMate:  { backgroundColor:CARD },
   bubbleTxt:   { fontSize:14, color:TEXT, lineHeight:19 },
   bubbleTime:  { fontSize:10, color:TEXT3, marginTop:4, alignSelf:'flex-end' },
-
-  // Quick section
-  quickWrap: { 
-    paddingTop: 0, 
-    backgroundColor: BG,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -6 },
-    shadowOpacity: 0.09,
-    shadowRadius: 12,
-    elevation: 15,
-    borderTopWidth: 0,
-  },
-
-  // Tabs
+  quickWrap: { paddingTop: 0, backgroundColor: BG, shadowColor: '#000', shadowOffset: { width: 0, height: -6 }, shadowOpacity: 0.09, shadowRadius: 12, elevation: 15, borderTopWidth: 0 },
   tabs:        { flexDirection:'row', borderBottomWidth:0.5, borderBottomColor:BORDER, marginBottom:8, position:'relative' },
   tabIndicator:{ position:'absolute', bottom:-0.5, left:0, height:2, backgroundColor:TEXT },
   tab:         { flex:1, paddingVertical:8, alignItems:'center' },
   tabText:     { fontSize:12, color:TEXT2, fontWeight:'500' },
   tabTextActive:{ color:TEXT, fontWeight:'700' },
-
-  // 2-row chip scroll
   chipScroll:  { paddingLeft:14, paddingRight:8, paddingBottom:12, gap:8 },
   chipCol:     { gap:8, flexDirection:'column', maxWidth:200 },
   chip:        { borderRadius:14, backgroundColor:'#FFF5F6', borderWidth:1, borderColor:'#FFE0E5', paddingHorizontal:12, paddingVertical:8, maxWidth:200 },
   chipTxt:     { fontSize:12, fontWeight:'500', lineHeight:16, color:TEXT },
-
-  // Input
   inputBar:   { flexDirection:'row', alignItems:'center', gap:10, paddingHorizontal:16, paddingVertical:12, borderTopWidth:0.5, borderTopColor:BORDER, backgroundColor: BG },
   textInput:  { flex:1, backgroundColor:CARD, borderRadius:24, paddingHorizontal:20, paddingTop:12, paddingBottom:12, fontSize:15, color:TEXT, maxHeight:120, minHeight:48, borderWidth: 1, borderColor: 'transparent' },
   sendBtn:    { width:48, height:48, borderRadius:24, backgroundColor:SURFACE, alignItems:'center', justifyContent:'center' },

@@ -38,11 +38,11 @@ export interface User {
   gender: Gender;
   avatarUri: string | null;
   isPro: boolean;
-  interests?: string[];
+  interests: string[];
   routines: Routine[];
   photos: Photo[];
   achievementScore: number;
-  matchedSince: string;
+  matchedSince: string | null;
   restDays: string[]; // ISO date strings marked as rest days
 }
 
@@ -51,16 +51,33 @@ export interface Mate {
   username: string;
   gender: Gender;
   avatarUri: string | null;
+  interests: string[];
   routines: Routine[];
   photos: Photo[];
   achievementScore: number;
 }
 
+export interface MatchRequest {
+  id: string;
+  fromUser: {
+    id: string;
+    username: string;
+    avatarUri: string | null;
+    interests: string[];
+    achievementScore: number;
+    gender: Gender;
+  };
+  timestamp: string;
+}
+
 interface AppState {
   user: User;
-  mate: Mate;
+  mate: Mate | null;
   messages: Message[];
   isLoggedIn: boolean;
+  discoveryUsers: Mate[];
+  matchRequests: MatchRequest[];
+  sentMatchRequests: string[]; // IDs of users we sent requests to
 
   // Actions
   toggleRoutineComplete: (routineId: string, date: string) => void;
@@ -75,46 +92,62 @@ interface AppState {
   pinPhoto: (id: string) => void;
   sendMessage: (text: string) => void;
   deleteMessage: (id: string) => void;
-  forceNewMatch: () => void;
-  generateMockStats: () => void;
-  toggleRestDay: (date: string) => void;
   setLoggedIn: (value: boolean) => void;
+  
+  // Discovery & Matching
+  sendMatchRequest: (targetUser: Mate) => void;
+  acceptMatchRequest: (request: MatchRequest) => void;
+  rejectMatchRequest: (requestId: string) => void;
+  unmatch: () => void;
 }
 
-const MOCK_MATE: Mate = {
-  id: 'mate-1',
-  username: 'alex_fit',
-  gender: 'male',
-  avatarUri: null,
-  achievementScore: 82,
-  routines: [
-    {
-      id: 'r-m-1',
-      name: '5 km Morning Run',
-      frequency: 'daily',
-      notificationTime: '07:00',
-      completedDates: [new Date().toISOString().split('T')[0]],
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'r-m-2',
-      name: 'Cold Shower',
-      frequency: 'daily',
-      notificationTime: '07:30',
-      completedDates: [],
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'r-m-3',
-      name: 'Read 30 min',
-      frequency: 'daily',
-      notificationTime: '22:00',
-      completedDates: [new Date().toISOString().split('T')[0]],
-      createdAt: new Date().toISOString(),
-    },
-  ],
-  photos: [],
-};
+const MOCK_DISCOVERY: Mate[] = [
+  {
+    id: 'd-1',
+    username: 'selin_yoga',
+    gender: 'female',
+    avatarUri: 'https://i.pravatar.cc/150?u=selin_yoga',
+    interests: ['Spor', 'Meditasyon', 'Kitap'],
+    achievementScore: 88,
+    routines: [], photos: []
+  },
+  {
+    id: 'd-2',
+    username: 'can_kod',
+    gender: 'male',
+    avatarUri: 'https://i.pravatar.cc/150?u=can_kod',
+    interests: ['Yazılım', 'Girişimcilik', 'Müzik'],
+    achievementScore: 92,
+    routines: [], photos: []
+  },
+  {
+    id: 'd-3',
+    username: 'ayse_fit',
+    gender: 'female',
+    avatarUri: 'https://i.pravatar.cc/150?u=ayse_fit',
+    interests: ['Spor', 'Beslenme', 'Yürüyüş'],
+    achievementScore: 75,
+    routines: [], photos: []
+  },
+  {
+    id: 'd-4',
+    username: 'mert_travel',
+    gender: 'male',
+    avatarUri: 'https://i.pravatar.cc/150?u=mert_travel',
+    interests: ['Seyahat', 'Sanat', 'Tasarım'],
+    achievementScore: 64,
+    routines: [], photos: []
+  },
+  {
+    id: 'd-5',
+    username: 'dilara_edu',
+    gender: 'female',
+    avatarUri: 'https://i.pravatar.cc/150?u=dilara_edu',
+    interests: ['Dil Öğrenimi', 'Kitap', 'Yazılım'],
+    achievementScore: 81,
+    routines: [], photos: []
+  }
+];
 
 const INITIAL_USER: User = {
   id: 'user-1',
@@ -122,9 +155,9 @@ const INITIAL_USER: User = {
   gender: 'male',
   avatarUri: null,
   isPro: false,
-  interests: [],
+  interests: ['Yazılım', 'Spor', 'Kitap'],
   achievementScore: 74,
-  matchedSince: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+  matchedSince: null,
   routines: [
     {
       id: 'r-1',
@@ -142,47 +175,32 @@ const INITIAL_USER: User = {
       completedDates: [],
       createdAt: new Date().toISOString(),
     },
-    {
-      id: 'r-3',
-      name: 'Read 20 pages',
-      frequency: 'daily',
-      notificationTime: '21:00',
-      completedDates: [new Date().toISOString().split('T')[0]],
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'r-4',
-      name: 'Weekly Review',
-      frequency: 'weekly',
-      notificationTime: '18:00',
-      completedDates: [],
-      createdAt: new Date().toISOString(),
-    },
   ],
   photos: [],
   restDays: [],
 };
 
-const INITIAL_MESSAGES: Message[] = [
-  {
-    id: 'm-1',
-    text: 'Bugün rutinlerini tamamladın mı? 👀',
-    sentByMe: false,
-    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'm-2',
-    text: 'Harika gidiyorsun, devam et!',
-    sentByMe: true,
-    timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
-  },
-];
-
 export const useStore = create<AppState>((set, get) => ({
   user: INITIAL_USER,
-  mate: MOCK_MATE,
-  messages: INITIAL_MESSAGES,
+  mate: null,
+  messages: [],
   isLoggedIn: false,
+  discoveryUsers: MOCK_DISCOVERY,
+  matchRequests: [
+    {
+      id: 'req-1',
+      fromUser: {
+        id: 'd-5',
+        username: 'dilara_edu',
+        avatarUri: 'https://i.pravatar.cc/150?u=dilara_edu',
+        interests: ['Dil Öğrenimi', 'Kitap', 'Yazılım'],
+        achievementScore: 81,
+        gender: 'female'
+      },
+      timestamp: new Date().toISOString()
+    }
+  ],
+  sentMatchRequests: [],
 
   toggleRoutineComplete: (routineId, date) => {
     set((state) => ({
@@ -279,7 +297,7 @@ export const useStore = create<AppState>((set, get) => ({
     });
   },
 
-  sendMessage: (text) => {
+  sendMessage: (text: string) => {
     const msg: Message = {
       id: Date.now().toString(), text, sentByMe: true,
       timestamp: new Date().toISOString(),
@@ -287,13 +305,13 @@ export const useStore = create<AppState>((set, get) => ({
     set((state) => ({ messages: [...state.messages, msg] }));
   },
 
-  deleteMessage: (id) => {
+  deleteMessage: (id: string) => {
     set((state) => ({
       messages: state.messages.filter((m) => m.id !== id),
     }));
   },
 
-  toggleRestDay: (date) => {
+  toggleRestDay: (date: string) => {
     set((state) => {
       const already = state.user.restDays.includes(date);
       return {
@@ -307,61 +325,52 @@ export const useStore = create<AppState>((set, get) => ({
     });
   },
 
-  forceNewMatch: () => {
-    const newMate: Mate = {
-      id: `mate-${Date.now()}`,
-      username: `user_${Math.floor(Math.random() * 9999)}`,
-      gender: Math.random() > 0.5 ? 'male' : 'female',
-      avatarUri: null,
-      achievementScore: Math.floor(Math.random() * 100),
-      routines: [
-        {
-          id: `r-new-1`,
-          name: 'New Routine 1',
-          frequency: 'daily',
-          notificationTime: '08:00',
-          completedDates: [],
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: `r-new-2`,
-          name: 'New Routine 2',
-          frequency: 'weekly',
-          notificationTime: '19:00',
-          completedDates: [],
-          createdAt: new Date().toISOString(),
-        },
-      ],
-      photos: [],
-    };
-    set({
-      mate: newMate,
-      messages: [],
-      user: {
-        ...get().user,
-        matchedSince: new Date().toISOString(),
-      },
-    });
-  },
+  setLoggedIn: (value: boolean) => set({ isLoggedIn: value }),
 
-  generateMockStats: () => {
-    const today = new Date();
-    const routines = get().user.routines.map((r) => {
-      const dates: string[] = [];
-      for (let i = 0; i < 30; i++) {
-        if (Math.random() > 0.35) {
-          const d = new Date(today);
-          d.setDate(d.getDate() - i);
-          dates.push(d.toISOString().split('T')[0]);
-        }
-      }
-      return { ...r, completedDates: dates };
-    });
-    const score = Math.floor(Math.random() * 30) + 60;
+  // Discovery & Matching
+  sendMatchRequest: (targetUser: Mate) => {
     set((state) => ({
-      user: { ...state.user, routines, achievementScore: score },
+      sentMatchRequests: [...state.sentMatchRequests, targetUser.id]
     }));
   },
 
-  setLoggedIn: (value) => set({ isLoggedIn: value }),
+  acceptMatchRequest: (request: MatchRequest) => {
+    const newMate: Mate = {
+      id: request.fromUser.id,
+      username: request.fromUser.username,
+      avatarUri: request.fromUser.avatarUri,
+      gender: request.fromUser.gender,
+      interests: request.fromUser.interests,
+      achievementScore: request.fromUser.achievementScore,
+      routines: [],
+      photos: []
+    };
+    set((state) => ({
+      mate: newMate,
+      user: { ...state.user, matchedSince: new Date().toISOString() },
+      matchRequests: state.matchRequests.filter(r => r.id !== request.id),
+      messages: [
+        {
+          id: 'initial',
+          text: `🎉 ${request.fromUser.username} ile eşleştin! Rutin yolculuğunuz başlıyor.`,
+          sentByMe: false,
+          timestamp: new Date().toISOString()
+        }
+      ]
+    }));
+  },
+
+  rejectMatchRequest: (requestId: string) => {
+    set((state) => ({
+      matchRequests: state.matchRequests.filter(r => r.id !== requestId)
+    }));
+  },
+
+  unmatch: () => {
+    set((state) => ({
+      mate: null,
+      messages: [],
+      user: { ...state.user, matchedSince: null }
+    }));
+  }
 }));
