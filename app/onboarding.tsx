@@ -8,9 +8,10 @@ import { useRouter } from 'expo-router';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useStore } from '../store/useStore';
+import LocationSearch, { LocationResult } from '../components/LocationSearch';
 
 const { width } = Dimensions.get('window');
-const RED = '#E60023';
+const RED = '#00bf63';
 const TEXT = '#111111'; const TEXT2 = '#767676'; const TEXT3 = '#ABABAB';
 const BORDER = '#EFEFEF'; const CARD = '#F8F8F8'; const BG = '#FFFFFF';
 
@@ -39,6 +40,7 @@ export default function OnboardingScreen() {
   const [gender, setGender]       = useState<'male' | 'female' | null>(null);
   const [age, setAge]             = useState('');
   const [location, setLocation]   = useState('');
+  const [locationData, setLocationData] = useState<LocationResult | null>(null);
   const [interests, setInterests] = useState<string[]>([]);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [username, setUsername]   = useState('');
@@ -78,7 +80,7 @@ export default function OnboardingScreen() {
   const handleNext = () => {
     if (step === 0 && !gender) return Alert.alert('', 'Lütfen bir cinsiyet seç.');
     if (step === 1 && (!age || isNaN(Number(age)) || Number(age) < 13)) return Alert.alert('', 'Lütfen geçerli bir yaş gir (En az 13).');
-    if (step === 2 && location.trim().length < 2) return Alert.alert('', 'Lütfen geçerli bir konum gir.');
+    if (step === 2 && location.trim().length > 0 && location.trim().length < 2) return Alert.alert('', 'Lütfen geçerli bir konum gir.');
     if (step === 3 && interests.length === 0) return Alert.alert('', 'Lütfen en az bir ilgi alanı seç.');
     if (step === 5 && username.trim().length < 3) return Alert.alert('', 'Kullanıcı adı en az 3 karakter olmalı.');
 
@@ -93,13 +95,15 @@ export default function OnboardingScreen() {
         const birthYear = currentYear - Number(age);
         const birthDate = `${birthYear}-01-01`; // Simplified date 
 
-        updateUser({ 
-          gender: gender!, 
+        updateUser({
+          gender: gender!,
           birthDate,
-          locationName: location.trim(),
+          locationName: (locationData?.label ?? location.trim()) || undefined,
+          locationLat: locationData?.lat,
+          locationLon: locationData?.lon,
           interests,
-          avatarUri, 
-          username: username.trim() 
+          avatarUri,
+          username: username.trim()
         });
         setLoggedIn(true);
         router.replace('/(tabs)');
@@ -166,6 +170,7 @@ export default function OnboardingScreen() {
 
                 <View style={s.genderRow}>
                   <TouchableOpacity
+                    testID="gender-male-card"
                     style={[s.genderCard, gender === 'male' && s.genderCardActive, gender === 'male' && { borderColor: '#3498db' }]}
                     onPress={() => setGender('male')}
                     activeOpacity={0.8}
@@ -182,6 +187,7 @@ export default function OnboardingScreen() {
                   </TouchableOpacity>
 
                   <TouchableOpacity
+                    testID="gender-female-card"
                     style={[s.genderCard, gender === 'female' && s.genderCardActive, gender === 'female' && { borderColor: '#e91e63' }]}
                     onPress={() => setGender('female')}
                     activeOpacity={0.8}
@@ -208,6 +214,8 @@ export default function OnboardingScreen() {
 
                 <View style={[s.inputWrap, { borderColor: age ? accent : BORDER }]}>
                   <TextInput
+                    testID="onboarding-age-input"
+                    nativeID="onboarding-age-input"
                     style={s.bigInput}
                     placeholder="24"
                     placeholderTextColor={TEXT3}
@@ -226,20 +234,17 @@ export default function OnboardingScreen() {
             {step === 2 && (
               <View style={s.stepWrap}>
                 <Text style={s.stepTitle}>Neredensin?</Text>
-                <Text style={s.stepSub}>Yakınlarındaki benzer hedefleri olan mate'leri bul.</Text>
+                <Text style={s.stepSub}>Yakınlarındaki benzer hedefleri olan mate'leri bul. (İsteğe bağlı)</Text>
 
-                <View style={[s.inputWrap, { borderColor: location.length > 2 ? accent : BORDER }]}>
-                  <Ionicons name="location" size={24} color={location ? accent : TEXT3} style={{ marginRight: 10 }} />
-                  <TextInput
-                    style={s.textInput}
-                    placeholder="Şehir, Ülke (Örn: İstanbul, TR)"
-                    placeholderTextColor={TEXT3}
-                    value={location}
-                    onChangeText={setLocation}
-                    autoCapitalize="words"
-                    autoFocus
-                  />
-                </View>
+                <LocationSearch
+                  value={location}
+                  accentColor={accent}
+                  placeholder="Şehir ara... (örn: İstanbul)"
+                  onSelect={result => {
+                    setLocation(result.label);
+                    setLocationData(result);
+                  }}
+                />
               </View>
             )}
 
@@ -306,6 +311,8 @@ export default function OnboardingScreen() {
                 <View style={[s.usernameWrap, { borderColor: username.length >= 3 ? accent : BORDER }]}>
                   <Text style={[s.usernameAt, { color: accent }]}>@</Text>
                   <TextInput
+                    testID="onboarding-username-input"
+                    nativeID="onboarding-username-input"
                     style={s.usernameInput}
                     placeholder="kullanici_adi"
                     placeholderTextColor={TEXT3}
@@ -353,6 +360,7 @@ export default function OnboardingScreen() {
               </TouchableOpacity>
             )}
             <TouchableOpacity
+              testID="onboarding-next-btn"
               style={[s.nextBtn, { backgroundColor: accent, flex: 1 }]}
               onPress={handleNext}
               activeOpacity={0.85}

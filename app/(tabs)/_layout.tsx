@@ -1,4 +1,4 @@
-import { Tabs } from 'expo-router';
+﻿import { Tabs } from 'expo-router';
 import { StyleSheet, View, Image } from 'react-native';
 import { Ionicons, MaterialCommunityIcons, SimpleLineIcons } from '@expo/vector-icons';
 import Octicons from '@expo/vector-icons/Octicons';
@@ -49,24 +49,13 @@ export default function TabsLayout() {
       />
       <Tabs.Screen
         name="create"
+        options={{ href: null }}
+      />
+      <Tabs.Screen
+        name="store"
         options={{
           tabBarIcon: ({ focused }) => (
-            <View style={{
-              backgroundColor: '#E60023',
-              width: 44,
-              height: 32,
-              borderRadius: 10,
-              justifyContent: 'center',
-              alignItems: 'center',
-              opacity: focused ? 0.8 : 1
-            }}>
-              <Ionicons
-                name="add"
-                size={26}
-                color="#FFFFFF"
-                style={{ fontWeight: 'bold' }}
-              />
-            </View>
+            <Ionicons name={focused ? 'storefront' : 'storefront-outline'} size={24} color={focused ? '#111' : '#ABABAB'} />
           ),
         }}
       />

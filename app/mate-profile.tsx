@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Dimensions, Image, Alert,
+  Dimensions, Alert,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
@@ -17,13 +18,29 @@ const NAVBAR_H = 56; // approximate navbar height
 
 const BG = '#FFFFFF'; const CARD = '#F4F4F4'; const SURFACE = '#EEEEEE';
 const TEXT = '#111111'; const TEXT2 = '#767676'; const TEXT3 = '#ABABAB';
-const RED = '#E60023'; const GREEN = '#008800'; const GOLD = '#D4860A';
+const RED = '#00bf63'; const GREEN = '#008800'; const GOLD = '#D4860A';
 const BORDER = '#E8E8E8'; const PILL = 999;
 
 export default function MateProfileScreen() {
   const router = useRouter();
   const user = useStore((s) => s.user);
   const mate = useStore((s) => s.mate);
+
+  if (!mate) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.navbar}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={20} color={TEXT} />
+          </TouchableOpacity>
+        </View>
+        <View style={{flex: 1, alignItems: 'center', justifyContent: 'center'}}>
+          <Text style={{color: TEXT2}}>Mate bulunamadı</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   const accentColor = mate.gender === 'female' ? '#e91e63' : '#3498db';
   const completedToday = mate.routines.filter((r) => r.completedDates.includes(today)).length;
 
@@ -56,10 +73,10 @@ export default function MateProfileScreen() {
             <View style={styles.avatarWrap}>
               <View style={[styles.avatarRing, { borderColor: accentColor }]}>
                 {mate.avatarUri
-                  ? <Image source={{ uri: mate.avatarUri }} style={styles.avatarImage} />
+                  ? <Image source={{ uri: mate.avatarUri }} style={styles.avatarImage} contentFit="cover" cachePolicy="memory-disk" />
                   : (
                     <View style={styles.avatarInner}>
-                      <Text style={[styles.avatarLetter, { color: accentColor }]}>{mate.username[0].toUpperCase()}</Text>
+                      <Text style={[styles.avatarLetter, { color: accentColor }]}>{(mate.username || '?')[0].toUpperCase()}</Text>
                     </View>
                   )
                 }
@@ -133,7 +150,7 @@ export default function MateProfileScreen() {
                 ? <Text style={styles.emptyMsg}>Henüz fotoğraf paylaşılmadı</Text>
                 : mate.photos.map((p, i) => (
                   <View key={i} style={styles.photoCell}>
-                    <Image source={{ uri: p.uri }} style={styles.photoImage} resizeMode="cover" />
+                    <Image source={{ uri: p.uri }} style={styles.photoImage} contentFit="cover" />
                   </View>
                 ))
               }

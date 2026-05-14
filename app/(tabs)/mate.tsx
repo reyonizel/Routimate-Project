@@ -1,5 +1,6 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Dimensions } from 'react-native';
+﻿import React from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
@@ -39,8 +40,44 @@ const CircularProgress = ({ size = 72, strokeWidth = 5, progress = 0, color = '#
 const today = new Date().toISOString().split('T')[0];
 const BG='#FFFFFF'; const CARD='#F4F4F4'; const SURFACE='#EEEEEE';
 const TEXT='#111111'; const TEXT2='#767676'; const TEXT3='#ABABAB';
-const RED='#E60023'; const GREEN='#008800'; const GOLD='#D4860A';
+const RED='#00bf63'; const GREEN='#008800'; const GOLD='#D4860A';
 const BORDER='#E8E8E8'; const PILL=999;
+
+const INTEREST_ICON: Record<string, React.ComponentProps<typeof Ionicons>['name']> = {
+  'Yoga':        'body-outline',
+  'Meditasyon':  'leaf-outline',
+  'Koşu':        'footsteps-outline',
+  'Fitness':     'barbell-outline',
+  'Soğuk Duş':   'water-outline',
+  'Kitap':       'book-outline',
+  'Pilates':     'fitness-outline',
+  'Beslenme':    'nutrition-outline',
+  'Uyku':        'moon-outline',
+  'Bisiklet':    'bicycle-outline',
+  'Müzik':       'musical-notes-outline',
+  'Yazarlık':    'pencil-outline',
+  'Spor':        'basketball-outline',
+};
+
+const MOCK_DISCOVERY: Mate[] = [
+  { id: 'm1', username: 'ayse_kaya',    fullName: 'Ayşe',   gender: 'female', avatarUri: 'https://i.pravatar.cc/150?img=47', interests: ['Yoga', 'Meditasyon', 'Koşu'],     routines: [], photos: [], achievementScore: 89 },
+  { id: 'm2', username: 'mehmet_demir', fullName: 'Mehmet', gender: 'male',   avatarUri: 'https://i.pravatar.cc/150?img=12', interests: ['Fitness', 'Soğuk Duş', 'Kitap'],  routines: [], photos: [], achievementScore: 76 },
+  { id: 'm3', username: 'zeynep_ar',    fullName: 'Zeynep', gender: 'female', avatarUri: 'https://i.pravatar.cc/150?img=32', interests: ['Pilates', 'Beslenme', 'Uyku'],    routines: [], photos: [], achievementScore: 92 },
+  { id: 'm4', username: 'can_yildiz',   fullName: 'Can',    gender: 'male',   avatarUri: 'https://i.pravatar.cc/150?img=53', interests: ['Koşu', 'Bisiklet', 'Müzik'],      routines: [], photos: [], achievementScore: 68 },
+  { id: 'm5', username: 'elif_sahin',   fullName: 'Elif',   gender: 'female', avatarUri: 'https://i.pravatar.cc/150?img=44', interests: ['Meditasyon', 'Yoga', 'Yazarlık'], routines: [], photos: [], achievementScore: 81 },
+  { id: 'm6', username: 'emre_celik',   fullName: 'Emre',   gender: 'male',   avatarUri: 'https://i.pravatar.cc/150?img=8',  interests: ['Spor', 'Beslenme', 'Uyku'],       routines: [], photos: [], achievementScore: 73 },
+];
+
+const MOCK_REQUESTS: MatchRequest[] = [
+  {
+    id: 'req1',
+    fromUser: {
+      id: 'r1', username: 'berkay_y', avatarUri: 'https://i.pravatar.cc/150?img=15',
+      interests: ['Koşu', 'Meditasyon'], achievementScore: 84, gender: 'male',
+    },
+    timestamp: new Date().toISOString(),
+  },
+];
 
 export default function MateScreen() {
   const user = useStore(s => s.user);
@@ -49,7 +86,8 @@ export default function MateScreen() {
   const matchRequests = useStore(s => s.matchRequests);
   const sentRequests = useStore(s => s.sentMatchRequests);
   
-  const sendMatchRequest = useStore(s => s.sendMatchRequest);
+  const sendMatchRequest   = useStore(s => s.sendMatchRequest);
+  const cancelMatchRequest = useStore(s => s.cancelMatchRequest);
   const acceptMatchRequest = useStore(s => s.acceptMatchRequest);
   const rejectMatchRequest = useStore(s => s.rejectMatchRequest);
 
@@ -61,7 +99,10 @@ export default function MateScreen() {
     return common.length;
   };
 
-  const sortedDiscovery = [...discoveryUsers]
+  const effectiveDiscovery = discoveryUsers.length > 0 ? discoveryUsers : MOCK_DISCOVERY;
+  const effectiveRequests  = matchRequests.length > 0  ? matchRequests  : MOCK_REQUESTS;
+
+  const sortedDiscovery = [...effectiveDiscovery]
     .filter(u => u.id !== user.id)
     .sort((a, b) => calculateSimilarity(b) - calculateSimilarity(a));
 
@@ -82,7 +123,7 @@ export default function MateScreen() {
           <View style={s.mateTop}>
             <View style={[s.avatar, {borderColor: accent}]}>
               {user.isPro
-                ? <Image source={{ uri: mate.avatarUri || '' }} style={{ width: '100%', height: '100%', borderRadius: PILL }} />
+                ? <Image source={{ uri: mate.avatarUri || '' }} style={{ width: '100%', height: '100%', borderRadius: PILL }} contentFit="cover" cachePolicy="memory-disk" />
                 : <Ionicons name="lock-closed" size={20} color={TEXT3} />}
             </View>
             <View style={{flex:1}}>
@@ -150,30 +191,32 @@ export default function MateScreen() {
   const renderDiscovery = () => {
     return (
       <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={s.header}>
-          <Text style={s.title}>Keşfet</Text>
-          <Text style={s.subTitle}>Sana en uygun rutin arkadaşını bul</Text>
-        </View>
+        <View style={{ height: 16 }} />
 
-        {matchRequests.length > 0 && (
+        {effectiveRequests.length > 0 && (
           <View style={s.requestSection}>
             <Text style={s.sectionHeaderDiscovery}>Eşleşme İstekleri</Text>
-            {matchRequests.map(req => (
-              <View key={req.id} style={s.requestCard}>
-                <Image source={{ uri: req.fromUser.avatarUri || '' }} style={s.reqAvatar} />
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={s.reqText}><Text style={{ fontWeight: '800' }}>{req.fromUser.username}</Text> seninle eşleşmek istiyor.</Text>
-                  <View style={s.reqBtnRow}>
-                    <TouchableOpacity style={[s.reqBtn, s.acceptBtn]} onPress={() => acceptMatchRequest(req)}>
-                      <Text style={s.acceptBtnTxt}>Kabul Et</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[s.reqBtn, s.rejectBtn]} onPress={() => rejectMatchRequest(req.id)}>
-                      <Text style={s.rejectBtnTxt}>Reddet</Text>
-                    </TouchableOpacity>
+            {effectiveRequests.map(req => {
+              const reqAccent = req.fromUser.gender === 'female' ? '#e91e63' : '#3498db';
+              return (
+                <View key={req.id} style={s.requestCard}>
+                  <View style={[s.reqAvatarWrap, { borderColor: reqAccent }]}>
+                    <Image source={{ uri: req.fromUser.avatarUri || '' }} style={s.reqAvatar} contentFit="cover" cachePolicy="memory-disk" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.reqText}><Text style={{ fontWeight: '800' }}>{req.fromUser.username}</Text> seninle eşleşmek istiyor.</Text>
+                    <View style={s.reqBtnRow}>
+                      <TouchableOpacity style={[s.reqBtn, s.acceptBtn]} onPress={() => acceptMatchRequest(req)}>
+                        <Text style={s.acceptBtnTxt}>Kabul Et</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={[s.reqBtn, s.rejectBtn]} onPress={() => rejectMatchRequest(req.id)}>
+                        <Text style={s.rejectBtnTxt}>Reddet</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
         )}
 
@@ -183,31 +226,61 @@ export default function MateScreen() {
             const isSent = sentRequests.includes(item.id);
             const similarity = calculateSimilarity(item);
             const accentColor = item.gender === 'female' ? '#e91e63' : '#3498db';
+            const compat = Math.min(70 + similarity * 10, 99);
+            const displayName = item.fullName ?? item.username;
 
             return (
               <View key={item.id} style={s.discoveryCard}>
-                <Image source={{ uri: item.avatarUri || '' }} style={s.discoveryAvatar} />
-                <View style={{ flex: 1, marginLeft: 16 }}>
+                {/* Avatar — blurred, gender border */}
+                <View style={[s.discoveryAvatarWrap, { borderColor: accentColor }]}>
+                  <Image
+                    source={{ uri: item.avatarUri || '' }}
+                    style={s.discoveryAvatar}
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
+                    blurRadius={6}
+                  />
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  {/* Name + compat */}
                   <View style={s.discoveryTopRow}>
-                    <Text style={s.discoveryName}>@{item.username}</Text>
-                    <View style={[s.similarityPill, { backgroundColor: accentColor + '15' }]}>
-                      <Text style={[s.similarityTxt, { color: accentColor }]}>%{70 + similarity * 10} Uyum</Text>
+                    <Text style={s.discoveryName}>{displayName}</Text>
+                    <View style={s.similarityPill}>
+                      <Text style={s.similarityTxt}>%{compat} uyum</Text>
                     </View>
                   </View>
-                  <Text style={s.discoveryInterests}>{item.interests.slice(0, 3).join(' · ')}</Text>
+
+                  {/* Interests */}
+                  <View style={s.interestRow}>
+                    {item.interests.slice(0, 3).map(int => {
+                      const icon = INTEREST_ICON[int] ?? 'star-outline';
+                      return (
+                        <View key={int} style={s.interestChip}>
+                          <Ionicons name={icon} size={11} color={TEXT3} />
+                          <Text style={s.interestTxt}>{int}</Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+
+                  {/* Score + action */}
                   <View style={s.discoveryBottomRow}>
                     <View style={s.scoreRow}>
                       <Ionicons name="trophy" size={12} color={GOLD} />
-                      <Text style={s.scoreTxt}>{item.achievementScore} Başarı</Text>
+                      <Text style={s.scoreTxt}>%{item.achievementScore} başarı</Text>
                     </View>
-                    <TouchableOpacity 
-                      style={[s.matchBtn, isSent && s.matchBtnSent, { backgroundColor: accentColor }]} 
-                      onPress={() => !isSent && sendMatchRequest(item)}
-                      disabled={isSent}
-                    >
-                      <Text style={s.matchBtnTxt}>{isSent ? 'İstek Gönderildi' : 'Eşleş'}</Text>
-                      {!isSent && <Ionicons name="heart" size={14} color="#fff" />}
-                    </TouchableOpacity>
+                    {isSent ? (
+                      <TouchableOpacity style={s.cancelBtn} onPress={() => cancelMatchRequest(item.id)} activeOpacity={0.8}>
+                        <Ionicons name="close" size={12} color={TEXT2} />
+                        <Text style={s.cancelBtnTxt}>Geri Çek</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity style={[s.matchBtn, { backgroundColor: RED }]} onPress={() => sendMatchRequest(item)} activeOpacity={0.85}>
+                        <Ionicons name="heart" size={12} color="#fff" />
+                        <Text style={s.matchBtnTxt}>Eşleş</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </View>
               </View>
@@ -231,34 +304,44 @@ const s = StyleSheet.create({
   header: {paddingHorizontal:20, paddingTop:24, paddingBottom:16},
   title: {fontSize:32, color:TEXT, fontWeight:'900', letterSpacing:-1},
   subTitle: {fontSize:14, color:TEXT2, marginTop:4, fontWeight:'500'},
+  discoverySpacer: { height: 16 },
   
   // Discovery Styles
-  requestSection: { paddingHorizontal: 20, marginBottom: 24 },
-  sectionHeaderDiscovery: { fontSize: 18, fontWeight: '800', color: TEXT, marginBottom: 12 },
-  requestCard: { flexDirection: 'row', backgroundColor: CARD, padding: 16, borderRadius: 20, borderWidth: 1, borderColor: BORDER, alignItems: 'center' },
-  reqAvatar: { width: 50, height: 50, borderRadius: 25, backgroundColor: SURFACE },
-  reqText: { fontSize: 13, color: TEXT, lineHeight: 18 },
-  reqBtnRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
-  reqBtn: { flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  requestSection: { paddingHorizontal: 16, marginBottom: 8 },
+  sectionHeaderDiscovery: { fontSize: 16, fontWeight: '800', color: TEXT, marginBottom: 10 },
+  requestCard: { flexDirection: 'row', backgroundColor: CARD, padding: 12, borderRadius: 18, alignItems: 'center', marginBottom: 8, gap: 12 },
+  reqAvatarWrap: { width: 46, height: 46, borderRadius: 23, borderWidth: 2, overflow: 'hidden', flexShrink: 0 },
+  reqAvatar: { width: '100%', height: '100%' },
+  reqText: { fontSize: 13, color: TEXT, lineHeight: 17 },
+  reqBtnRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  reqBtn: { flex: 1, paddingVertical: 7, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   acceptBtn: { backgroundColor: RED },
   acceptBtnTxt: { color: '#fff', fontSize: 12, fontWeight: '800' },
   rejectBtn: { backgroundColor: SURFACE },
   rejectBtnTxt: { color: TEXT2, fontSize: 12, fontWeight: '700' },
 
-  discoverySection: { paddingHorizontal: 20 },
-  discoveryCard: { flexDirection: 'row', backgroundColor: BG, paddingVertical: 20, borderBottomWidth: 1, borderBottomColor: BORDER },
-  discoveryAvatar: { width: 64, height: 64, borderRadius: 32, backgroundColor: CARD },
-  discoveryTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  discoveryName: { fontSize: 17, fontWeight: '800', color: TEXT },
-  similarityPill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-  similarityTxt: { fontSize: 11, fontWeight: '800' },
-  discoveryInterests: { fontSize: 13, color: TEXT2, marginTop: 4 },
-  discoveryBottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 },
+  discoverySection: { paddingHorizontal: 16 },
+  discoveryCard: {
+    flexDirection: 'row', gap: 14,
+    backgroundColor: CARD, borderRadius: 18, padding: 14,
+    marginBottom: 8,
+  },
+  discoveryAvatarWrap: { width: 58, height: 58, borderRadius: 29, borderWidth: 2.5, overflow: 'hidden', flexShrink: 0 },
+  discoveryAvatar: { width: '100%', height: '100%' },
+  discoveryTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 },
+  discoveryName: { fontSize: 15, fontWeight: '800', color: TEXT, letterSpacing: -0.2 },
+  similarityPill: { backgroundColor: SURFACE, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  similarityTxt: { fontSize: 10, fontWeight: '700', color: TEXT2 },
+  interestRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginBottom: 10 },
+  interestChip: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: SURFACE, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
+  interestTxt: { fontSize: 11, fontWeight: '600', color: TEXT2 },
+  discoveryBottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   scoreRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   scoreTxt: { fontSize: 12, color: TEXT2, fontWeight: '600' },
-  matchBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12 },
-  matchBtnSent: { backgroundColor: TEXT3, opacity: 0.7 },
-  matchBtnTxt: { color: '#fff', fontSize: 13, fontWeight: '800' },
+  matchBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10 },
+  matchBtnTxt: { color: '#fff', fontSize: 12, fontWeight: '800' },
+  cancelBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: SURFACE, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10 },
+  cancelBtnTxt: { color: TEXT2, fontSize: 11, fontWeight: '700' },
 
   // Active Match Styles (Original)
   mateCard: {marginHorizontal:16, paddingVertical:20, borderBottomWidth:1, borderBottomColor:BORDER},

@@ -1,0 +1,1170 @@
+[
+  {
+    "id": "TC001",
+    "title": "Register, verify OTP, and reach onboarding",
+    "description": "This verifies that a new user can create an account, complete email verification, and proceed to onboarding successfully.",
+    "category": "Authentication",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /auth"
+      },
+      {
+        "type": "action",
+        "description": "Select the registration tab"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the display name field with a new user name"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with a new email address"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with a valid password"
+      },
+      {
+        "type": "action",
+        "description": "Submit the registration form"
+      },
+      {
+        "type": "action",
+        "description": "Enter the 6-digit email OTP"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the onboarding screen is displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC002",
+    "title": "Complete first-time onboarding after authentication",
+    "description": "This verifies that a newly authenticated user can finish onboarding and land in the main app tabs.",
+    "category": "Onboarding",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /welcome"
+      },
+      {
+        "type": "action",
+        "description": "Open the registration flow"
+      },
+      {
+        "type": "action",
+        "description": "Register with a new email and password"
+      },
+      {
+        "type": "action",
+        "description": "Complete email verification"
+      },
+      {
+        "type": "action",
+        "description": "Proceed to onboarding"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the onboarding profile fields"
+      },
+      {
+        "type": "action",
+        "description": "Save the onboarding profile"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the main tabs are displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify onboarding is complete"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC003",
+    "title": "Log in and enter the main tabs",
+    "description": "This verifies that an existing user can log in and reach the main app tabs successfully.",
+    "category": "Authentication",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /auth"
+      },
+      {
+        "type": "action",
+        "description": "Select the login tab"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with {{LOGIN_USER}}"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with {{LOGIN_PASSWORD}}"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the main tabs are displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC004",
+    "title": "Toggle rest day for today",
+    "description": "This verifies that an authenticated member can mark today as a rest day and see routine tracking skipped for the day.",
+    "category": "Rest Day Toggle",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill in {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the home tab"
+      },
+      {
+        "type": "action",
+        "description": "Toggle today as a rest day"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the home screen shows that today is a rest day"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify routine completion is skipped for today"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC005",
+    "title": "See the DM locked state without a match",
+    "description": "This verifies that a member without an active match sees the locked DM placeholder instead of conversation access.",
+    "category": "Direct Messages",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /(tabs)/dm"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the locked DM placeholder is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify direct messages are not accessible"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC006",
+    "title": "Complete onboarding and enter the app",
+    "description": "This verifies that a new user can finish profile setup and enter the main tabs.",
+    "category": "Onboarding",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /onboarding"
+      },
+      {
+        "type": "action",
+        "description": "Click the gender card with testID \"gender-male-card\" to select Erkek"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Devam Et\" button with testID \"onboarding-next-btn\""
+      },
+      {
+        "type": "action",
+        "description": "Fill the age field with testID \"onboarding-age-input\" with value 25"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Devam Et\" button with testID \"onboarding-next-btn\""
+      },
+      {
+        "type": "action",
+        "description": "Fill the location field with testID \"onboarding-location-input\" with value \"Istanbul, TR\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Devam Et\" button with testID \"onboarding-next-btn\""
+      },
+      {
+        "type": "action",
+        "description": "Select at least one interest from the list"
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Devam Et\" button with testID \"onboarding-next-btn\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Simdilik Atla\" (skip) button to skip avatar"
+      },
+      {
+        "type": "action",
+        "description": "Fill the username field with testID \"onboarding-username-input\" with value \"testuser\""
+      },
+      {
+        "type": "action",
+        "description": "Click the \"Hazırim!\" button with testID \"onboarding-next-btn\""
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the main tabs are displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC007",
+    "title": "View routines in the home list",
+    "description": "This verifies that an authenticated member can open the home screen and see their routines in the default list view.",
+    "category": "Routine Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /(tabs)/"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify routines are displayed in the home list"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC008",
+    "title": "Mark a routine complete and incomplete",
+    "description": "This verifies that a member can toggle a routine status and see the update reflected on the home screen.",
+    "category": "Routine Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /(tabs)/"
+      },
+      {
+        "type": "action",
+        "description": "Mark an existing routine as complete"
+      },
+      {
+        "type": "action",
+        "description": "Mark the same routine as incomplete"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the routine status is updated"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC009",
+    "title": "Create a new routine",
+    "description": "This verifies that an authenticated member can create a routine from the create flow and see it available for tracking.",
+    "category": "Routine Creation",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill in {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the create routine screen"
+      },
+      {
+        "type": "action",
+        "description": "Fill in a routine name"
+      },
+      {
+        "type": "action",
+        "description": "Select a valid frequency and schedule for the routine"
+      },
+      {
+        "type": "action",
+        "description": "Save the routine"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the new routine appears in the routine list"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the routine is available for daily tracking"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC010",
+    "title": "Create a new routine from the create screen",
+    "description": "This verifies that a member can create a routine with required scheduling details and see it added to their routine list.",
+    "category": "Routine Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /(tabs)/"
+      },
+      {
+        "type": "action",
+        "description": "Open the routine creation screen"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the routine name field with a new routine name"
+      },
+      {
+        "type": "action",
+        "description": "Choose a frequency"
+      },
+      {
+        "type": "action",
+        "description": "Set a notification time"
+      },
+      {
+        "type": "action",
+        "description": "Select target days when required"
+      },
+      {
+        "type": "action",
+        "description": "Save the routine"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the new routine is displayed in the home list"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC011",
+    "title": "Open direct messages after a match exists",
+    "description": "This verifies that a matched member can access the DM tab and see an active conversation area.",
+    "category": "Direct Messages",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /(tabs)/dm"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the conversation view is displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC012",
+    "title": "Respond to an incoming match request",
+    "description": "This verifies that an authenticated member can accept or reject an incoming request and see the match state update accordingly.",
+    "category": "Match Discovery",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill in {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the mate tab"
+      },
+      {
+        "type": "action",
+        "description": "View the incoming match requests"
+      },
+      {
+        "type": "action",
+        "description": "Accept or reject an incoming request"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the request is removed or accepted in the requests view"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the match state is updated appropriately"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC013",
+    "title": "Set today as a rest day and return to normal routine tracking",
+    "description": "This verifies that a member can toggle today as a rest day and then switch back to routine tracking without losing the home state.",
+    "category": "Routine Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /(tabs)/"
+      },
+      {
+        "type": "action",
+        "description": "Toggle today as a rest day"
+      },
+      {
+        "type": "action",
+        "description": "Toggle today back to a normal routine day"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the home routine state updates appropriately"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC014",
+    "title": "Send an accountability mate request",
+    "description": "This verifies that a member can send a match request from discovery and see it reflected in their mate state.",
+    "category": "Match Discovery",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /(tabs)/mate"
+      },
+      {
+        "type": "action",
+        "description": "Open a discovery card"
+      },
+      {
+        "type": "action",
+        "description": "Send a match request"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the request state is displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC015",
+    "title": "Send a match request",
+    "description": "This verifies that an authenticated member can send a match request from discovery and see the request state update.",
+    "category": "Match Discovery",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill in {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the mate tab"
+      },
+      {
+        "type": "action",
+        "description": "Send a match request to a suggested user"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the request state updates on the selected user"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the user is shown as pending or requested"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC016",
+    "title": "Chat with a matched mate",
+    "description": "This verifies that an authenticated matched member can open direct messages, send a text message, and see the conversation update.",
+    "category": "Direct Messages",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill in {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the DM tab"
+      },
+      {
+        "type": "action",
+        "description": "View the message history"
+      },
+      {
+        "type": "action",
+        "description": "Type a text message into the message field"
+      },
+      {
+        "type": "action",
+        "description": "Send the message"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the sent message appears in the conversation"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the conversation shows the updated message history"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC017",
+    "title": "Send a message in direct messages",
+    "description": "This verifies that a matched member can send a text message and see the conversation update in the chat view.",
+    "category": "Direct Messages",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /(tabs)/dm"
+      },
+      {
+        "type": "action",
+        "description": "Enter a message in the text field"
+      },
+      {
+        "type": "action",
+        "description": "Send the message"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the new message appears in the conversation"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC018",
+    "title": "Browse accountability mate discovery cards",
+    "description": "This verifies that a member can open the mate tab and browse available discovery cards.",
+    "category": "Match Discovery",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /(tabs)/mate"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify discovery cards are displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC019",
+    "title": "Return from rest day to normal tracking",
+    "description": "This verifies that an authenticated member can turn off today's rest day and resume routine tracking.",
+    "category": "Rest Day Toggle",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill in {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the home tab"
+      },
+      {
+        "type": "action",
+        "description": "Toggle today as a rest day"
+      },
+      {
+        "type": "action",
+        "description": "Toggle today as not a rest day"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify today's rest day state is cleared"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify routine tracking is available again"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC020",
+    "title": "Switch between routine list and calendar views",
+    "description": "This verifies that a member can change the home routines view and still see their routine data.",
+    "category": "Routine Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /(tabs)/"
+      },
+      {
+        "type": "action",
+        "description": "Switch to the calendar view"
+      },
+      {
+        "type": "action",
+        "description": "Switch back to the list view"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify routine data is displayed in both views"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC021",
+    "title": "Handle incoming match requests",
+    "description": "This verifies that a member can accept or reject an incoming accountability request and see the updated relationship state.",
+    "category": "Match Discovery",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /(tabs)/mate"
+      },
+      {
+        "type": "action",
+        "description": "Open the incoming requests view"
+      },
+      {
+        "type": "action",
+        "description": "Accept or reject an incoming request"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the match request state is updated"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC022",
+    "title": "Quick edit a routine from home",
+    "description": "This verifies that an authenticated member can update an existing routine from the home screen and see the changes reflected.",
+    "category": "Routine Edit",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill in {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the home tab"
+      },
+      {
+        "type": "action",
+        "description": "Open a routine for quick edit"
+      },
+      {
+        "type": "action",
+        "description": "Update the routine details"
+      },
+      {
+        "type": "action",
+        "description": "Save the routine changes"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the routine updates are visible on the home screen"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC023",
+    "title": "Browse match discovery cards",
+    "description": "This verifies that an authenticated member can open match discovery and browse suggested accountability mates.",
+    "category": "Match Discovery",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill in {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the mate tab"
+      },
+      {
+        "type": "action",
+        "description": "Browse the discovery cards"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify discovery user cards are displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify suggested mates can be reviewed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC024",
+    "title": "Log out from the profile",
+    "description": "This test verifies that a member can log out from the profile screen and return to the unauthenticated entry flow.",
+    "category": "User Profile",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /(tabs)/profile"
+      },
+      {
+        "type": "action",
+        "description": "Log out"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the unauthenticated entry flow is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the authenticated profile screen is no longer accessible"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC025",
+    "title": "Update profile details and manage photos",
+    "description": "This verifies that a member can edit profile information and manage their photos from the profile screen.",
+    "category": "Profile Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /(tabs)/profile"
+      },
+      {
+        "type": "action",
+        "description": "Edit the bio or personal details"
+      },
+      {
+        "type": "action",
+        "description": "Add a photo"
+      },
+      {
+        "type": "action",
+        "description": "Pin a photo"
+      },
+      {
+        "type": "action",
+        "description": "Delete a photo"
+      },
+      {
+        "type": "action",
+        "description": "Save the profile changes"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the updated profile content is displayed"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC026",
+    "title": "Update profile bio and personal details",
+    "description": "This test verifies that a member can edit their bio or personal information and see the saved profile update.",
+    "category": "User Profile",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /(tabs)/profile"
+      },
+      {
+        "type": "action",
+        "description": "Edit the profile bio and personal details"
+      },
+      {
+        "type": "action",
+        "description": "Save the profile changes"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the updated profile information is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the profile save confirmation is visible"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC027",
+    "title": "Delete a routine from the home screen",
+    "description": "This verifies that a member can remove an existing routine and see it disappear from their list.",
+    "category": "Routine Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /(tabs)/"
+      },
+      {
+        "type": "action",
+        "description": "Open the delete action for an existing routine"
+      },
+      {
+        "type": "action",
+        "description": "Confirm the deletion"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the routine is removed from the list"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC028",
+    "title": "Toggle Pro status and log out",
+    "description": "This verifies that a member can change their Pro status and return to the auth screen by logging out.",
+    "category": "Profile Management",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /(tabs)/profile"
+      },
+      {
+        "type": "action",
+        "description": "Toggle Pro status"
+      },
+      {
+        "type": "action",
+        "description": "Log out"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the auth screen is displayed"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC029",
+    "title": "Delete a routine from the create flow",
+    "description": "This verifies that an authenticated member can delete a routine they created and that it no longer appears in tracking.",
+    "category": "Routine Delete",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in {{LOGIN_USER}} into the email field"
+      },
+      {
+        "type": "action",
+        "description": "Fill in {{LOGIN_PASSWORD}} into the password field"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Open the create routine screen"
+      },
+      {
+        "type": "action",
+        "description": "Create a routine to remove later"
+      },
+      {
+        "type": "action",
+        "description": "Open the routine edit view"
+      },
+      {
+        "type": "action",
+        "description": "Delete the routine"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the routine no longer appears in the app"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify routine tracking no longer includes the deleted routine"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC030",
+    "title": "View matched mate profile details",
+    "description": "This test verifies that a matched mate’s profile opens successfully and shows their bio, stats, routines, and photos.",
+    "category": "Mate Profile View",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /mate-profile"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the mate’s profile details are displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the mate’s routines and photo gallery are displayed"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC031",
+    "title": "Open a matched mate profile and unmatch",
+    "description": "This verifies that a matched member can review a mate profile and end the match when needed.",
+    "category": "Mate Profile",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /mate-profile"
+      },
+      {
+        "type": "action",
+        "description": "Review the matched mate profile"
+      },
+      {
+        "type": "action",
+        "description": "Open the unmatch action"
+      },
+      {
+        "type": "action",
+        "description": "Confirm the unmatch"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the match is removed"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC032",
+    "title": "View profile summary and stats",
+    "description": "This test verifies that an authenticated user can open their profile and review personal details and progress stats.",
+    "category": "User Profile",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /(tabs)/profile"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the profile details are displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify profile stats are displayed"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC033",
+    "title": "Unmatch from a mate profile",
+    "description": "This test verifies that a user can unmatch from a mate profile and the match is removed after confirmation.",
+    "category": "Mate Profile View",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /mate-profile"
+      },
+      {
+        "type": "action",
+        "description": "Choose to unmatch from the mate profile"
+      },
+      {
+        "type": "action",
+        "description": "Confirm the unmatch action"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the match is no longer active"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the mate profile is no longer available"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC034",
+    "title": "Add a profile photo to the gallery",
+    "description": "This test verifies that a member can add a new photo and see it appear in the profile gallery.",
+    "category": "User Profile",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /(tabs)/profile"
+      },
+      {
+        "type": "action",
+        "description": "Add a photo to the gallery"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the new photo appears in the gallery"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the profile gallery is displayed"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC035",
+    "title": "Pin and remove a profile photo",
+    "description": "This test verifies that a member can pin a photo and delete a photo from the gallery, with the gallery updating afterward.",
+    "category": "User Profile",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /(tabs)/profile"
+      },
+      {
+        "type": "action",
+        "description": "Pin a photo in the gallery"
+      },
+      {
+        "type": "action",
+        "description": "Delete a photo from the gallery"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the gallery reflects the photo changes"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the pinned photo state is updated"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC036",
+    "title": "Toggle Pro status on the profile",
+    "description": "This test verifies that a member can change Pro status from their profile and see the account status update.",
+    "category": "User Profile",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /(tabs)/profile"
+      },
+      {
+        "type": "action",
+        "description": "Toggle Pro status"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the account status changes"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the updated status is displayed on the profile"
+      }
+    ],
+    "priority": "Low"
+  }
+]

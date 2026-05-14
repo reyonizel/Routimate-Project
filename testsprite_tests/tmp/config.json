@@ -1,0 +1,17 @@
+{
+  "status": "init",
+  "scope": "codebase",
+  "type": "frontend",
+  "localEndpoint": "http://localhost:8082/",
+  "serverPort": 58060,
+  "executionArgs": {
+    "projectName": "routinmate",
+    "projectPath": "C:\\Users\\Burhan\\.gemini\\antigravity\\scratch\\routinmate",
+    "testIds": [],
+    "additionalInstruction": "Use testID attributes to locate inputs: auth-name-input, auth-email-input, auth-password-input, auth-submit-btn for auth form. For onboarding: gender-male-card, gender-female-card, onboarding-age-input, onboarding-location-input, onboarding-username-input, onboarding-next-btn. Click the show-password toggle (testID: auth-toggle-password) before filling the password field.",
+    "serverMode": "production",
+    "envs": {
+      "API_KEY": "sk-user-jZNDW4aD3OQiW7O3NsauRhBZ_H49C-ON1P8EW2DIxDwiIwCCvZTbhe1ta8hPvWzbUhuW_5GavCJyIfU4ySSgrjvT-qq58-PvWWi6Bn_PJ0SB4-gPgzigJ4rmiQ6XQR8A8_0"
+    }
+  }
+}

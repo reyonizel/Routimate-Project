@@ -1,521 +1,475 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
-  ScrollView, Alert, Platform, Animated, Dimensions
+  ScrollView, Alert, Platform, Modal, Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useStore, Routine } from '../../store/useStore';
 
-const BG='#FFFFFF'; const CARD='#F4F4F4'; const SURFACE='#EEEEEE';
-const TEXT='#111111'; const TEXT2='#767676'; const TEXT3='#ABABAB';
-const RED='#E60023'; const BORDER='#E8E8E8'; const PILL=999;
+const BG = '#FFFFFF'; const CARD = '#F4F4F4'; const SURFACE = '#EEEEEE';
+const TEXT = '#111111'; const TEXT2 = '#767676'; const TEXT3 = '#ABABAB';
+const GREEN = '#00bf63'; const BORDER = '#E8E8E8';
 
-type Freq = 'daily'|'weekly'|'monthly';
+type Freq = 'daily' | 'weekly' | 'monthly';
+type Scope = 'once' | 'recurring';
+type FreqScope = 'daily-once' | 'daily-rec' | 'weekly-once' | 'weekly-rec' | 'monthly-once' | 'monthly-rec';
+
+type RoutineItem = {
+  tempId: string;
+  title: string;
+  desc: string;
+  hour: string;
+  min: string;
+  freq: Freq;
+  scope: Scope;
+  targetDays: number[];
+  monthDays: number[];
+};
 
 const WEEK_DAYS = [
-  {label:'Pzt', short:'P', js:1},{label:'Sal', short:'S', js:2},
-  {label:'Çar', short:'Ç', js:3},{label:'Per', short:'P', js:4},
-  {label:'Cum', short:'C', js:5},{label:'Cmt', short:'C', js:6},
-  {label:'Paz', short:'P', js:0},
+  { label: 'Pzt', js: 1 }, { label: 'Sal', js: 2 }, { label: 'Çar', js: 3 },
+  { label: 'Per', js: 4 }, { label: 'Cum', js: 5 }, { label: 'Cmt', js: 6 }, { label: 'Paz', js: 0 },
 ];
 
-// ─── Weekly schedule: each day has its own task list ────────────────
-type WeekDayTask = { title: string; desc: string; hour: string; min: string };
+const FS_OPTIONS: { value: FreqScope; label: string; freq: Freq; scope: Scope }[] = [
+  { value: 'daily-once',   label: 'Sadece Bugün',   freq: 'daily',   scope: 'once' },
+  { value: 'daily-rec',    label: 'Her Gün',         freq: 'daily',   scope: 'recurring' },
+  { value: 'weekly-once',  label: 'Sadece Bu Hafta', freq: 'weekly',  scope: 'once' },
+  { value: 'weekly-rec',   label: 'Her Hafta',       freq: 'weekly',  scope: 'recurring' },
+  { value: 'monthly-once', label: 'Sadece Bu Ay',    freq: 'monthly', scope: 'once' },
+  { value: 'monthly-rec',  label: 'Her Ay',          freq: 'monthly', scope: 'recurring' },
+];
+
+const FREQ_LABEL: Record<Freq, string> = { daily: 'Günlük', weekly: 'Haftalık', monthly: 'Aylık' };
+
+const scopeLabel = (freq: Freq, scope: Scope) =>
+  FS_OPTIONS.find(o => o.freq === freq && o.scope === scope)?.label ?? '';
+
+const getOnceRange = (freq: Freq): { start: string; end: string } => {
+  const now = new Date();
+  const fmt = (d: Date) => d.toISOString().split('T')[0];
+  if (freq === 'daily') { const s = fmt(now); return { start: s, end: s }; }
+  if (freq === 'weekly') {
+    const day = now.getDay();
+    const mon = new Date(now); mon.setDate(now.getDate() + (day === 0 ? -6 : 1 - day));
+    const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+    return { start: fmt(mon), end: fmt(sun) };
+  }
+  return {
+    start: fmt(new Date(now.getFullYear(), now.getMonth(), 1)),
+    end: fmt(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
+  };
+};
 
 export default function CreateScreen() {
-  const addRoutine  = useStore(s => s.addRoutine);
   const addRoutines = useStore(s => s.addRoutines);
-  const router = useRouter();
 
-  const [freq, setFreq] = useState<Freq>('daily');
-  const slideAnim = React.useRef(new Animated.Value(0)).current;
+  const [setName, setSetName] = useState('');
+  const [nameError, setNameError] = useState(false);
+  const [items, setItems] = useState<RoutineItem[]>([]);
+  const [showForm, setShowForm] = useState(false);
 
-  const handleTabPress = (val: Freq, idx: number) => {
-    setFreq(val);
-    Animated.spring(slideAnim, {
-      toValue: idx,
-      useNativeDriver: true,
-      bounciness: 0,
-      speed: 16
-    }).start();
-  };
+  // form fields
+  const [fTitle, setFTitle] = useState('');
+  const [fHour, setFHour] = useState('09');
+  const [fMin, setFMin] = useState('00');
+  const [fFreqScope, setFFreqScope] = useState<FreqScope>('daily-rec');
+  const [fDays, setFDays] = useState<number[]>([]);
+  const [fMonthDays, setFMonthDays] = useState<number[]>([]);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 });
+  const triggerRef = useRef<View>(null);
+  const DROPDOWN_H = FS_OPTIONS.length * 46;
 
-  const TAB_DATA: [Freq, string][] = [['daily','Günlük'],['weekly','Haftalık'],['monthly','Aylık']];
-  const tabWidth = (Dimensions.get('window').width - 32) / 3;
+  const fOpt = FS_OPTIONS.find(o => o.value === fFreqScope)!;
 
-  const TR_MONTHS = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
-  const currentMonthStr = TR_MONTHS[new Date().getMonth()];
+  const canAdd = fTitle.trim().length > 0
+    && (fOpt.freq === 'weekly' ? fDays.length > 0 : true)
+    && (fOpt.freq === 'monthly' ? fMonthDays.length > 0 : true);;
 
-  // ── DAILY ──────────────────────────────────────────────────────────
-  const [dailyName, setDailyName] = useState('');
-  const [dailyDesc, setDailyDesc] = useState('');
-  const [dailyHour, setDailyHour] = useState('09');
-  const [dailyMin,  setDailyMin]  = useState('00');
-  const [showDailyH, setShowDailyH] = useState(false);
-  const [showDailyM, setShowDailyM] = useState(false);
-
-  // ── WEEKLY ─────────────────────────────────────────────────────────
-  const [weekTasks, setWeekTasks] = useState<{ [day: number]: WeekDayTask }>({});
-  const [activeDay, setActiveDay] = useState<number>(1);
-  const updateWeekTask = (day: number, key: keyof WeekDayTask, val: string) => {
-    setWeekTasks(prev => {
-      const existing = prev[day] || { title: '', desc: '', hour: '09', min: '00' };
-      return { ...prev, [day]: { ...existing, [key]: val } };
+  const openDropdown = () => {
+    triggerRef.current?.measureInWindow((x, y, w, h) => {
+      setDropdownPos({
+        top: Math.max(8, y - DROPDOWN_H),
+        left: x,
+        width: w,
+      });
+      setShowDropdown(true);
     });
   };
 
-  // ── MONTHLY ────────────────────────────────────────────────────────
-  const [monthTasks, setMonthTasks] = useState<{ [day: number]: WeekDayTask }>({});
-  const today = new Date();
-  const [activeMonthDay, setActiveMonthDay] = useState<number>(today.getDate());
-  const [displayedMonth, setDisplayedMonth] = useState(new Date());
-  const updateMonthTask = (day: number, key: keyof WeekDayTask, val: string) => {
-    setMonthTasks(prev => {
-      const existing = prev[day] || { title: '', desc: '', hour: '09', min: '00' };
-      return { ...prev, [day]: { ...existing, [key]: val } };
-    });
+  const resetForm = () => {
+    setFTitle(''); setFHour('09'); setFMin('00');
+    setFFreqScope('daily-rec'); setFDays([]); setFMonthDays([]);
+    setShowTimePicker(false); setShowDropdown(false); setShowForm(false);
   };
 
-  // ── REST DAYS ──────────────────────────────────────────────────────
-  const [restDays, setRestDays] = useState<number[]>([]); // day of week indices
-  const toggleRestWeekday = (js: number) =>
-    setRestDays(prev => prev.includes(js) ? prev.filter(d => d !== js) : [...prev, js]);
+  const handleAddItem = () => {
+    if (!fTitle.trim()) return;
+    setItems(prev => [...prev, {
+      tempId: Date.now().toString(),
+      title: fTitle.trim(), desc: '',
+      hour: fHour, min: fMin,
+      freq: fOpt.freq, scope: fOpt.scope,
+      targetDays: fDays, monthDays: fMonthDays,
+    }]);
+    resetForm();
+  };
 
-  // ── HELPERS ────────────────────────────────────────────────────────
-  const HOURS = Array.from({length:24}, (_,i) => String(i).padStart(2,'0'));
-  const MINS  = ['00','15','30','45'];
-
-  // Helpers...
-
-  // ── SAVE ───────────────────────────────────────────────────────────
   const handleSave = () => {
-
-    if (freq === 'daily') {
-      if (!dailyName.trim()) return;
-      addRoutine({
-        id: Date.now().toString(), name: dailyName.trim(),
-        description: dailyDesc.trim() || undefined,
-        frequency: 'daily', notificationTime: `${dailyHour}:${dailyMin}`,
-        completedDates: [], createdAt: new Date().toISOString(),
-      });
-      setDailyName('');
-      setDailyDesc('');
-      Alert.alert('Kaydedildi ✓', `"${dailyName.trim()}" eklendi.`);
-
-    } else if (freq === 'weekly') {
-      const days = Object.keys(weekTasks).map(Number).filter(d => (weekTasks[d]?.title || '').trim().length > 0);
-      if (days.length === 0) { Alert.alert('Uyarı', 'En az bir güne görev ekleyin.'); return; }
-      const now = Date.now();
-      const routines: Routine[] = [];
-      days.forEach((jsDay, di) => {
-        const task = weekTasks[jsDay];
-        routines.push({
-          id: `${now}-${di}`, name: task.title.trim(),
-          description: task.desc.trim() || undefined,
-          frequency: 'weekly', notificationTime: `${task.hour}:${task.min}`,
-          targetDays: [jsDay],
-          completedDates: [], createdAt: new Date().toISOString(),
-        });
-      });
-      addRoutines(routines);
-      setWeekTasks({});
-      Alert.alert('Kaydedildi ✓', `${routines.length} haftalık rutin eklendi.`);
-
-    } else {
-      const days = Object.keys(monthTasks).map(Number).filter(d => (monthTasks[d]?.title || '').trim().length > 0);
-      if (days.length === 0) { Alert.alert('Uyarı', 'En az bir güne görev ekleyin.'); return; }
-      const now = Date.now();
-      const routines: Routine[] = [];
-      days.forEach((mDay, di) => {
-        const task = monthTasks[mDay];
-        routines.push({
-          id: `${now}-${di}`, name: task.title.trim(),
-          description: task.desc.trim() || undefined,
-          frequency: 'monthly', notificationTime: `${task.hour}:${task.min}`,
-          monthlyDays: [mDay],
-          completedDates: [], createdAt: new Date().toISOString(),
-        });
-      });
-      addRoutines(routines);
-      setMonthTasks({});
-      Alert.alert('Kaydedildi ✓', `${routines.length} aylık rutin eklendi.`);
-    }
+    if (!setName.trim()) { setNameError(true); return; }
+    if (items.length === 0) return;
+    const now = Date.now();
+    const routines: Routine[] = items.map((item, i) => ({
+      id: `${now}-${i}`,
+      name: item.title,
+      frequency: item.freq,
+      notificationTime: `${item.hour}:${item.min}`,
+      completedDates: [],
+      createdAt: new Date().toISOString(),
+      setName: setName.trim(),
+      scope: item.scope,
+      onceRange: item.scope === 'once' ? getOnceRange(item.freq) : undefined,
+      targetDays: item.freq === 'weekly' && item.targetDays.length > 0
+        ? item.targetDays : undefined,
+      monthlyDays: item.freq === 'monthly' && item.monthDays.length > 0
+        ? item.monthDays : undefined,
+    }));
+    addRoutines(routines);
+    setSetName(''); setItems([]);
+    Alert.alert('Kaydedildi ✓', `"${setName.trim()}" seti ${routines.length} rutinle oluşturuldu.`);
   };
 
-  const canSave =
-    freq === 'daily' ? dailyName.trim().length > 0
-    : freq === 'weekly' ? Object.values(weekTasks).some(t => t.title.trim().length > 0)
-    : Object.values(monthTasks).some(t => t.title.trim().length > 0);
+  const timeDate = new Date();
+  timeDate.setHours(parseInt(fHour, 10));
+  timeDate.setMinutes(parseInt(fMin, 10));
 
-  // ── RENDER ─────────────────────────────────────────────────────────
   return (
     <SafeAreaView style={s.container} edges={['top']}>
       <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
-        {/* Header */}
         <View style={s.header}>
-          <Text style={s.headerTitle}>Yeni alışkanlık başlat</Text>
+          <Text style={s.headerTitle}>Yeni Rutin Seti</Text>
         </View>
 
-        {/* Freq selector */}
-        <View style={[s.field, { marginBottom: 16 }]}>
-          <View style={s.tabs}>
-            <Animated.View style={[s.tabIndicator, {
-              width: tabWidth,
-              transform: [{
-                translateX: slideAnim.interpolate({
-                  inputRange: [0, 1, 2],
-                  outputRange: [0, tabWidth, tabWidth * 2]
-                })
-              }]
-            }]} />
-            {TAB_DATA.map(([val,lbl], idx) => {
-              const on = freq === val;
-              return (
-                <TouchableOpacity key={val} style={s.tab} onPress={() => handleTabPress(val, idx)}>
-                  <Text style={[s.tabText, on && s.tabTextActive]}>{lbl}</Text>
+        {/* ── Main card ── */}
+        <View style={s.card}>
+
+          {/* Set name */}
+          <TextInput
+            style={[s.setNameInput, nameError && { color: '#e74c3c' }]}
+            value={setName}
+            onChangeText={t => { setSetName(t.slice(0, 80)); if (t.trim()) setNameError(false); }}
+            placeholder={nameError ? 'Set adı zorunlu!' : 'Set adı girin...'}
+            placeholderTextColor={nameError ? '#e74c3c88' : TEXT3}
+            maxLength={80}
+          />
+
+          {/* Added routines */}
+          {items.length > 0 && (
+            <View style={s.itemsSection}>
+              <View style={s.divider} />
+              {items.map((item, idx) => (
+                <View key={item.tempId} style={[s.itemRow, idx < items.length - 1 && s.itemRowBorder]}>
+                  <View style={[s.itemDot, {
+                    backgroundColor: item.freq === 'daily' ? '#2980b9'
+                      : item.freq === 'weekly' ? '#8e44ad' : '#d35400'
+                  }]} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.itemTitle}>{item.title}</Text>
+                    <Text style={s.itemMeta}>{scopeLabel(item.freq, item.scope)} · {item.hour}:{item.min}</Text>
+                  </View>
+                  <TouchableOpacity
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    onPress={() => setItems(prev => prev.filter(i => i.tempId !== item.tempId))}
+                  >
+                    <Ionicons name="close-circle" size={18} color={TEXT3} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
+
+          <View style={s.divider} />
+
+          {/* Inline form */}
+          {showForm ? (
+            <View style={s.form}>
+              {/* Title */}
+              <TextInput
+                style={s.formTitleInput}
+                value={fTitle}
+                onChangeText={t => setFTitle(t.slice(0, 60))}
+                placeholder="Rutin adı"
+                placeholderTextColor={TEXT3}
+                autoFocus
+                maxLength={60}
+              />
+
+              {/* Timing dropdown */}
+              <View ref={triggerRef} collapsable={false}>
+                <TouchableOpacity
+                  style={s.dropdownTrigger}
+                  onPress={openDropdown}
+                  activeOpacity={0.7}
+                >
+                  <Text style={s.dropdownValue}>{fOpt.label}</Text>
+                  <Ionicons name={showDropdown ? 'chevron-up' : 'chevron-down'} size={16} color={TEXT3} />
                 </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* ─── DAILY ──────────────────────────────────────── */}
-        {freq === 'daily' && (
-          <>
-            <View style={s.field}>
-              <View style={s.inputRow}>
-                <TextInput style={s.input} value={dailyName} onChangeText={t=>setDailyName(t.slice(0,60))}
-                  placeholder="Başlık (örn: Sabah Koşusu)" placeholderTextColor={TEXT3} maxLength={60} />
-                {dailyName.length > 0 && (
-                  <TouchableOpacity onPress={() => setDailyName('')}>
-                    <Ionicons name="close-circle" size={18} color={TEXT3} />
-                  </TouchableOpacity>
-                )}
               </View>
-            </View>
 
-            <View style={s.field}>
-              <View style={[s.inputRow, { alignItems: 'flex-start' }]}>
-                <TextInput style={[s.input, { fontSize: 16, fontWeight: '400', minHeight: 60, textAlignVertical: 'top' }]} 
-                  value={dailyDesc} onChangeText={t=>setDailyDesc(t.slice(0,200))}
-                  placeholder="Açıklama (opsiyonel)" placeholderTextColor={TEXT3} multiline maxLength={200} />
-                {dailyDesc.length > 0 && (
-                  <TouchableOpacity onPress={() => setDailyDesc('')} style={{ marginTop: 2 }}>
-                    <Ionicons name="close-circle" size={18} color={TEXT3} />
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-
-            <TimeField label="" hour={dailyHour} min={dailyMin}
-              onTimeChange={(h: string, m: string) => { setDailyHour(h); setDailyMin(m); }} />
-          </>
-        )}
-
-        {/* ─── WEEKLY ─────────────────────────────────────── */}
-        {freq === 'weekly' && (
-          <>
-            <View style={s.field}>
-              <View style={s.dayRowFlex}>
-                {WEEK_DAYS.map(({label, js}) => {
-                  const isActive = activeDay === js;
-                  const hasTask = (weekTasks[js]?.title || '').trim().length > 0;
-                  return (
-                    <TouchableOpacity key={js} style={[s.restChip, isActive && s.restChipOn]} onPress={() => setActiveDay(js)}>
-                      <Text style={[s.restLabel, isActive && {color:'#fff'}]}>{label}</Text>
-                      {hasTask && !isActive && <View style={s.weekDayDotMini} />}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
-
-            <View style={s.field}>
-              <View style={s.inputRow}>
-                <TextInput style={s.input} 
-                  value={weekTasks[activeDay]?.title || ''} 
-                  onChangeText={t => updateWeekTask(activeDay, 'title', t.slice(0,60))}
-                  placeholder={`${WEEK_DAYS.find(d=>d.js===activeDay)?.label} günü için başlık`} 
-                  placeholderTextColor={TEXT3} maxLength={60} />
-              </View>
-            </View>
-
-            <View style={s.field}>
-              <View style={[s.inputRow, { alignItems: 'flex-start' }]}>
-                <TextInput style={[s.input, { fontSize: 16, fontWeight: '400', minHeight: 60, textAlignVertical: 'top' }]} 
-                  value={weekTasks[activeDay]?.desc || ''} 
-                  onChangeText={t => updateWeekTask(activeDay, 'desc', t.slice(0,200))}
-                  placeholder="Açıklama (opsiyonel)" placeholderTextColor={TEXT3} multiline maxLength={200} />
-              </View>
-            </View>
-
-            <TimeField label="" 
-              hour={weekTasks[activeDay]?.hour || '09'} 
-              min={weekTasks[activeDay]?.min || '00'}
-              onTimeChange={(h: string, m: string) => { 
-                updateWeekTask(activeDay, 'hour', h); 
-                updateWeekTask(activeDay, 'min', m); 
-              }} />
-          </>
-        )}
-
-        {/* ─── MONTHLY ────────────────────────────────────── */}
-        {freq === 'monthly' && (
-          <>
-            <View style={[s.field, { marginBottom: 8 }]}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 4, gap: 8, flexDirection: 'row', alignItems: 'center' }}>
-                {(() => {
-                  const y = displayedMonth.getFullYear();
-                  const m = displayedMonth.getMonth();
-                  const daysInMonth = new Date(y, m + 1, 0).getDate();
-                  const monthAbbr = TR_MONTHS[m];
-                  const nextMonthAbbr = TR_MONTHS[(m + 1) % 12];
-                  const prevMonthAbbr = TR_MONTHS[(m - 1 + 12) % 12];
-
-                  // Is this the current month? If so, days before today are past.
-                  const isCurrentMonth = y === today.getFullYear() && m === today.getMonth();
-                  const startDay = isCurrentMonth ? today.getDate() : 1;
-
-                  const chips = [];
-
-                  // Prev month nav chip — only if we're in a future month
-                  if (!isCurrentMonth) {
-                    chips.push(
+              <Modal visible={showDropdown} transparent animationType="fade" onRequestClose={() => setShowDropdown(false)}>
+                <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setShowDropdown(false)} />
+                <View style={[s.dropdownList, { top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }]}>
+                  {FS_OPTIONS.map((opt, idx) => {
+                    const on = fFreqScope === opt.value;
+                    return (
                       <TouchableOpacity
-                        key="prev-month"
-                        style={s.mChipNav}
-                        onPress={() => {
-                          const prevDate = new Date(y, m - 1, 1);
-                          setDisplayedMonth(prevDate);
-                          // If going back to current month, select today; else select day 1
-                          const prevIsCurrentMonth = prevDate.getFullYear() === today.getFullYear() && prevDate.getMonth() === today.getMonth();
-                          setActiveMonthDay(prevIsCurrentMonth ? today.getDate() : 1);
-                        }}
+                        key={opt.value}
+                        style={[s.dropdownItem, idx < FS_OPTIONS.length - 1 && s.dropdownItemBorder, on && s.dropdownItemOn]}
+                        onPress={() => { setFFreqScope(opt.value); setFDays([]); setFMonthDays([]); setShowDropdown(false); }}
+                        activeOpacity={0.7}
                       >
-                        <Ionicons name="chevron-back" size={14} color={RED} />
-                        <Text style={s.mChipNavTxt}>{prevMonthAbbr}</Text>
+                        <Text style={[s.dropdownItemTxt, on && s.dropdownItemTxtOn]}>{opt.label}</Text>
+                        {on && <Ionicons name="checkmark" size={15} color={GREEN} />}
                       </TouchableOpacity>
                     );
-                  }
+                  })}
+                </View>
+              </Modal>
 
-                  for (let d = startDay; d <= daysInMonth; d++) {
-                    const isActive = activeMonthDay === d;
-                    const hasTask = (monthTasks[d]?.title || '').trim().length > 0;
-                    chips.push(
-                      <TouchableOpacity 
-                        key={`${m}-${d}`}
-                        style={[s.mChip, isActive && s.mChipActive]}
-                        onPress={() => setActiveMonthDay(d)}
+              {/* Weekly days — her hafta ve sadece bu hafta için */}
+              {fOpt.freq === 'weekly' && (
+                <View style={s.dayRow}>
+                  {WEEK_DAYS.map(({ label, js }) => {
+                    const on = fDays.includes(js);
+                    return (
+                      <TouchableOpacity
+                        key={js}
+                        style={[s.dayChip, on && s.dayChipOn]}
+                        onPress={() => setFDays(prev => on ? prev.filter(d => d !== js) : [...prev, js])}
                       >
-                        <Text style={[s.mChipDay, isActive && { color: '#fff' }]}>{d}</Text>
-                        <Text style={[s.mChipMonth, isActive && { color: 'rgba(255,255,255,0.75)' }]}>{monthAbbr}</Text>
-                        {hasTask && !isActive && <View style={s.mChipDot} />}
+                        <Text style={[s.dayChipTxt, on && { color: '#fff' }]}>{label}</Text>
                       </TouchableOpacity>
                     );
-                  }
+                  })}
+                </View>
+              )}
 
-                  // Next month nav chip
-                  chips.push(
-                    <TouchableOpacity
-                      key="next-month"
-                      style={s.mChipNav}
-                      onPress={() => {
-                        setDisplayedMonth(new Date(y, m + 1, 1));
-                        setActiveMonthDay(1);
-                      }}
-                    >
-                      <Text style={s.mChipNavTxt}>{nextMonthAbbr}</Text>
-                      <Ionicons name="chevron-forward" size={14} color={RED} />
-                    </TouchableOpacity>
-                  );
+              {/* Monthly grid — her ay ve sadece bu ay için */}
+              {fOpt.freq === 'monthly' && (
+                <View style={s.calGrid}>
+                  {Array.from({ length: 31 }, (_, i) => i + 1).map(d => {
+                    const on = fMonthDays.includes(d);
+                    return (
+                      <TouchableOpacity
+                        key={d}
+                        style={[s.calCell, on && s.calCellOn]}
+                        onPress={() => setFMonthDays(prev => on ? prev.filter(x => x !== d) : [...prev, d])}
+                      >
+                        <Text style={[s.calCellTxt, on && { color: '#fff' }]}>{d}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
 
-                  return chips;
-                })()}
-              </ScrollView>
-            </View>
+              {/* Time selector */}
+              <TouchableOpacity style={s.timeBtn} onPress={() => setShowTimePicker(v => !v)} activeOpacity={0.7}>
+                <Ionicons name="time-outline" size={16} color={TEXT2} />
+                <Text style={s.timeLbl}>Bildirim saatiniz:</Text>
+                <Text style={s.timeBtnTxt}>{fHour}:{fMin}</Text>
+                <Ionicons name={showTimePicker ? 'chevron-up' : 'chevron-down'} size={14} color={TEXT3} />
+              </TouchableOpacity>
 
-            <View style={s.field}>
-              <View style={s.inputRow}>
-                <TextInput style={s.input} 
-                  value={monthTasks[activeMonthDay]?.title || ''} 
-                  onChangeText={t => updateMonthTask(activeMonthDay, 'title', t.slice(0,60))}
-                  placeholder={`${activeMonthDay} ${TR_MONTHS[displayedMonth.getMonth()]} için başlık`} 
-                  placeholderTextColor={TEXT3} maxLength={60} />
+              {showTimePicker && Platform.OS === 'ios' && (
+                <View style={{ overflow: 'hidden', marginBottom: 12 }}>
+                  <DateTimePicker
+                    value={timeDate} mode="time" display="spinner" is24Hour
+                    onChange={(_, d) => {
+                      if (d) {
+                        setFHour(String(d.getHours()).padStart(2, '0'));
+                        setFMin(String(d.getMinutes()).padStart(2, '0'));
+                      }
+                    }}
+                    style={{ width: '100%', height: 110 }}
+                  />
+                </View>
+              )}
+              {showTimePicker && Platform.OS === 'android' && (
+                <DateTimePicker
+                  value={timeDate} mode="time" display="spinner" is24Hour
+                  onChange={(e, d) => {
+                    setShowTimePicker(false);
+                    if (e.type === 'set' && d) {
+                      setFHour(String(d.getHours()).padStart(2, '0'));
+                      setFMin(String(d.getMinutes()).padStart(2, '0'));
+                    }
+                  }}
+                />
+              )}
+
+              {/* Form buttons */}
+              <View style={s.formBtns}>
+                <TouchableOpacity style={s.cancelBtn} onPress={resetForm} activeOpacity={0.7}>
+                  <Text style={s.cancelTxt}>İptal</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[s.addBtn, !canAdd && s.addBtnOff]}
+                  onPress={handleAddItem}
+                  disabled={!canAdd}
+                  activeOpacity={0.8}
+                >
+                  <Text style={s.addBtnTxt}>Ekle</Text>
+                </TouchableOpacity>
               </View>
             </View>
-
-            <View style={s.field}>
-              <View style={[s.inputRow, { alignItems: 'flex-start' }]}>
-                <TextInput style={[s.input, { fontSize: 16, fontWeight: '400', minHeight: 60, textAlignVertical: 'top' }]} 
-                  value={monthTasks[activeMonthDay]?.desc || ''} 
-                  onChangeText={t => updateMonthTask(activeMonthDay, 'desc', t.slice(0,200))}
-                  placeholder="Açıklama (opsiyonel)" placeholderTextColor={TEXT3} multiline maxLength={200} />
-              </View>
-            </View>
-
-            <TimeField label="" 
-              hour={monthTasks[activeMonthDay]?.hour || '09'} 
-              min={monthTasks[activeMonthDay]?.min || '00'}
-              onTimeChange={(h: string, m: string) => { 
-                updateMonthTask(activeMonthDay, 'hour', h); 
-                updateMonthTask(activeMonthDay, 'min', m); 
-              }} />
-          </>
-        )}
+          ) : (
+            <TouchableOpacity style={s.addRowBtn} onPress={() => setShowForm(true)} activeOpacity={0.6}>
+              <Ionicons name="add-circle-outline" size={18} color={GREEN} />
+              <Text style={s.addRowTxt}>Rutin ekle</Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
         {/* Save */}
-        <TouchableOpacity style={[s.saveBtn, !canSave && s.saveBtnOff]} onPress={handleSave} disabled={!canSave}>
-          <Text style={[s.saveTxt, !canSave && {color:TEXT3}]}>
-            {freq === 'monthly' ? `Kaydet (${Object.values(monthTasks).filter(t => t.title.trim().length > 0).length} gün)` :
-             freq === 'weekly' ? `Kaydet (${Object.values(weekTasks).filter(t => t.title.trim().length > 0).length} gün)` : 'Kaydet'}
-          </Text>
-        </TouchableOpacity>
+        {items.length > 0 && !showForm && (
+          <TouchableOpacity style={s.saveBtn} onPress={handleSave} activeOpacity={0.85}>
+            <Text style={s.saveTxt}>Kaydet  ·  {items.length} rutin</Text>
+          </TouchableOpacity>
+        )}
 
-        <View style={{height:80}} />
+        <View style={{ height: 100 }} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-// ─── Sub-components ──────────────────────────────────────────────────
-
-export function TimeField({label, hour, min, onTimeChange, weekMode, weekHour, weekMin, onWeekTimeChange}: any) {
+// ─── TimeField — used by index.tsx quick edit ────────────────────────────────
+export function TimeField({ label, hour, min, onTimeChange, weekMode, weekHour, weekMin, onWeekTimeChange }: any) {
   const [show, setShow] = useState(false);
-
   const h = weekMode ? weekHour : hour;
   const m = weekMode ? weekMin : min;
-
   const date = new Date();
   date.setHours(parseInt(h || '0', 10));
   date.setMinutes(parseInt(m || '0', 10));
 
   const onChange = (event: any, selectedDate?: Date) => {
-    if (Platform.OS === 'android') {
-      setShow(false);
-    }
+    if (Platform.OS === 'android') setShow(false);
     if (event.type === 'set' || Platform.OS === 'ios') {
       if (selectedDate) {
         const newH = String(selectedDate.getHours()).padStart(2, '0');
         const newM = String(selectedDate.getMinutes()).padStart(2, '0');
-        if (weekMode) {
-          onWeekTimeChange(newH, newM);
-        } else {
-          onTimeChange(newH, newM);
-        }
+        weekMode ? onWeekTimeChange(newH, newM) : onTimeChange(newH, newM);
       }
-    } else {
-      setShow(false);
-    }
+    } else { setShow(false); }
   };
 
   return (
-    <View style={s.field}>
-      {!!label && <Text style={s.label}>{label}</Text>}
+    <View style={s.tfField}>
+      {!!label && <Text style={s.tfLabel}>{label}</Text>}
       {Platform.OS === 'ios' ? (
         <View style={{ overflow: 'hidden' }}>
-          <DateTimePicker
-            value={date}
-            mode="time"
-            display="spinner"
-            is24Hour={true}
-            onChange={onChange}
-            style={{ width: '100%', height: 120 }}
-          />
+          <DateTimePicker value={date} mode="time" display="spinner" is24Hour onChange={onChange} style={{ width: '100%', height: 120 }} />
         </View>
       ) : (
         <>
-          <TouchableOpacity style={s.timePadAndroid} onPress={() => setShow(true)}>
-            <Ionicons name="time-outline" size={22} color={TEXT2} style={{marginRight: 8}} />
-            <Text style={s.timeNumAndroid}>{h}:{m}</Text>
+          <TouchableOpacity style={s.tfAndroid} onPress={() => setShow(true)}>
+            <Ionicons name="time-outline" size={22} color={TEXT2} style={{ marginRight: 8 }} />
+            <Text style={s.tfAndroidTxt}>{h}:{m}</Text>
           </TouchableOpacity>
-          
-          {show && (
-            <DateTimePicker
-              value={date}
-              mode="time"
-              display="spinner"
-              is24Hour={true}
-              onChange={onChange}
-            />
-          )}
+          {show && <DateTimePicker value={date} mode="time" display="spinner" is24Hour onChange={onChange} />}
         </>
       )}
     </View>
   );
 }
 
-function RestDayPicker({restDays, onToggle}: {restDays: number[]; onToggle:(js:number)=>void}) {
-  const WEEK_DAYS_SHORT = [{label:'Pzt',js:1},{label:'Sal',js:2},{label:'Çar',js:3},{label:'Per',js:4},{label:'Cum',js:5},{label:'Cmt',js:6},{label:'Paz',js:0}];
-  return (
-    <View style={s.field}>
-      <Text style={s.label}>DİNLENME GÜNLERİ (opsiyonel)</Text>
-      <Text style={s.calHint}>Seçilen günlerde bu görev sayılmaz.</Text>
-      <View style={s.dayRowFlex}>
-        {WEEK_DAYS_SHORT.map(({label,js}) => {
-          const on = restDays.includes(js);
-          return (
-            <TouchableOpacity key={js} style={[s.restChip, on && s.restChipOn]} onPress={() => onToggle(js)}>
-              <Text style={[s.restLabel, on && {color:'#fff'}]}>{label}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-      {restDays.length > 0 && (
-        <Text style={s.restSummary}>
-          {WEEK_DAYS_SHORT.filter(d => restDays.includes(d.js)).map(d=>d.label).join(', ')} dinlenme günü
-        </Text>
-      )}
-    </View>
-  );
-}
-
 const s = StyleSheet.create({
-  container: {flex:1, backgroundColor:BG},
-  header: {paddingHorizontal:16, paddingTop:16, paddingBottom:20},
-  headerSub: {fontSize:13, color:TEXT2, marginBottom:4},
-  headerTitle: {fontSize:24, color:TEXT, fontWeight:'900', letterSpacing:-0.5},
-  field: {marginHorizontal:16, marginBottom:24},
-  label: {fontSize:11, color:TEXT3, fontWeight:'700', letterSpacing:1.5, marginBottom:10},
-  calHint: {fontSize:12, color:TEXT3, marginBottom:12},
-  inputRow: {flexDirection:'row', alignItems:'center', borderBottomWidth:1, borderBottomColor:BORDER},
-  input: {flex:1, fontSize:22, fontWeight:'600', color:TEXT, paddingVertical:12},
-  
-  // Tabs
-  tabs: { flexDirection:'row', borderBottomWidth:0.5, borderBottomColor:BORDER, position:'relative' },
-  tabIndicator: { position:'absolute', bottom:-0.5, left:0, height:2, backgroundColor:RED },
-  tab: { flex:1, paddingVertical:12, alignItems:'center' },
-  tabText: { fontSize:13, color:TEXT2, fontWeight:'600' },
-  tabTextActive: { color:TEXT, fontWeight:'800' },
+  container: { flex: 1, backgroundColor: BG },
+  header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12 },
+  headerTitle: { fontSize: 24, color: TEXT, fontWeight: '900', letterSpacing: -0.5 },
 
-  // Weekly schedule
-  weekDayDotMini: {width:6, height:6, borderRadius:3, backgroundColor:RED, position:'absolute', top:4, right:4},
+  // Main card
+  card: { marginHorizontal: 16, backgroundColor: CARD, borderRadius: 20 },
 
-  // Monthly carousel chips
-  mChip:       { width: 52, height: 60, borderRadius: 14, backgroundColor: CARD, alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  mChipActive: { backgroundColor: RED },
-  mChipDay:    { fontSize: 18, fontWeight: '700', color: TEXT },
-  mChipMonth:  { fontSize: 11, color: TEXT3, fontWeight: '600', marginTop: 2 },
-  mChipDot:    { position: 'absolute', top: 6, right: 6, width: 6, height: 6, borderRadius: 3, backgroundColor: RED },
-  mChipNav:    { height: 60, paddingHorizontal: 14, borderRadius: 14, backgroundColor: 'rgba(230,0,35,0.1)', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 4, borderWidth: 1.5, borderColor: 'rgba(230,0,35,0.25)' },
-  mChipNavTxt: { fontSize: 14, fontWeight: '700', color: RED },
+  setNameInput: { fontSize: 18, fontWeight: '700', color: TEXT, paddingHorizontal: 18, paddingVertical: 18 },
 
-  // Time
-  timePadAndroid: {flexDirection:'row', alignItems:'center', paddingVertical:10, borderBottomWidth:1, borderBottomColor:BORDER},
-  timeNumAndroid: {fontSize:22, color:TEXT, fontWeight:'600', letterSpacing:1},
+  divider: { height: 1, backgroundColor: BORDER, marginHorizontal: 0 },
 
-  // Rest days
-  dayRowFlex: {flexDirection:'row', justifyContent:'space-between', gap:4},
-  restChip: {flex:1, aspectRatio:1, borderRadius:99, backgroundColor:CARD, alignItems:'center', justifyContent:'center'},
-  restChipOn: {backgroundColor:TEXT},
-  restLabel: {fontSize:13, color:TEXT, fontWeight:'700'},
-  restSummary: {fontSize:12, color:TEXT2, marginTop:10},
+  itemsSection: {},
+  itemRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 18, paddingVertical: 13 },
+  itemRowBorder: { borderBottomWidth: 0.5, borderBottomColor: BORDER },
+  itemDot: { width: 8, height: 8, borderRadius: 4 },
+  itemTitle: { fontSize: 13, fontWeight: '600', color: TEXT },
+  itemMeta: { fontSize: 11, color: TEXT3, marginTop: 1 },
+
+  // Inline form
+  form: { padding: 16, gap: 14 },
+  formTitleInput: {
+    fontSize: 16, fontWeight: '600', color: TEXT,
+    borderBottomWidth: 1, borderBottomColor: BORDER, paddingBottom: 10,
+  },
+
+  dropdownTrigger: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: SURFACE, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11,
+  },
+  dropdownValue: { fontSize: 14, fontWeight: '600', color: TEXT },
+  dropdownList: {
+    position: 'absolute',
+    backgroundColor: BG, borderRadius: 12,
+    borderWidth: 1, borderColor: BORDER,
+    overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1, shadowRadius: 12, elevation: 10,
+  },
+  dropdownItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 12 },
+  dropdownItemBorder: { borderBottomWidth: 0.5, borderBottomColor: BORDER },
+  dropdownItemOn: { backgroundColor: GREEN + '0d' },
+  dropdownItemTxt: { fontSize: 14, color: TEXT2, fontWeight: '500' },
+  dropdownItemTxtOn: { color: TEXT, fontWeight: '700' },
+
+  dayRow: { flexDirection: 'row', gap: 5 },
+  dayChip: { flex: 1, aspectRatio: 1, borderRadius: 999, backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center' },
+  dayChipOn: { backgroundColor: TEXT },
+  dayChipTxt: { fontSize: 11, fontWeight: '700', color: TEXT2 },
+
+  calGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
+  calCell: { width: '12%', aspectRatio: 1, borderRadius: 8, backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center' },
+  calCellOn: { backgroundColor: GREEN },
+  calCellTxt: { fontSize: 12, fontWeight: '700', color: TEXT2 },
+
+  timeBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start',
+    backgroundColor: SURFACE, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8,
+  },
+  timeLbl: { fontSize: 13, color: TEXT2, flex: 1 },
+  timeBtnTxt: { fontSize: 15, fontWeight: '700', color: TEXT, letterSpacing: 0.5 },
+
+  formBtns: { flexDirection: 'row', gap: 8, marginTop: 2 },
+  cancelBtn: { flex: 1, borderRadius: 12, paddingVertical: 12, alignItems: 'center', backgroundColor: SURFACE },
+  cancelTxt: { fontSize: 14, color: TEXT2, fontWeight: '600' },
+  addBtn: { flex: 2, borderRadius: 12, paddingVertical: 12, alignItems: 'center', backgroundColor: GREEN },
+  addBtnOff: { backgroundColor: SURFACE },
+  addBtnTxt: { fontSize: 14, color: '#fff', fontWeight: '700' },
+
+  addRowBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 16 },
+  addRowTxt: { fontSize: 14, color: GREEN, fontWeight: '600' },
 
   // Save
-  saveBtn: {marginHorizontal:16, backgroundColor:RED, borderRadius:8, paddingVertical:14, alignItems:'center'},
-  saveBtnOff: {backgroundColor:SURFACE},
-  saveTxt: {fontSize:16, color:'#fff', fontWeight:'bold'},
+  saveBtn: {
+    marginHorizontal: 16, marginTop: 12, backgroundColor: GREEN,
+    borderRadius: 16, paddingVertical: 15, alignItems: 'center',
+  },
+  saveTxt: { fontSize: 16, color: '#fff', fontWeight: '800' },
+
+  // TimeField (for index.tsx)
+  tfField: { marginBottom: 20 },
+  tfLabel: { fontSize: 11, color: TEXT3, fontWeight: '700', letterSpacing: 1.5, marginBottom: 10 },
+  tfAndroid: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: BORDER },
+  tfAndroidTxt: { fontSize: 22, color: TEXT, fontWeight: '600', letterSpacing: 1 },
 });

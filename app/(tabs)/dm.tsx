@@ -1,367 +1,563 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
-  ScrollView, Dimensions, Alert, Image, Animated,
-  KeyboardAvoidingView, Platform, Modal, Keyboard
+  FlatList, Dimensions, KeyboardAvoidingView, Platform, Modal, ScrollView,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Image } from 'expo-image';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
-import { useStore } from '../../store/useStore';
+import { useStore, Message } from '../../store/useStore';
 import { useRouter } from 'expo-router';
 
-const BG='#FFFFFF'; const CARD='#F4F4F4'; const SURFACE='#EEEEEE';
-const TEXT='#111111'; const TEXT2='#767676'; const TEXT3='#ABABAB';
-const RED='#E60023'; const GOLD='#D4860A'; const BORDER='#E8E8E8'; const PILL=999;
+const { width: SW } = Dimensions.get('window');
 
-const QUESTIONS = [
-  'Bugün tüm rutinlerini tamamladın mı? 👀',
-  'Bugün hiç rutin aksattın mı, dürüst ol!',
-  'Neden hala başlamadın, hesap ver! 🤨',
-  'Bu haftaki gidişatın nasıl, hedefte miyiz?',
-  'Son günlerde motivasyonunu nasıl hissediyorsun?',
-  'Bugün kendini dünküne göre nasıl hissediyorsun?',
-  'Zorlandığın anlarda pes etmeyi düşündün mü?',
-  'En çok hangi rutininde zorlanıyorsun?',
-  'Dün akşamki rutinleri eksiksiz yaptın mı?',
-  'Uyku düzenin bu aralar nasıl gidiyor?',
-  'Sıradaki büyük başarın ne olacak sence?',
-  'Bugün rutinlerinin dışına çıkıp ekstra bir şey yaptın mı?',
-  'Hafta sonları da rutinlerine sadık kalabiliyor musun?',
-  'Seni bu yolda en çok ne motive ediyor?',
-  'Bugünlük rutinlerine ara verip dinlenmek ister misin?',
-  'Kendinle en çok gurur duyduğun an hangisiydi?',
-  'Bir rutini tamamen hayatından çıkarsan hangisi olurdu?',
-  'Bugün için kendine 10 üzerinden kaç puan verirsin?',
-  'Yarın için özel bir planın veya hedefin var mı?',
-  'Benim performansımı nasıl buluyorsun, iyi miyim?'
+// ── Palette ──────────────────────────────────────────────────────────────────
+const CHAT_BG = '#F0F2F5';
+const ME_BG   = '#00bf63';
+const MATE_BG = '#E4E6EB';
+const TEXT    = '#111111';
+const TEXT2   = '#767676';
+const TEXT3   = '#ABABAB';
+const BORDER  = '#E8E8E8';
+const SURFACE = '#F4F4F4';
+const GOLD    = '#D4860A';
+const GREEN   = '#00bf63';
+
+// ── Mock data ─────────────────────────────────────────────────────────────────
+const _now = new Date();
+const ts = (m: number) => new Date(_now.getTime() - m * 60000).toISOString();
+
+const MOCK_MATE = {
+  id: 'mock-1', username: 'ayse_kaya', fullName: 'Ayşe',
+  gender: 'female' as const,
+  avatarUri: 'https://i.pravatar.cc/150?img=47',
+  interests: ['Yoga', 'Meditasyon', 'Koşu'],
+  routines: [], photos: [], achievementScore: 89,
+};
+
+const MOCK_MESSAGES: Message[] = [
+  { id: 'm1',  text: 'Merhaba! Bugün rutinlerin nasıl gidiyor? 😊',          sentByMe: false, timestamp: ts(62) },
+  { id: 'm2',  text: 'Sabah yogasını az önce bitirdim, harikaydı!',           sentByMe: true,  timestamp: ts(60) },
+  { id: 'm3',  text: 'Sen ne kadar yaptın?',                                  sentByMe: true,  timestamp: ts(59) },
+  { id: 'm4',  text: 'Ben de meditasyonu yaptım ama koşuyu es geçtim 😅',    sentByMe: false, timestamp: ts(57) },
+  { id: 'm5',  text: 'Haha olmaz, akşama koşmak zorundasın!',                 sentByMe: true,  timestamp: ts(55) },
+  { id: 'm6',  text: 'Biliyorum 😂 akşama kesinlikle çıkacağım',             sentByMe: false, timestamp: ts(54) },
+  { id: 'm7',  text: 'Söz mü?',                                               sentByMe: false, timestamp: ts(53) },
+  { id: 'm8',  text: 'Bu hafta hedeflerime tam gaz ilerliyorum. Ya sen?',      sentByMe: false, timestamp: ts(20) },
+  { id: 'm9',  text: 'Ben de! 5 günlük seri yaptım 🔥',                      sentByMe: true,  timestamp: ts(18) },
+  { id: 'm10', text: 'Süper! Beni de motive ediyorsun ❤️',                  sentByMe: false, timestamp: ts(16) },
+  { id: 'm11', text: 'Birlikte başaracağız! Rutinleri es geçme 💪',          sentByMe: true,  timestamp: ts(8)  },
+  { id: 'm12', text: 'Kesinlikle! Bugün hangi rutini tamamladın? 🎯',         sentByMe: false, timestamp: ts(3)  },
 ];
 
-const ANSWERS_POS = [
-  'Evet, hepsini eksiksiz tamamladım! 💪',
-  'Bugün harikaydım, sıfır hata!',
-  'Hemen şimdi başlıyorum, bekle!',
-  'Haftalık hedeflerime tam gaz ilerliyorum! 🚀',
-  'Motivasyonum şu an tavan yapmış durumda! 🔥',
-  'Bugün dünden çok daha enerjik ve odaklıyım!',
-  'Asla pes etmem, üstesinden geliyorum!',
-  'Zorlansam da sonunda başarıyorum.',
-  'Dün akşamki rutinleri harika şekilde bitirdim.',
-  'Uyku düzenimi nihayet rayına oturttum.',
-  'Mevcut serimi 30 güne tamamlamak! 🏆',
-  'Evet, bugün ekstra olarak yürüyüş yaptım.',
-  'Hafta sonları da rutinlere tam uyum sağlıyorum.',
-  'Gelişimimi görmek en büyük motivasyonum! ❤️',
-  'Dinlenmeye niyetim yok, çalışmaya devam!',
-  'Zorlanırken bile pes etmeden başardığım an!',
-  'Hepsi çok faydalı, hiçbirini çıkarmam.',
-  'Bugün performansım harikaydı, tam 10 puan! 🌟',
-  'Yarın çok daha erken kalkmayı planlıyorum.',
-  'Harika gidiyorsun, beni de gaza getiriyorsun! 🤝'
+// ── Quick-reply answer map ────────────────────────────────────────────────────
+const QR_ANSWER_MAP: { keys: string[]; replies: string[] }[] = [
+  {
+    keys: ['rutin', 'tamamla', 'yaptın', 'hedef', 'görev'],
+    replies: ['Evet, hepsini tamamladım! 💪', 'Birkaçını atlayabildim 😅', 'Henüz yapmadım, birazdan olacak', 'Bugün tam gaz! 🔥'],
+  },
+  {
+    keys: ['nasıl', 'naber', 'ne haber', 'gidiyor', 'günün', 'nasılsın'],
+    replies: ['İyiyim, sen nasılsın? 😊', 'Çok iyi gidiyor! 🔥', 'İdare eder 😊', 'Harika, teşekkürler!'],
+  },
+  {
+    keys: ['neler yapıyorsun', 'ne yapıyorsun', 'neler'],
+    replies: ['Rutinlerime odaklanıyorum 🎯', 'Biraz dinleniyorum ☕', 'Çalışıyorum, sen?', 'Spora gitmeye hazırlanıyorum 💪'],
+  },
+  {
+    keys: ['mutlu'],
+    replies: ['Rutinimi tamamlamak! 🎯', 'Güzel bir kahve içmek ☕', 'Beklemediğim güzel bir haber almak ✨', 'Henüz pek bir şey olmadı 😅'],
+  },
+  {
+    keys: ['motivasyon', 'motive'],
+    replies: ['Motivasyonum çok yüksek! 🚀', 'Bugün biraz düşük 😔', 'Sen motive ettin beni 💪', 'Her gün daha iyi hissediyorum'],
+  },
+  {
+    keys: ['zor', 'zorlan', 'başaramıy'],
+    replies: ['Devam et, yapabilirsin! 💪', 'Ben de aynı şekilde hissediyorum', 'Yarın daha iyi olacak', 'Küçük adımlar önemli 🎯'],
+  },
+  {
+    keys: ['uyku', 'sabah', 'erken'],
+    replies: ['Uyku düzenim iyi! 😴', 'Erken kalkmak zor 😅', 'Sabah rutini harika gidiyor', 'Dün geç yattım maalesef'],
+  },
+  {
+    keys: ['spor', 'egzersiz', 'antrenman', 'koşu', 'yoga', 'pilates'],
+    replies: ['Az önce bitirdim! 💪', 'Harika hissettirdi! 🔥', 'Bugün es geçtim 😅', 'Her gün yapıyorum!'],
+  },
 ];
+const QR_DEFAULT = ['Harika! 💪', 'Teşekkürler 😊', 'Anladım 👍', 'Biraz sonra yazacağım'];
 
-const ANSWERS_NEG = [
-  'Maalesef bugün hiçbirini yapamadım. 😔',
-  'Bugün bir rutinimi es geçmek zorunda kaldım.',
-  'Bugün hiç enerjim yok, yarına kaldı.',
-  'Hedeflerin biraz gerisinde kaldım bu hafta.',
-  'Bugün motivasyonum gerçekten çok düşük.',
-  'Düne göre daha yorgun ve halsizim.',
-  'Açıkçası bugün pes etmenin eşiğinden döndüm.',
-  'Sabah erken kalkma rutini beni çok zorluyor.',
-  'Dün akşam beklenmedik bir işim çıktı, yapamadım.',
-  'Uyku düzenim darmadağın oldu maalesef.',
-  'Şu an tek başarım günü zararsız atlatmak.',
-  'Bugün ekstra bir şey yapacak halim kalmadı.',
-  'Hafta sonları maalesef çok fazla salıyorum.',
-  'Şu sıralar hiçbir şey beni motive etmiyor.',
-  'Bugün kesinlikle dinlenmeye ihtiyacım var.',
-  'Gurur duyacak bir şey yapamadım henüz.',
-  'Şu diyet işini hayatımdan çıkarsam keşke.',
-  'Bugün maalesef 10 üzerinden ancak 3 veririm.',
-  'Yarın sadece günü kurtarmaya çalışacağım.',
-  'İkimiz de biraz saldık galiba bu aralar. 😅'
-];
-
-type QATab = 'ask' | 'answer';
-
-function toPairs<T>(arr: T[]): [T, T | null][] {
-  const pairs: [T, T | null][] = [];
-  for (let i = 0; i < arr.length; i += 2) {
-    pairs.push([arr[i], arr[i + 1] ?? null]);
+function getAnswerReplies(text: string): string[] {
+  const lower = text.toLowerCase();
+  for (const { keys, replies } of QR_ANSWER_MAP) {
+    if (keys.some(k => lower.includes(k))) return replies;
   }
-  return pairs;
+  return QR_DEFAULT;
 }
 
-export default function DMScreen() {
-  const user        = useStore(s => s.user);
-  const mate        = useStore(s => s.mate);
-  const messages    = useStore(s => s.messages);
-  const sendMessage = useStore(s => s.sendMessage);
-  const deleteMessage = useStore(s => s.deleteMessage);
-  const router      = useRouter();
+// ── Question bank ─────────────────────────────────────────────────────────────
+const ALL_QUESTIONS = [
+  // Rutin
+  'Bugün tüm rutinlerini tamamladın mı? 👀',
+  'Bu haftaki hedeflerine ulaşıyor musun? 🎯',
+  'Hangi rutini en çok seviyorsun?',
+  'En çok hangi rutinde zorlanıyorsun?',
+  'Hafta sonları da rutinlerine sadık mısın?',
+  'Bugün ekstra bir şey yaptın mı? 💪',
+  'Bu ay kaç gün rutinini atladın?',
+  'Sabah mı akşam mı rutin yapmayı tercih edersin?',
+  'Bir rutini bırakmayı düşündüğünde ne yapıyorsun?',
+  // Motivasyon
+  'Motivasyonun şu sıralar nasıl? 🔥',
+  'Seni en çok ne motive ediyor?',
+  'Bu ay en büyük başarın ne oldu? 🏆',
+  'Sıradaki büyük hedefin ne?',
+  'Hedefine ne kadar yakınsın?',
+  'Kendin için koyduğun en zorlu kural nedir?',
+  // Sağlık & Spor
+  'Bugün spor yaptın mı?',
+  'Uyku düzenin nasıl? 😴',
+  'Kaç saatlik uyku aldın?',
+  'Beslenme düzenin nasıl?',
+  'Suyu yeterince içiyor musun? 💧',
+  'Soğuk duş denedin mi hiç?',
+  'En sevdiğin egzersiz nedir?',
+  // Genel
+  'Merhaba, nasılsın? 👋',
+  'Bugün nasıldı? ✨',
+  'Neler yapıyorsun?',
+  'Bugün seni en çok ne mutlu etti? 😊',
+  'Bugün nasıl hissediyorsun?',
+  'Bu hafta nasıl geçti?',
+  'Kendin için ne yaptın bugün? 💚',
+  'Stresliysen nasıl başa çıkıyorsun?',
+  'En büyük hayalin ne?',
+];
 
-  const [input, setInput] = useState('');
-  const [tab, setTab]     = useState<QATab>('ask');
-  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
-  const insets = useSafeAreaInsets();
-  const slideAnim = useRef(new Animated.Value(0)).current;
-  const msgRef = useRef<ScrollView>(null);
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function msgTime(iso: string) {
+  return new Date(iso).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+}
+function dateLabel(iso: string) {
+  const d = new Date(iso);
+  const today = new Date();
+  const yest = new Date(today); yest.setDate(today.getDate() - 1);
+  if (d.toDateString() === today.toDateString()) return 'Bugün';
+  if (d.toDateString() === yest.toDateString()) return 'Dün';
+  return d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' });
+}
 
-  useEffect(() => {
-    const showSub = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => setKeyboardVisible(true));
-    const hideSub = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', () => setKeyboardVisible(false));
-    return () => { showSub.remove(); hideSub.remove(); };
-  }, []);
+const GROUP_THRESHOLD = 3 * 60 * 1000;
 
-  const handleTabPress = (val: QATab, idx: number) => {
-    setTab(val);
-    Animated.spring(slideAnim, {
-      toValue: idx,
-      useNativeDriver: true,
-      bounciness: 0,
-      speed: 16
-    }).start();
-  };
+type ChatItem =
+  | { type: 'date';       id: string; label: string }
+  | { type: 'msg';        id: string; msg: Message; isFirst: boolean; isLast: boolean }
+  | { type: 'quickreply'; id: string; replies: string[] };
 
-  const TAB_DATA: [QATab, string][] = [['ask', 'Soru Sor'], ['answer', 'Cevap Ver']];
-  const tabWidth = Dimensions.get('window').width / 2;
+function buildChatItems(messages: Message[]): ChatItem[] {
+  const items: ChatItem[] = [];
+  let lastDate = '';
 
-  const [sheetConfig, setSheetConfig] = useState<{ title?: string; message?: string; options: { text: string; destructive?: boolean; onPress?: () => void }[] } | null>(null);
+  messages.forEach((msg, i) => {
+    const dateKey = new Date(msg.timestamp).toDateString();
+    if (dateKey !== lastDate) {
+      lastDate = dateKey;
+      items.push({ type: 'date', id: `date-${dateKey}`, label: dateLabel(msg.timestamp) });
+    }
+    const prev = messages[i - 1];
+    const next = messages[i + 1];
+    const sameAsPrev = prev && prev.sentByMe === msg.sentByMe &&
+      new Date(msg.timestamp).getTime() - new Date(prev.timestamp).getTime() < GROUP_THRESHOLD;
+    const sameAsNext = next && next.sentByMe === msg.sentByMe &&
+      new Date(next.timestamp).getTime() - new Date(msg.timestamp).getTime() < GROUP_THRESHOLD;
+    items.push({ type: 'msg', id: msg.id, msg, isFirst: !sameAsPrev, isLast: !sameAsNext });
+  });
 
-  const send = (text: string) => {
-    sendMessage(text);
-    setTimeout(() => msgRef.current?.scrollToEnd({ animated: true }), 80);
-  };
-
-  if (!mate) {
-    return (
-      <SafeAreaView style={s.container}>
-        <View style={s.emptyChat}>
-          <View style={s.emptyIconCircle}>
-            <Ionicons name="chatbubbles-outline" size={48} color={TEXT3} />
-          </View>
-          <Text style={s.emptyTitle}>Henüz Bir Mate Bulamadın</Text>
-          <Text style={s.emptySub}>Mesajlaşmaya başlamak için keşfet sekmesinden kendine bir rutin arkadaşı bulmalısın.</Text>
-          <TouchableOpacity style={s.findBtn} onPress={() => router.push('/mate')}>
-            <Text style={s.findBtnTxt}>Rutinmate Bul</Text>
-            <Ionicons name="search" size={18} color="#fff" />
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
+  // Quick replies only when last message is received
+  const lastMsg = messages[messages.length - 1];
+  if (lastMsg && !lastMsg.sentByMe) {
+    items.push({ type: 'quickreply', id: 'qr', replies: getAnswerReplies(lastMsg.text) });
   }
 
-  const mateAccent  = mate.gender === 'female' ? '#e91e63' : '#3498db';
+  return items;
+}
+
+// ── Bubble ────────────────────────────────────────────────────────────────────
+type BubbleProps = {
+  item: Extract<ChatItem, { type: 'msg' }>;
+  mateAvatarUri: string;
+  mateAccent: string;
+  isPro: boolean;
+  onLongPress: (id: string) => void;
+};
+
+const Bubble = React.memo(({ item, mateAvatarUri, mateAccent, isPro, onLongPress }: BubbleProps) => {
+  const { msg, isFirst, isLast } = item;
+  const mine = msg.sentByMe;
+  const radius = {
+    borderTopLeftRadius:     mine ? 18 : (isFirst ? 4 : 18),
+    borderTopRightRadius:    mine ? (isFirst ? 4 : 18) : 18,
+    borderBottomLeftRadius:  mine ? 18 : (isLast ? 4 : 18),
+    borderBottomRightRadius: mine ? (isLast ? 4 : 18) : 18,
+  };
+  return (
+    <View style={[s.bubbleRow, mine ? s.bubbleRowMine : s.bubbleRowMate, isFirst ? s.groupFirst : s.groupContinue]}>
+      {!mine && (
+        isLast
+          ? <View style={[s.avatarSmall, { borderColor: mateAccent }]}>
+              <Image source={{ uri: mateAvatarUri }} style={{ width: '100%', height: '100%' }} contentFit="cover" blurRadius={isPro ? 0 : 8} />
+            </View>
+          : <View style={s.avatarSmallPlaceholder} />
+      )}
+      <TouchableOpacity activeOpacity={0.8} onLongPress={() => onLongPress(msg.id)} delayLongPress={350}
+        style={[s.bubble, mine ? s.bubbleMine : s.bubbleMate, radius]}>
+        <Text style={[s.bubbleTxt, mine && s.bubbleTxtMine]}>{msg.text}</Text>
+        <View style={s.bubbleMeta}>
+          <Text style={[s.bubbleTime, mine && s.bubbleTimeMine]}>{msgTime(msg.timestamp)}</Text>
+          {mine && <Ionicons name="checkmark-done" size={13} color="rgba(255,255,255,0.7)" style={{ marginLeft: 2 }} />}
+        </View>
+      </TouchableOpacity>
+    </View>
+  );
+});
+
+// ── QuickReplyList ────────────────────────────────────────────────────────────
+const QuickReplyList = React.memo(({ replies, onSend }: { replies: string[]; onSend: (t: string) => void }) => (
+  <View style={s.qrSection}>
+    <Text style={s.qrLabel}>Yanıt Ver</Text>
+    {replies.map((r, i) => (
+      <TouchableOpacity key={i} style={s.qrPill} onPress={() => onSend(r)} activeOpacity={0.65}>
+        <Text style={s.qrPillTxt}>{r}</Text>
+      </TouchableOpacity>
+    ))}
+  </View>
+));
+
+// ── Main screen ───────────────────────────────────────────────────────────────
+export default function DMScreen() {
+  const isPro         = useStore(s => s.user.isPro);
+  const storeMate     = useStore(s => s.mate);
+  const storeMessages = useStore(s => s.messages);
+  const sendMessage   = useStore(s => s.sendMessage);
+  const deleteMessage = useStore(s => s.deleteMessage);
+  const unmatch       = useStore(s => s.unmatch);
+  const router        = useRouter();
+
+  const mate     = storeMate ?? MOCK_MATE;
+  const messages = storeMessages.length > 0 ? storeMessages : (!storeMate ? MOCK_MESSAGES : []);
+
+  const [input, setInput]           = useState('');
+  const [sheetMsgId, setSheetMsgId] = useState<string | null>(null);
+  const [moreOpen, setMoreOpen]     = useState(false);
+  const [confirmUnmatch, setConfirmUnmatch] = useState(false);
+  const [questionOpen, setQuestionOpen]     = useState(false);
+
+  const listRef = useRef<FlatList<ChatItem>>(null);
+
+  const mateAccent    = mate.gender === 'female' ? '#e91e63' : '#3498db';
+  const mateAvatarUri = mate.avatarUri || `https://i.pravatar.cc/150?u=${mate.username}`;
+  const displayName   = (mate as any).fullName ?? mate.username;
+
+  const chatItems = useMemo(() => buildChatItems(messages), [messages]);
+
+  const send = useCallback((text: string) => {
+    if (!text.trim()) return;
+    sendMessage(text.trim());
+    setInput('');
+    setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
+  }, [sendMessage]);
+
+  const renderItem = useCallback(({ item }: { item: ChatItem }) => {
+    if (item.type === 'date') {
+      return <View style={s.datePill}><Text style={s.dateTxt}>{item.label}</Text></View>;
+    }
+    if (item.type === 'quickreply') {
+      if (isPro) return null;
+      return <QuickReplyList replies={item.replies} onSend={send} />;
+    }
+    return <Bubble item={item} mateAvatarUri={mateAvatarUri} mateAccent={mateAccent} isPro={isPro} onLongPress={setSheetMsgId} />;
+  }, [mateAvatarUri, mateAccent, isPro, send]);
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
-      <KeyboardAvoidingView 
-        style={{ flex: 1 }} 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
-      >
-        {/* ── Header ── */}
+
+      {/* ── Header ─────────────────────────────────────────────────────── */}
       <View style={s.header}>
-        <View style={[s.avatar, { overflow: 'hidden', borderWidth: 2, borderColor: mateAccent }]}>
-          <Image 
-            source={{ uri: mate.avatarUri || `https://i.pravatar.cc/150?u=${mate.username}` }} 
-            style={{ width: '100%', height: '100%' }}
-            blurRadius={user.isPro ? undefined : 12}
-          />
+        <View style={[s.headerAvatar, { borderColor: mateAccent }]}>
+          <Image source={{ uri: mateAvatarUri }} style={{ width: '100%', height: '100%' }} contentFit="cover" blurRadius={isPro ? 0 : 12} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={s.mateName}>{mate.username}</Text>
+          <Text style={s.headerName}>{displayName}</Text>
           <View style={s.onlineRow}>
-            <View style={s.dot} /><Text style={s.onlineTxt}>Şu an aktif</Text>
+            <View style={s.onlineDot} />
+            <Text style={s.onlineTxt}>Şu an aktif</Text>
           </View>
         </View>
-        {!user.isPro && (
-          <TouchableOpacity style={s.headerPro} activeOpacity={0.7} onPress={() => router.push('/modal')}>
-            <View style={s.headerProTop}>
-              <FontAwesome5 name="crown" size={10} color={RED} />
-              <Text style={s.headerProTxt}>Pro'ya Geç</Text>
-            </View>
-            <Text style={s.headerProSub}>serbest mesajlaş</Text>
-          </TouchableOpacity>
-        )}
-        <TouchableOpacity style={{ marginLeft: 16, padding: 4 }} onPress={() => Keyboard.dismiss()} activeOpacity={0.6}>
+        <TouchableOpacity style={s.headerIcon} onPress={() => setMoreOpen(true)} activeOpacity={0.7}>
           <Ionicons name="ellipsis-vertical" size={20} color={TEXT2} />
         </TouchableOpacity>
       </View>
 
-      {/* ── Messages ── */}
-      <ScrollView 
-        ref={msgRef} 
-        style={s.messages} 
-        showsVerticalScrollIndicator={false}
-        keyboardDismissMode="on-drag"
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={s.datePill}><Text style={s.dateTxt}>Bugün</Text></View>
-        {messages.map(m => {
-          const t = new Date(m.timestamp).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
-          return (
-            <View key={m.id} style={[s.bubbleRow, m.sentByMe && { justifyContent: 'flex-end' }]}>
-              {!m.sentByMe && (
-                <View style={[s.bubbleAvatar, { overflow: 'hidden', borderWidth: 1.5, borderColor: mateAccent }]}>
-                  <Image 
-                    source={{ uri: mate.avatarUri || `https://i.pravatar.cc/150?u=${mate.username}` }} 
-                    style={{ width: '100%', height: '100%' }}
-                    blurRadius={user.isPro ? undefined : 8}
-                  />
-                </View>
-              )}
-              <TouchableOpacity 
-                style={[s.bubble, m.sentByMe ? s.bubbleMine : s.bubbleMate]}
-                activeOpacity={m.sentByMe ? 0.7 : 1}
-              >
-                <Text style={[s.bubbleTxt, m.sentByMe && { color: '#fff' }]}>{m.text}</Text>
-                <Text style={[s.bubbleTime, m.sentByMe && { color: 'rgba(255,255,255,0.55)' }]}>{t}</Text>
-              </TouchableOpacity>
-            </View>
-          );
-        })}
-        <View style={{ height: 10 }} />
-      </ScrollView>
+      {/* ── KAV: pushes input above keyboard on both platforms ─────────── */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
 
-      {/* ─── Quick Reply Section (non-Pro) ─── */}
-      {!user.isPro && (
-        <View style={[s.quickWrap, { paddingBottom: isKeyboardVisible ? 8 : Math.max(insets.bottom, 12) }]}>
-        <View style={s.tabs}>
-          <Animated.View style={[s.tabIndicator, {
-            width: tabWidth,
-            transform: [{
-              translateX: slideAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [0, tabWidth]
-              })
-            }]
-          }]} />
-          {TAB_DATA.map(([val, lbl], idx) => {
-            const on = tab === val;
-            return (
-              <TouchableOpacity key={val} style={s.tab} onPress={() => handleTabPress(val, idx)}>
-                <Text style={[s.tabText, on && s.tabTextActive]}>{lbl}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        <ScrollView
-          key={tab}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={s.chipScroll}
-        >
-          {tab === 'ask' 
-            ? toPairs(QUESTIONS).map(([top, bottom], idx) => (
-              <View key={`ask-${idx}`} style={s.chipCol}>
-                <TouchableOpacity style={s.chip} onPress={() => send(top)} activeOpacity={0.7}>
-                  <Text style={s.chipTxt} numberOfLines={2}>{top}</Text>
-                </TouchableOpacity>
-                {bottom && (
-                  <TouchableOpacity style={s.chip} onPress={() => send(bottom)} activeOpacity={0.7}>
-                    <Text style={s.chipTxt} numberOfLines={2}>{bottom}</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            ))
-            : ANSWERS_POS.map((pos, idx) => {
-              const neg = ANSWERS_NEG[idx];
-              return (
-                <View key={`ans-${idx}`} style={s.chipCol}>
-                  <TouchableOpacity style={[s.chip, { borderColor: '#C6F6D5', backgroundColor: '#F0FFF4' }]} onPress={() => send(pos)} activeOpacity={0.7}>
-                    <Text style={s.chipTxt} numberOfLines={2}>{pos}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[s.chip, { borderColor: '#FED7D7', backgroundColor: '#FFF5F5' }]} onPress={() => send(neg)} activeOpacity={0.7}>
-                    <Text style={s.chipTxt} numberOfLines={2}>{neg}</Text>
-                  </TouchableOpacity>
-                </View>
-              );
-            })
-          }
-        </ScrollView>
-        </View>
-      )}
-
-      {/* ── Input ── */}
-      {user.isPro && (
-        <View style={[s.inputBar, { paddingBottom: isKeyboardVisible ? 12 : Math.max(insets.bottom, 12) }]}>
-          <TextInput
-            style={s.textInput}
-            value={input}
-            onChangeText={setInput}
-            placeholder="Mesaj yaz..."
-            placeholderTextColor={TEXT3}
-            multiline
-            maxLength={500}
-            textAlignVertical="center"
-            disableFullscreenUI={true}
+        {/* Chat area + floating "Soru Sor" button */}
+        <View style={{ flex: 1 }}>
+          <FlatList
+            ref={listRef}
+            data={chatItems}
+            keyExtractor={item => item.id}
+            renderItem={renderItem}
+            style={s.list}
+            contentContainerStyle={s.listContent}
+            showsVerticalScrollIndicator={false}
+            keyboardDismissMode="on-drag"
+            keyboardShouldPersistTaps="handled"
+            onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
           />
-          <TouchableOpacity
-            style={[s.sendBtn, !!input.trim() && s.sendBtnOn]}
-            onPress={() => { if (input.trim()) { send(input.trim()); setInput(''); } }}
-          >
-            <Ionicons name="send" size={15} color={input.trim() ? '#fff' : TEXT3} />
-          </TouchableOpacity>
-        </View>
-      )}
 
-      {sheetConfig && (
-        <Modal transparent visible animationType="slide" onRequestClose={() => setSheetConfig(null)}>
-          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setSheetConfig(null)}>
-            <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} />
-          </TouchableOpacity>
-          <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#FFFFFF', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: 40 }}>
-            {/* Options would go here */}
+          {/* Floating question button — non-Pro only */}
+          {!isPro && (
+            <TouchableOpacity style={s.questionBtn} onPress={() => setQuestionOpen(true)} activeOpacity={0.85}>
+              <Text style={s.questionBtnText}>❓</Text>
+              <Text style={s.questionBtnLabel}>Soru Sor</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Non-Pro bar */}
+        {!isPro && (
+          <View style={s.nonProBar}>
+            <FontAwesome5 name="crown" size={10} color={GOLD} />
+            <Text style={s.nonProTxt}>Serbest mesaj için </Text>
+            <TouchableOpacity onPress={() => router.push('/pro-upgrade')} activeOpacity={0.8}>
+              <Text style={s.nonProLink}>Pro'ya geç</Text>
+            </TouchableOpacity>
           </View>
+        )}
+
+        {/* Pro input bar */}
+        {isPro && (
+          <View style={s.inputBar}>
+            <TextInput
+              style={s.textInput}
+              value={input}
+              onChangeText={setInput}
+              placeholder="Mesaj yaz..."
+              placeholderTextColor={TEXT3}
+              multiline
+              maxLength={1000}
+              textAlignVertical="center"
+              selectionColor={GREEN}
+            />
+            {!!input.trim() && (
+              <TouchableOpacity style={s.sendBtn} onPress={() => send(input)} activeOpacity={0.85}>
+                <Ionicons name="send" size={17} color="#fff" />
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
+      </KeyboardAvoidingView>
+
+      {/* ── Question popup (centered square card) ──────────────────────── */}
+      {questionOpen && (
+        <Modal transparent visible animationType="fade" onRequestClose={() => setQuestionOpen(false)}>
+          <TouchableOpacity style={s.qpOverlay} activeOpacity={1} onPress={() => setQuestionOpen(false)}>
+            <View style={s.qpCard} onStartShouldSetResponder={() => true}>
+              <View style={s.qpHeader}>
+                <Text style={s.qpTitle}>Soru Sor</Text>
+                <TouchableOpacity onPress={() => setQuestionOpen(false)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+                  <Ionicons name="close" size={20} color={TEXT3} />
+                </TouchableOpacity>
+              </View>
+              <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
+                {ALL_QUESTIONS.map((q, i) => (
+                  <React.Fragment key={i}>
+                    {i > 0 && <View style={s.qpDivider} />}
+                    <TouchableOpacity style={s.qpRow} activeOpacity={0.65}
+                      onPress={() => { send(q); setQuestionOpen(false); }}>
+                      <Text style={s.qpRowTxt}>{q}</Text>
+                      <Ionicons name="chevron-forward" size={14} color={TEXT3} style={{ flexShrink: 0 }} />
+                    </TouchableOpacity>
+                  </React.Fragment>
+                ))}
+                <View style={{ height: 8 }} />
+              </ScrollView>
+            </View>
+          </TouchableOpacity>
         </Modal>
       )}
-      </KeyboardAvoidingView>
+
+      {/* ── Message long-press sheet ────────────────────────────────────── */}
+      {sheetMsgId && (
+        <Modal transparent visible animationType="fade" onRequestClose={() => setSheetMsgId(null)}>
+          <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={() => setSheetMsgId(null)}>
+            <View style={s.sheet}>
+              <View style={s.sheetHandle} />
+              <TouchableOpacity style={s.sheetRow} onPress={() => { deleteMessage(sheetMsgId); setSheetMsgId(null); }}>
+                <Ionicons name="trash-outline" size={20} color="#e74c3c" />
+                <Text style={[s.sheetRowTxt, { color: '#e74c3c' }]}>Mesajı Sil</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      )}
+
+      {/* ── More menu sheet ─────────────────────────────────────────────── */}
+      {moreOpen && (
+        <Modal transparent visible animationType="fade" onRequestClose={() => setMoreOpen(false)}>
+          <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={() => setMoreOpen(false)}>
+            <View style={s.sheet}>
+              <View style={s.sheetHandle} />
+              <TouchableOpacity style={s.sheetRow} onPress={() => { setMoreOpen(false); router.push('/mate-profile'); }}>
+                <Ionicons name="person-outline" size={20} color={TEXT} />
+                <Text style={s.sheetRowTxt}>Profili Gör</Text>
+              </TouchableOpacity>
+              <View style={s.sheetDivider} />
+              <TouchableOpacity style={s.sheetRow} onPress={() => { setMoreOpen(false); setConfirmUnmatch(true); }}>
+                <Ionicons name="heart-dislike-outline" size={20} color="#e74c3c" />
+                <Text style={[s.sheetRowTxt, { color: '#e74c3c' }]}>Eşleşmeyi Bitir</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      )}
+
+      {/* ── Unmatch confirm ─────────────────────────────────────────────── */}
+      {confirmUnmatch && (
+        <Modal transparent visible animationType="fade" onRequestClose={() => setConfirmUnmatch(false)}>
+          <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={() => setConfirmUnmatch(false)}>
+            <View style={s.sheet}>
+              <View style={s.sheetHandle} />
+              <Text style={s.sheetTitle}>Eşleşmeyi Bitir</Text>
+              <Text style={s.sheetMsg}>Bu kişiyle eşleşmen ve tüm mesajlar kalıcı olarak silinecek.</Text>
+              <TouchableOpacity style={s.sheetRow} onPress={() => setConfirmUnmatch(false)}>
+                <Text style={s.sheetRowTxt}>Vazgeç</Text>
+              </TouchableOpacity>
+              <View style={s.sheetDivider} />
+              <TouchableOpacity style={s.sheetRow} onPress={() => { unmatch(); setConfirmUnmatch(false); }}>
+                <Text style={[s.sheetRowTxt, { color: '#e74c3c', fontWeight: '800' }]}>Evet, Bitir</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+      )}
+
     </SafeAreaView>
   );
 }
 
+// ── Styles ────────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  container:   { flex: 1, backgroundColor: BG },
-  emptyChat: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 40 },
-  emptyIconCircle: { width: 100, height: 100, borderRadius: 50, backgroundColor: CARD, justifyContent: 'center', alignItems: 'center', marginBottom: 24 },
-  emptyTitle: { fontSize: 20, fontWeight: '900', color: TEXT, textAlign: 'center' },
-  emptySub: { fontSize: 14, color: TEXT2, textAlign: 'center', marginTop: 12, lineHeight: 20 },
-  findBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: RED, paddingHorizontal: 24, paddingVertical: 14, borderRadius: 16, marginTop: 32 },
-  findBtnTxt: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
 
-  header:      { flexDirection:'row', alignItems:'center', gap:12, paddingHorizontal:16, paddingVertical:12, borderBottomWidth:0.5, borderBottomColor:BORDER },
-  avatar:      { width:44, height:44, borderRadius:22, alignItems:'center', justifyContent:'center', backgroundColor:SURFACE },
-  mateName:    { fontSize:16, color:TEXT, fontWeight:'700' },
-  onlineRow:   { flexDirection:'row', alignItems:'center', gap:5, marginTop:2 },
-  dot:         { width:6, height:6, borderRadius:3, backgroundColor:'#008800' },
-  onlineTxt:   { fontSize:12, color:TEXT2, fontWeight:'500' },
-  headerPro:   { alignItems:'flex-end', justifyContent:'center', paddingLeft:8 },
-  headerProTop:{ flexDirection:'row', alignItems:'center', gap:4 },
-  headerProTxt:{ fontSize:12, color:RED, fontWeight:'800' },
-  headerProSub:{ fontSize:9, color:TEXT3, marginTop:2, fontWeight:'600' },
-  messages:    { flex:1, paddingHorizontal:14 },
-  datePill:    { alignItems:'center', paddingVertical:16 },
-  dateTxt:     { fontSize:11, color:TEXT3, fontWeight:'600' },
-  bubbleRow:   { flexDirection:'row', alignItems:'flex-start', marginBottom:8, gap:7 },
-  bubbleAvatar:{ width:26, height:26, borderRadius:13, alignItems:'center', justifyContent:'center', marginTop: 2 },
-  bubble:      { maxWidth:'75%', borderRadius:20, paddingHorizontal:14, paddingVertical:10 },
-  bubbleMine:  { backgroundColor:RED },
-  bubbleMate:  { backgroundColor:CARD },
-  bubbleTxt:   { fontSize:14, color:TEXT, lineHeight:19 },
-  bubbleTime:  { fontSize:10, color:TEXT3, marginTop:4, alignSelf:'flex-end' },
-  quickWrap: { paddingTop: 0, backgroundColor: BG, shadowColor: '#000', shadowOffset: { width: 0, height: -6 }, shadowOpacity: 0.09, shadowRadius: 12, elevation: 15, borderTopWidth: 0 },
-  tabs:        { flexDirection:'row', borderBottomWidth:0.5, borderBottomColor:BORDER, marginBottom:8, position:'relative' },
-  tabIndicator:{ position:'absolute', bottom:-0.5, left:0, height:2, backgroundColor:TEXT },
-  tab:         { flex:1, paddingVertical:8, alignItems:'center' },
-  tabText:     { fontSize:12, color:TEXT2, fontWeight:'500' },
-  tabTextActive:{ color:TEXT, fontWeight:'700' },
-  chipScroll:  { paddingLeft:14, paddingRight:8, paddingBottom:12, gap:8 },
-  chipCol:     { gap:8, flexDirection:'column', maxWidth:200 },
-  chip:        { borderRadius:14, backgroundColor:'#FFF5F6', borderWidth:1, borderColor:'#FFE0E5', paddingHorizontal:12, paddingVertical:8, maxWidth:200 },
-  chipTxt:     { fontSize:12, fontWeight:'500', lineHeight:16, color:TEXT },
-  inputBar:   { flexDirection:'row', alignItems:'center', gap:10, paddingHorizontal:16, paddingVertical:12, borderTopWidth:0.5, borderTopColor:BORDER, backgroundColor: BG },
-  textInput:  { flex:1, backgroundColor:CARD, borderRadius:24, paddingHorizontal:20, paddingTop:12, paddingBottom:12, fontSize:15, color:TEXT, maxHeight:120, minHeight:48, borderWidth: 1, borderColor: 'transparent' },
-  sendBtn:    { width:48, height:48, borderRadius:24, backgroundColor:SURFACE, alignItems:'center', justifyContent:'center' },
-  sendBtnOn:  { backgroundColor:RED },
+  // Header
+  header: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 12, paddingVertical: 10,
+    borderBottomWidth: 0.5, borderBottomColor: BORDER, backgroundColor: '#FFFFFF',
+  },
+  headerAvatar: { width: 42, height: 42, borderRadius: 21, borderWidth: 2, overflow: 'hidden', backgroundColor: SURFACE },
+  headerName:   { fontSize: 16, fontWeight: '700', color: TEXT, letterSpacing: -0.2 },
+  onlineRow:    { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 1 },
+  onlineDot:    { width: 7, height: 7, borderRadius: 4, backgroundColor: '#25D366' },
+  onlineTxt:    { fontSize: 12, color: TEXT2 },
+  headerIcon:   { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+
+  // List
+  list:        { flex: 1, backgroundColor: CHAT_BG },
+  listContent: { paddingHorizontal: 8, paddingTop: 12, paddingBottom: 64 }, // extra bottom so last item clears the floating btn
+
+  // Date pill
+  datePill: { alignItems: 'center', marginVertical: 12 },
+  dateTxt:  { fontSize: 11, fontWeight: '600', color: TEXT2, backgroundColor: '#DDE1E7', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 3 },
+
+  // Bubble rows
+  bubbleRow:     { flexDirection: 'row', alignItems: 'flex-end', maxWidth: '88%' },
+  bubbleRowMine: { alignSelf: 'flex-end', flexDirection: 'row-reverse' },
+  bubbleRowMate: { alignSelf: 'flex-start' },
+  groupFirst:    { marginTop: 6 },
+  groupContinue: { marginTop: 2 },
+
+  // Avatar
+  avatarSmall:            { width: 28, height: 28, borderRadius: 14, borderWidth: 1.5, overflow: 'hidden', backgroundColor: SURFACE, marginRight: 4, flexShrink: 0 },
+  avatarSmallPlaceholder: { width: 32, flexShrink: 0 },
+
+  // Bubble
+  bubble: { maxWidth: SW * 0.7, paddingHorizontal: 13, paddingTop: 8, paddingBottom: 6, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
+  bubbleMine:     { backgroundColor: ME_BG, marginLeft: 4 },
+  bubbleMate:     { backgroundColor: MATE_BG, marginRight: 4 },
+  bubbleTxt:      { fontSize: 15, color: TEXT, lineHeight: 21 },
+  bubbleTxtMine:  { color: '#FFFFFF' },
+  bubbleMeta:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginTop: 3, gap: 1 },
+  bubbleTime:     { fontSize: 10, color: TEXT3 },
+  bubbleTimeMine: { color: 'rgba(255,255,255,0.65)' },
+
+  // Quick replies — floating pills
+  qrSection: { marginLeft: 40, marginRight: 16, marginTop: 8, marginBottom: 8, gap: 5 },
+  qrLabel:   { fontSize: 10, fontWeight: '700', color: TEXT3, letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 2 },
+  qrPill: {
+    backgroundColor: '#FFFFFF', borderRadius: 14,
+    paddingHorizontal: 14, paddingVertical: 11,
+    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, shadowOffset: { width: 0, height: 1 }, elevation: 1,
+  },
+  qrPillTxt: { fontSize: 14, color: TEXT, lineHeight: 19 },
+
+  // Floating "Soru Sor" button
+  questionBtn: {
+    position: 'absolute', right: 14, bottom: 14,
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: '#FFFFFF', borderRadius: 22,
+    paddingHorizontal: 14, paddingVertical: 9,
+    shadowColor: '#000', shadowOpacity: 0.14, shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 }, elevation: 6,
+  },
+  questionBtnText:  { fontSize: 16 },
+  questionBtnLabel: { fontSize: 13, fontWeight: '700', color: TEXT },
+
+  // Non-Pro bar
+  nonProBar: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 10, paddingHorizontal: 16, gap: 3,
+    backgroundColor: '#FFFFFF', borderTopWidth: 0.5, borderTopColor: BORDER,
+  },
+  nonProTxt:  { fontSize: 12, color: TEXT2 },
+  nonProLink: { fontSize: 12, color: GOLD, fontWeight: '700' },
+
+  // Pro input
+  inputBar: {
+    flexDirection: 'row', alignItems: 'flex-end', gap: 8,
+    paddingHorizontal: 12, paddingTop: 8, paddingBottom: 10,
+    backgroundColor: '#FFFFFF', borderTopWidth: 0.5, borderTopColor: BORDER,
+  },
+  textInput: {
+    flex: 1, backgroundColor: SURFACE, borderRadius: 22,
+    paddingHorizontal: 16, paddingTop: 11, paddingBottom: 11,
+    fontSize: 15, color: TEXT, maxHeight: 120, minHeight: 44, lineHeight: 20,
+  },
+  sendBtn: {
+    width: 44, height: 44, borderRadius: 22, backgroundColor: GREEN,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: GREEN, shadowOpacity: 0.4, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 4,
+  },
+
+  // Question popup
+  qpOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.42)', justifyContent: 'center', paddingHorizontal: 20 },
+  qpCard:    { backgroundColor: '#FFFFFF', borderRadius: 20, maxHeight: '72%', overflow: 'hidden' },
+  qpHeader:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 18, paddingBottom: 12 },
+  qpTitle:   { fontSize: 17, fontWeight: '800', color: TEXT },
+  qpDivider: { height: 0.5, backgroundColor: BORDER, marginHorizontal: 20 },
+  qpRow:     { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 14 },
+  qpRowTxt:  { fontSize: 14, color: TEXT, flex: 1, lineHeight: 20 },
+
+  // Sheets
+  overlay:      { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  sheet:        { backgroundColor: '#FFFFFF', borderTopLeftRadius: 22, borderTopRightRadius: 22, paddingHorizontal: 24, paddingTop: 12, paddingBottom: 40 },
+  sheetHandle:  { width: 40, height: 4, backgroundColor: SURFACE, borderRadius: 2, alignSelf: 'center', marginBottom: 16 },
+  sheetTitle:   { fontSize: 16, fontWeight: '800', color: TEXT, textAlign: 'center', marginBottom: 6 },
+  sheetMsg:     { fontSize: 13, color: TEXT2, textAlign: 'center', lineHeight: 18, marginBottom: 16 },
+  sheetRow:     { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 15 },
+  sheetRowTxt:  { fontSize: 16, color: TEXT, fontWeight: '600' },
+  sheetDivider: { height: 0.5, backgroundColor: BORDER },
 });

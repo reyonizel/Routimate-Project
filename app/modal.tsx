@@ -7,11 +7,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
+import { Audio } from 'expo-av';
 import { useStore } from '../store/useStore';
+import { supabase } from '../lib/supabase';
 
 const BG = '#FFFFFF';
 const TEXT = '#111111'; const TEXT2 = '#767676'; const TEXT3 = '#ABABAB';
-const RED = '#E60023'; const GOLD = '#C9920A'; const BORDER = '#F0F0F0';
+const RED = '#00bf63'; const GOLD = '#C9920A'; const BORDER = '#F0F0F0';
 const CARD = '#F8F8F8'; const PILL = 999;
 
 // ─── Animated Pro Card ───────────────────────────────────────────────────────
@@ -111,24 +113,58 @@ function Row({
 
 // ─── Notification Sound Sheet ─────────────────────────────────────────────────
 const SOUNDS = [
-  { id: 'default', label: 'Varsayılan',  icon: 'notifications-outline' as const },
-  { id: 'soft',    label: 'Yumuşak',     icon: 'volume-low-outline' as const },
-  { id: 'chime',   label: 'Çan Sesi',    icon: 'musical-notes-outline' as const },
-  { id: 'pulse',   label: 'Nabız',       icon: 'pulse-outline' as const },
-  { id: 'none',    label: 'Sessiz',      icon: 'volume-mute-outline' as const },
+  { id: 'default', label: 'Varsayılan', icon: 'notifications-outline' as const, file: null },
+  { id: 'correct', label: 'Doğru', icon: 'checkmark-circle-outline' as const, file: require('../assets/images/dragon-studio-correct-472358.mp3') },
+  { id: 'apple_pay', label: 'Başarılı (Apple)', icon: 'card-outline' as const, file: require('../assets/images/ksjsbwuil-apple-pay-success-sound-effect-481188.mp3') },
+  { id: 'success', label: 'Başarılı', icon: 'star-outline' as const, file: require('../assets/images/meldix-success-340660.mp3') },
+  { id: 'notify', label: 'Bildirim', icon: 'notifications-outline' as const, file: require('../assets/images/notification_message-notify-7-310750.mp3') },
+  { id: 'iphone_msg', label: 'Mesaj (iPhone)', icon: 'chatbubble-outline' as const, file: require('../assets/images/son_duquotidient-message-envoye-iphone-apple-391098.mp3') },
+  { id: 'level_up', label: 'Seviye Atlama', icon: 'arrow-up-circle-outline' as const, file: require('../assets/images/tithuh-level-up-02-528919.mp3') },
+  { id: 'notify_022', label: 'Kısa Çınlama', icon: 'musical-note-outline' as const, file: require('../assets/images/universfield-new-notification-022-370046.mp3') },
+  { id: 'notify_037', label: 'Hafif Tıklama', icon: 'musical-note-outline' as const, file: require('../assets/images/universfield-new-notification-037-485898.mp3') },
+  { id: 'notify_054', label: 'Tatlı Bildirim', icon: 'musical-note-outline' as const, file: require('../assets/images/universfield-new-notification-054-494259.mp3') },
+  { id: 'notify_057', label: 'Dikkat Çekici', icon: 'musical-note-outline' as const, file: require('../assets/images/universfield-new-notification-057-494255.mp3') },
+  { id: 'none', label: 'Sessiz', icon: 'volume-mute-outline' as const, file: null },
 ];
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function ModalScreen() {
-  const router    = useRouter();
-  const user      = useStore((s) => s.user);
+  const router     = useRouter();
+  const user       = useStore((s) => s.user);
   const updateUser = useStore((s) => s.updateUser);
   const togglePro  = useStore((s) => s.togglePro);
+  const resetStore = useStore((s) => s.resetStore);
 
   const [editing, setEditing]             = useState(false);
   const [username, setUsername]           = useState(user.username);
-  const [selectedSound, setSelectedSound] = useState('default');
-  const [soundSheet, setSoundSheet]       = useState(false);
+  const [soundSheet, setSoundSheet]       = useState<'notification' | 'completion' | null>(null);
+
+  const playSound = async (file: any) => {
+    if (!file) return;
+    try {
+      const { sound } = await Audio.Sound.createAsync(file);
+      await sound.playAsync();
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && status.didJustFinish) {
+          sound.unloadAsync();
+        }
+      });
+    } catch (e) {
+      console.log('Error playing sound', e);
+    }
+  };
+
+  const handleSelectSound = (snd: typeof SOUNDS[0]) => {
+    if (soundSheet === 'notification') {
+      updateUser({ notificationSound: snd.id });
+    } else if (soundSheet === 'completion') {
+      updateUser({ completionSound: snd.id });
+    }
+    if (snd.file) {
+      playSound(snd.file);
+    }
+    setSoundSheet(null);
+  };
 
   const saveUsername = () => {
     if (!username.trim()) return;
@@ -152,6 +188,51 @@ export default function ModalScreen() {
     );
   };
 
+  const handleLogout = () => {
+    Alert.alert('Çıkış Yap', 'Hesabınızdan çıkmak istediğinize emin misiniz?', [
+      { text: 'İptal', style: 'cancel' },
+      {
+        text: 'Çıkış Yap', style: 'destructive', onPress: async () => {
+          resetStore();
+          await supabase.auth.signOut();
+        },
+      },
+    ]);
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Hesabı Sil',
+      'Tüm verileriniz kalıcı olarak silinecek. Bu işlem geri alınamaz.',
+      [
+        { text: 'İptal', style: 'cancel' },
+        {
+          text: 'Evet, Sil', style: 'destructive', onPress: () => {
+            Alert.alert(
+              'Son Onay',
+              'Hesabınız ve tüm verileriniz silinecek. Devam edilsin mi?',
+              [
+                { text: 'Vazgeç', style: 'cancel' },
+                {
+                  text: 'Kalıcı Olarak Sil', style: 'destructive', onPress: async () => {
+                    try {
+                      const { error } = await supabase.rpc('delete_user_account');
+                      if (error) throw error;
+                      resetStore();
+                      await supabase.auth.signOut();
+                    } catch (err: any) {
+                      Alert.alert('Hata', err?.message ?? 'Hesap silinirken bir hata oluştu.');
+                    }
+                  },
+                },
+              ]
+            );
+          },
+        },
+      ]
+    );
+  };
+
   const handleRate = () => {
     const url = Platform.select({
       ios: 'https://apps.apple.com/app/idXXXXXXXXX',
@@ -168,7 +249,8 @@ export default function ModalScreen() {
     );
   };
 
-  const currentSound = SOUNDS.find(s => s.id === selectedSound) ?? SOUNDS[0];
+  const currentNotifSound = SOUNDS.find(s => s.id === (user.notificationSound || 'default')) ?? SOUNDS[0];
+  const currentCompSound = SOUNDS.find(s => s.id === (user.completionSound || 'correct')) ?? SOUNDS[1];
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
@@ -187,7 +269,14 @@ export default function ModalScreen() {
 
         {/* Pro Card */}
         <View style={{ marginHorizontal: 16, marginTop: 16, marginBottom: 8 }}>
-          <ProCard isPro={user.isPro} onToggle={togglePro} />
+          <ProCard isPro={user.isPro} onToggle={() => {
+            if (!user.isPro) {
+              router.back();
+              setTimeout(() => router.push('/pro-upgrade'), 250);
+            } else {
+              togglePro();
+            }
+          }} />
         </View>
 
         {/* Profil */}
@@ -233,7 +322,7 @@ export default function ModalScreen() {
         </Section>
 
         {/* Bildirimler */}
-        <Section title="Bildirimler">
+        <Section title="Bildirimler & Sesler">
           <Row
             icon="alarm-outline"
             label="Bildirim Saatini Değiştir"
@@ -242,10 +331,17 @@ export default function ModalScreen() {
           />
           <Divider />
           <Row
-            icon={currentSound.icon}
+            icon={currentNotifSound.icon}
             label="Bildirim Sesi"
-            sub={currentSound.label}
-            onPress={() => setSoundSheet(true)}
+            sub={currentNotifSound.label}
+            onPress={() => setSoundSheet('notification')}
+          />
+          <Divider />
+          <Row
+            icon={currentCompSound.icon}
+            label="Görev Tamamlama Sesi"
+            sub={currentCompSound.label}
+            onPress={() => setSoundSheet('completion')}
           />
         </Section>
 
@@ -284,36 +380,57 @@ export default function ModalScreen() {
             onPress={handleShare}
           />
           <Divider />
-          <Row icon="shield-checkmark-outline" label="KVKK & Gizlilik" onPress={() => Alert.alert('KVKK', 'Gizlilik politikası')} />
+          <Row
+            icon="shield-checkmark-outline"
+            label="KVKK & Gizlilik"
+            onPress={() => Linking.openURL('https://routinmate.app/kvkk').catch(() => Alert.alert('Hata', 'Sayfa açılamadı.'))}
+          />
           <Divider />
-          <Row icon="document-text-outline" label="Kullanıcı Sözleşmesi" onPress={() => Alert.alert('Sözleşme', 'Kullanıcı sözleşmesi')} />
+          <Row
+            icon="document-text-outline"
+            label="Kullanıcı Sözleşmesi"
+            onPress={() => Linking.openURL('https://routinmate.app/sozlesme').catch(() => Alert.alert('Hata', 'Sayfa açılamadı.'))}
+          />
         </Section>
 
         {/* Tehlike */}
         <Section title="Tehlike Bölgesi">
-          <Row icon="log-out-outline" label="Çıkış Yap" danger onPress={() => Alert.alert('Çıkış', 'Çıkış yapıldı.')} />
+          <Row icon="log-out-outline" label="Çıkış Yap" danger onPress={handleLogout} />
           <Divider />
-          <Row
-            icon="trash-outline"
-            label="Hesabı Sil"
-            danger
-            onPress={() =>
-              Alert.alert('Hesabı Sil', 'Tüm verileriniz kalıcı olarak silinecek.', [
-                { text: 'İptal', style: 'cancel' },
-                { text: 'Sil', style: 'destructive', onPress: () => Alert.alert('Silindi', 'Simülasyon.') },
-              ])
-            }
-          />
+          <Row icon="trash-outline" label="Hesabı Sil" danger onPress={handleDeleteAccount} />
         </Section>
 
-        {/* Dev */}
-        <TouchableOpacity
-          style={s.devBtn}
-          onPress={() => { router.back(); setTimeout(() => router.push('/debug'), 250); }}
-        >
-          <Ionicons name="code-slash-outline" size={14} color={TEXT3} />
-          <Text style={s.devTxt}>Geliştirici Paneli</Text>
-        </TouchableOpacity>
+        {/* Dev Panel */}
+        <Section title="🛠 Geliştirici Paneli">
+          {([
+            { icon: 'home-outline',           label: 'Ana Sayfa',          route: '/(tabs)/index' },
+            { icon: 'search-outline',         label: 'Mate Keşfi',         route: '/(tabs)/mate' },
+            { icon: 'storefront-outline',     label: 'Mağaza',             route: '/(tabs)/store' },
+            { icon: 'chatbubble-outline',     label: 'Mesajlar',           route: '/(tabs)/dm' },
+            { icon: 'person-outline',         label: 'Profil',             route: '/(tabs)/profile' },
+            { icon: 'add-circle-outline',     label: 'Rutin Oluştur',      route: '/(tabs)/create' },
+            { icon: 'create-outline',         label: 'Profili Düzenle',    route: '/edit-profile' },
+            { icon: 'bag-outline',            label: 'Ürün Detayı',        route: '/product-detail?id=1' },
+            { icon: 'people-outline',         label: 'Mate Profili',       route: '/mate-profile' },
+            { icon: 'person-add-outline',     label: 'Karşılama',          route: '/welcome' },
+            { icon: 'log-in-outline',         label: 'Giriş / Kayıt',      route: '/auth' },
+            { icon: 'clipboard-outline',      label: 'Onboarding',         route: '/onboarding' },
+            { icon: 'star-outline',           label: 'Pro Yükseltme',       route: '/pro-upgrade' },
+            { icon: 'bug-outline',            label: 'Debug Paneli',        route: '/debug' },
+          ] as { icon: React.ComponentProps<typeof Ionicons>['name']; label: string; route: string }[]).map(
+            (item, i, arr) => (
+              <React.Fragment key={item.route}>
+                <Row
+                  icon={item.icon}
+                  label={item.label}
+                  iconBg="#F0F0F0"
+                  onPress={() => { router.back(); setTimeout(() => router.push(item.route as any), 250); }}
+                />
+                {i < arr.length - 1 && <Divider />}
+              </React.Fragment>
+            )
+          )}
+        </Section>
 
       </ScrollView>
 
@@ -335,14 +452,14 @@ export default function ModalScreen() {
               <TouchableOpacity
                 key={snd.id}
                 style={[s.soundRow, i === SOUNDS.length - 1 && { borderBottomWidth: 0 }]}
-                onPress={() => { setSelectedSound(snd.id); setSoundSheet(false); }}
+                onPress={() => handleSelectSound(snd)}
                 activeOpacity={0.7}
               >
-                <View style={[s.soundIcon, selectedSound === snd.id && { backgroundColor: RED + '18' }]}>
-                  <Ionicons name={snd.icon} size={18} color={selectedSound === snd.id ? RED : TEXT2} />
+                <View style={[s.soundIcon, (user.notificationSound || 'default') === snd.id && { backgroundColor: RED + '18' }]}>
+                  <Ionicons name={snd.icon} size={18} color={(user.notificationSound || 'default') === snd.id ? RED : TEXT2} />
                 </View>
-                <Text style={[s.soundLabel, selectedSound === snd.id && { color: RED, fontWeight: '700' }]}>{snd.label}</Text>
-                {selectedSound === snd.id && <Ionicons name="checkmark" size={18} color={RED} />}
+                <Text style={[s.soundLabel, (user.notificationSound || 'default') === snd.id && { color: RED, fontWeight: '700' }]}>{snd.label}</Text>
+                {(user.notificationSound || 'default') === snd.id && <Ionicons name="checkmark" size={18} color={RED} />}
               </TouchableOpacity>
             ))}
           </View>

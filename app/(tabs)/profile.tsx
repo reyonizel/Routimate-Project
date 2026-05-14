@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Image, Alert, Modal, TextInput, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Alert, Modal } from 'react-native';
+import { Image } from 'expo-image';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import * as Location from 'expo-location';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { useStore } from '../../store/useStore';
+import { Photo } from '../../store/useStore';
+import { BlurView } from 'expo-blur';
 import Svg, { Circle, G, Text as SvgText } from 'react-native-svg';
 
 const { width } = Dimensions.get('window');
@@ -15,7 +16,7 @@ const today = new Date().toISOString().split('T')[0];
 
 const BG = '#FFFFFF'; const CARD = '#F4F4F4'; const SURFACE = '#EEEEEE';
 const TEXT = '#111111'; const TEXT2 = '#767676'; const TEXT3 = '#ABABAB';
-const RED = '#E60023'; const GREEN = '#008800'; const GOLD = '#D4860A';
+const RED = '#00bf63'; const GREEN = '#008800'; const GOLD = '#D4860A';
 const BORDER = '#E8E8E8'; const PILL = 999;
 
 export default function ProfileScreen() {
@@ -24,103 +25,15 @@ export default function ProfileScreen() {
   const addPhoto = useStore((s) => s.addPhoto);
   const deletePhoto = useStore((s) => s.deletePhoto);
   const pinPhoto = useStore((s) => s.pinPhoto);
+  const toggleSetActive = useStore((s) => s.toggleSetActive);
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const accentColor = user.gender === 'female' ? '#e91e63' : '#3498db';
   const [activeTab, setActiveTab] = useState(0);
+  const [expandedSet, setExpandedSet] = useState<string | null>(null);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
-  const [editProfileVisible, setEditProfileVisible] = useState(false);
-  
-  const [editUsername, setEditUsername] = useState(user.username);
-  const [editFullName, setEditFullName] = useState(user.fullName || '');
-  const [editBio, setEditBio] = useState(user.bio || '');
-  
-  const [birthDateObj, setBirthDateObj] = useState<Date | null>(() => {
-    if (!user.birthDate) return null;
-    const d = new Date(user.birthDate);
-    return isNaN(d.getTime()) ? null : d;
-  });
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  
-  const [selectedCity, setSelectedCity] = useState(user.locationName || '');
-  const [cityQuery, setCityQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<string[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const searchTimeout = React.useRef<any>(null);
 
-  const searchLocation = (text: string) => {
-    setCityQuery(text);
-    if (text.length < 3) {
-      setSearchResults([]);
-      return;
-    }
-    
-    if (searchTimeout.current) clearTimeout(searchTimeout.current);
-    searchTimeout.current = setTimeout(async () => {
-      setIsSearching(true);
-      try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(text)}&format=json&limit=5&addressdetails=1`, {
-          headers: { 'User-Agent': 'RoutinMate/1.0' }
-        });
-        const data = await res.json();
-        const results = data.map((d: any) => {
-          const addr = d.address || {};
-          const city = addr.city || addr.town || addr.village || addr.state;
-          const country = addr.country;
-          if (city && country) return `${city}, ${country}`;
-          return d.display_name.split(',').slice(0,2).join(',').trim();
-        }).filter((v: string, i: number, a: string[]) => v && a.indexOf(v) === i);
-        setSearchResults(results);
-      } catch (e) {
-        // ignore
-      } finally {
-        setIsSearching(false);
-      }
-    }, 800);
-  };
-  
   const TABS = ['Rutinler', 'Fotoğraflar', 'İstatistik'];
-
-  const handleSaveProfile = () => {
-    updateUser({ 
-      username: editUsername,
-      fullName: editFullName,
-      bio: editBio,
-      birthDate: birthDateObj ? birthDateObj.toISOString() : undefined,
-      locationName: selectedCity || undefined
-    });
-    setEditProfileVisible(false);
-  };
-
-  const handleDateChange = (event: any, selectedDate?: Date) => {
-    if (Platform.OS === 'android') setShowDatePicker(false);
-    if (event.type === 'set' || Platform.OS === 'ios') {
-      if (selectedDate) setBirthDateObj(selectedDate);
-    } else {
-      setShowDatePicker(false);
-    }
-  };
-
-  const fetchLocation = async () => {
-    try {
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Hata', 'Konum izni reddedildi.');
-        return;
-      }
-      const loc = await Location.getCurrentPositionAsync({});
-      const geocode = await Location.reverseGeocodeAsync({
-        latitude: loc.coords.latitude,
-        longitude: loc.coords.longitude
-      });
-      if (geocode && geocode.length > 0) {
-        const place = geocode[0];
-        const locName = `${place.city || place.subregion || place.region}, ${place.country}`;
-        setSelectedCity(locName);
-      }
-    } catch (e) {
-      Alert.alert('Hata', 'Konum alınamadı.');
-    }
-  };
 
   const photoRefs = React.useRef<{ [id: string]: any }>({});
   const [popover, setPopover] = useState<{ id: string, x: number, y: number, w: number, h: number } | null>(null);
@@ -183,10 +96,10 @@ export default function ProfileScreen() {
             <TouchableOpacity onPress={pickAvatar} activeOpacity={0.85} style={styles.avatarWrap}>
               <View style={[styles.avatarRing, { borderColor: accentColor }]}>
                 {user.avatarUri
-                  ? <Image source={{ uri: user.avatarUri }} style={styles.avatarImage} />
+                  ? <Image source={{ uri: user.avatarUri }} style={styles.avatarImage} contentFit="cover" />
                   : (
                     <View style={styles.avatarInner}>
-                      <Text style={[styles.avatarLetter, { color: accentColor }]}>{user.username[0].toUpperCase()}</Text>
+                      <Text style={[styles.avatarLetter, { color: accentColor }]}>{(user.username || '?')[0].toUpperCase()}</Text>
                     </View>
                   )
                 }
@@ -234,30 +147,15 @@ export default function ProfileScreen() {
               <Text style={[styles.proBadgeText, { color: GOLD }]}>Pro Üye</Text>
             </View>
           ) : (
-            <TouchableOpacity style={[styles.upgradeBtn, { flex: 1 }]} onPress={() => router.push('/modal')} activeOpacity={0.85}>
+            <TouchableOpacity style={[styles.upgradeBtn, { flex: 1 }]} onPress={() => router.push('/pro-upgrade')} activeOpacity={0.85}>
               <FontAwesome5 name="crown" size={14} color="#fff" />
               <Text style={styles.upgradeBtnText}>Pro'ya Geç</Text>
             </TouchableOpacity>
           )}
 
-          <TouchableOpacity 
-            style={[styles.editProfileBtn, { flex: 1, marginLeft: 8 }]} 
-            onPress={() => { 
-              setEditUsername(user.username); 
-              setEditFullName(user.fullName || ''); 
-              setEditBio(user.bio || ''); 
-              
-              if (user.birthDate) {
-                const d = new Date(user.birthDate);
-                setBirthDateObj(isNaN(d.getTime()) ? null : d);
-              } else {
-                setBirthDateObj(null);
-              }
-              
-              setSelectedCity(user.locationName || ''); 
-              setCityQuery('');
-              setEditProfileVisible(true); 
-            }} 
+          <TouchableOpacity
+            style={[styles.editProfileBtn, { flex: 1, marginLeft: 8 }]}
+            onPress={() => router.push('/edit-profile')}
             activeOpacity={0.85}
           >
             <Text style={styles.editProfileBtnText}>Profili Düzenle</Text>
@@ -276,23 +174,74 @@ export default function ProfileScreen() {
         {/* Tab 0: Routines */}
         {activeTab === 0 && (
           <View style={styles.tabContent}>
-            {user.routines.length === 0
-              ? <Text style={styles.emptyMsg}>Henüz rutin yok</Text>
-              : user.routines.map((r) => {
-                const done = r.completedDates.includes(today);
+            {user.routines.length === 0 ? (
+              <Text style={styles.emptyMsg}>Henüz rutin seti yok</Text>
+            ) : (() => {
+              const FREQ_LABEL: Record<string, string> = { daily: 'Günlük', weekly: 'Haftalık', monthly: 'Aylık' };
+              const groups: Record<string, typeof user.routines> = {};
+              user.routines.forEach(r => {
+                const key = r.setName || 'Diğer';
+                if (!groups[key]) groups[key] = [];
+                groups[key].push(r);
+              });
+              return Object.entries(groups).map(([setName, routines]) => {
+                const isInactive = (user.inactiveSets ?? []).includes(setName);
+                const isExpanded = expandedSet === setName;
                 return (
-                  <View key={r.id} style={styles.routineRow}>
-                    <View style={[styles.routineDot, { backgroundColor: done ? GREEN : SURFACE, borderWidth: done ? 0 : 1.5, borderColor: BORDER }]}>
-                      {done && <Ionicons name="checkmark" size={12} color="#fff" />}
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.routineName, done && { color: TEXT3, textDecorationLine: 'line-through' }]}>{r.name}</Text>
-                      <Text style={styles.routineMeta}>{r.frequency} · {r.completedDates.length} tamamlama</Text>
-                    </View>
+                  <View key={setName} style={styles.setBlock}>
+                    {/* Collapsed header — tap chevron to expand */}
+                    <TouchableOpacity
+                      style={styles.setHeader}
+                      onPress={() => setExpandedSet(isExpanded ? null : setName)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.setTitle, isInactive && styles.setTitleInactive]}>{setName}</Text>
+                        <Text style={styles.setMeta}>{routines.length} rutin · {isInactive ? 'Pasif' : 'Aktif'}</Text>
+                      </View>
+                      <Ionicons
+                        name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                        size={18}
+                        color={TEXT3}
+                      />
+                    </TouchableOpacity>
+
+                    {/* Expanded: routine rows + pasifleştir butonu */}
+                    {isExpanded && (
+                      <>
+                        {routines.map(r => {
+                          const done = r.completedDates.includes(today);
+                          return (
+                            <View key={r.id} style={styles.routineRow}>
+                              <View style={[styles.routineDot, {
+                                backgroundColor: done ? RED : SURFACE,
+                                borderWidth: done ? 0 : 1.5,
+                                borderColor: BORDER,
+                              }]}>
+                                {done && <Ionicons name="checkmark" size={10} color="#fff" />}
+                              </View>
+                              <View style={{ flex: 1 }}>
+                                <Text style={[styles.routineName, done && { color: TEXT3 }]}>{r.name}</Text>
+                                <Text style={styles.routineMeta}>{FREQ_LABEL[r.frequency]} · {r.completedDates.length} tamamlama</Text>
+                              </View>
+                            </View>
+                          );
+                        })}
+                        <TouchableOpacity
+                          style={[styles.setActionBtn, isInactive && styles.setActionBtnActive]}
+                          onPress={() => toggleSetActive(setName)}
+                          activeOpacity={0.8}
+                        >
+                          <Text style={[styles.setActionTxt, isInactive && { color: RED }]}>
+                            {isInactive ? 'Aktifleştir' : 'Pasifleştir'}
+                          </Text>
+                        </TouchableOpacity>
+                      </>
+                    )}
                   </View>
                 );
-              })
-            }
+              });
+            })()}
           </View>
         )}
 
@@ -305,8 +254,8 @@ export default function ProfileScreen() {
                 <Text style={styles.photoAddText}>Fotoğraf Ekle</Text>
               </TouchableOpacity>
               {user.photos.map((p, index) => (
-                <TouchableOpacity 
-                  key={p.id} 
+                <TouchableOpacity
+                  key={p.id}
                   ref={el => { photoRefs.current[p.id] = el; }}
                   style={styles.photoCell}
                   activeOpacity={0.8}
@@ -314,10 +263,15 @@ export default function ProfileScreen() {
                   onLongPress={() => handleLongPress(p.id)}
                   delayLongPress={200}
                 >
-                  <Image source={{ uri: p.uri }} style={styles.photoImage} resizeMode="cover" />
+                  <Image source={{ uri: p.uri }} style={styles.photoImage} contentFit="cover" />
                   {p.isPinned && (
                     <View style={{ position: 'absolute', top: 6, right: 6, backgroundColor: RED, borderRadius: 12, width: 22, height: 22, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 3, shadowOffset: {width: 0, height: 2}, elevation: 3 }}>
                       <FontAwesome5 name="thumbtack" size={11} color="#fff" style={{ transform: [{ rotate: '-45deg' }] }} />
+                    </View>
+                  )}
+                  {p.proofMeta && !p.isPinned && (
+                    <View style={{ position: 'absolute', top: 6, right: 6, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 10, width: 22, height: 22, alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name="camera" size={12} color="#fff" />
                     </View>
                   )}
                 </TouchableOpacity>
@@ -426,10 +380,7 @@ export default function ProfileScreen() {
       {/* Fullscreen Photo Gallery Viewer */}
       {viewerIndex !== null && (
         <Modal transparent visible={true} animationType="fade" onRequestClose={() => setViewerIndex(null)}>
-          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.95)' }}>
-            <TouchableOpacity style={{ position: 'absolute', top: 50, right: 20, zIndex: 10, padding: 10 }} onPress={() => setViewerIndex(null)}>
-              <Ionicons name="close" size={32} color="#fff" />
-            </TouchableOpacity>
+          <View style={{ flex: 1, backgroundColor: '#fff' }}>
             <ScrollView
               horizontal
               pagingEnabled
@@ -437,8 +388,28 @@ export default function ProfileScreen() {
               contentOffset={{ x: viewerIndex * width, y: 0 }}
             >
               {user.photos.map((p) => (
-                <View key={p.id} style={{ width, height: Dimensions.get('window').height, justifyContent: 'center', alignItems: 'center' }}>
-                  <Image source={{ uri: p.uri }} style={{ width: '100%', height: width * 1.2 }} resizeMode="contain" />
+                <View key={p.id} style={{ width, height: Dimensions.get('window').height, backgroundColor: '#fff', justifyContent: 'center' }}>
+                  <Image source={{ uri: p.uri }} style={{ width: '100%', height: '100%' }} contentFit="contain" />
+                  
+                  {/* Top Header Panel */}
+                  <View style={{ position: 'absolute', top: Math.max(insets.top + 10, 40), left: 20, right: 20, flexDirection: 'row', alignItems: 'center' }}>
+                    <TouchableOpacity style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.06)', alignItems: 'center', justifyContent: 'center', marginRight: 12 }} onPress={() => setViewerIndex(null)}>
+                      <Ionicons name="chevron-back" size={24} color="#111" style={{ marginRight: 2 }} />
+                    </TouchableOpacity>
+                    
+                    <View style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.85)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 14 }}>
+                      <Text style={{ fontSize: 15, fontWeight: '800', color: '#111', letterSpacing: -0.3 }} numberOfLines={1}>
+                        {p.proofMeta ? (
+                          p.proofMeta.setName ? `${p.proofMeta.setName} - ${p.proofMeta.routineName}` : p.proofMeta.routineName
+                        ) : (
+                          'Fotoğraf'
+                        )}
+                      </Text>
+                      <Text style={{ fontSize: 12, color: '#666', marginTop: 2, fontWeight: '500' }}>
+                        {new Date(p.proofMeta?.capturedAt || p.uploadedAt).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                      </Text>
+                    </View>
+                  </View>
                 </View>
               ))}
             </ScrollView>
@@ -446,143 +417,6 @@ export default function ProfileScreen() {
         </Modal>
       )}
 
-      {/* Edit Profile Modal */}
-      <Modal visible={editProfileVisible} transparent animationType="slide" onRequestClose={() => setEditProfileVisible(false)}>
-        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setEditProfileVisible(false)}>
-          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} />
-        </TouchableOpacity>
-        <View style={styles.editModalContainer}>
-          <View style={styles.editModalHeader}>
-            <Text style={styles.editModalTitle}>Profili Düzenle</Text>
-            <TouchableOpacity onPress={() => setEditProfileVisible(false)} style={{ padding: 4 }}>
-              <Ionicons name="close" size={24} color={TEXT} />
-            </TouchableOpacity>
-          </View>
-          
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
-            <View style={styles.editInputGroup}>
-              <Text style={styles.editInputLabel}>Ad Soyad</Text>
-              <TextInput
-                style={styles.editInput}
-                value={editFullName}
-                onChangeText={setEditFullName}
-                placeholder="Örn: Burhan Yılmaz"
-                placeholderTextColor={TEXT3}
-                selectionColor={TEXT}
-              />
-            </View>
-            <View style={styles.editInputGroup}>
-              <Text style={styles.editInputLabel}>Kullanıcı Adı</Text>
-              <TextInput
-                style={styles.editInput}
-                value={editUsername}
-                onChangeText={setEditUsername}
-                placeholder="Kullanıcı adı"
-                placeholderTextColor={TEXT3}
-                selectionColor={TEXT}
-              />
-            </View>
-            <View style={styles.editInputGroup}>
-              <Text style={styles.editInputLabel}>Biyografi</Text>
-              <TextInput
-                style={[styles.editInput, { minHeight: 60, textAlignVertical: 'top' }]}
-                value={editBio}
-                onChangeText={setEditBio}
-                placeholder="Kendinden bahset..."
-                placeholderTextColor={TEXT3}
-                selectionColor={TEXT}
-                multiline
-              />
-            </View>
-            <View style={styles.editInputGroup}>
-              <Text style={styles.editInputLabel}>Doğum Tarihi</Text>
-              {Platform.OS === 'ios' ? (
-                <View style={{ overflow: 'hidden', height: 120 }}>
-                  <DateTimePicker
-                    value={birthDateObj || new Date(2000, 0, 1)}
-                    mode="date"
-                    display="spinner"
-                    onChange={handleDateChange}
-                    style={{ width: '100%', height: 120 }}
-                  />
-                </View>
-              ) : (
-                <>
-                  <TouchableOpacity 
-                    style={[styles.editInput, { paddingVertical: 12 }]} 
-                    onPress={() => setShowDatePicker(true)}
-                  >
-                    <Text style={{ fontSize: 16, color: birthDateObj ? TEXT : TEXT3 }}>
-                      {birthDateObj ? birthDateObj.toLocaleDateString('tr-TR') : 'Doğum tarihi seçin'}
-                    </Text>
-                  </TouchableOpacity>
-                  
-                  {showDatePicker && (
-                    <DateTimePicker
-                      value={birthDateObj || new Date(2000, 0, 1)}
-                      mode="date"
-                      display="spinner"
-                      onChange={handleDateChange}
-                    />
-                  )}
-                </>
-              )}
-            </View>
-            <View style={styles.editInputGroup}>
-              <Text style={styles.editInputLabel}>Konum Seçimi</Text>
-              
-              {selectedCity ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1.5, borderBottomColor: TEXT, paddingVertical: 8 }}>
-                  <Ionicons name="location" size={18} color={TEXT} style={{ marginRight: 8 }} />
-                  <Text style={{ flex: 1, fontSize: 16, color: TEXT, fontWeight: '500' }}>{selectedCity}</Text>
-                  <TouchableOpacity onPress={() => setSelectedCity('')}>
-                    <Ionicons name="close-circle" size={20} color={TEXT3} />
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1.5, borderBottomColor: TEXT }}>
-                    <TextInput
-                      style={{ flex: 1, fontSize: 16, paddingVertical: 8, color: TEXT, fontWeight: '500' }}
-                      value={cityQuery}
-                      onChangeText={searchLocation}
-                      placeholder="Şehir, ülke ara..."
-                      placeholderTextColor={TEXT3}
-                      selectionColor={TEXT}
-                    />
-                    <TouchableOpacity onPress={fetchLocation} style={{ padding: 4 }}>
-                      <Ionicons name="location" size={22} color={TEXT} />
-                    </TouchableOpacity>
-                  </View>
-                  
-                  {isSearching && <Text style={{ marginTop: 8, color: TEXT3, fontSize: 12 }}>Aranıyor...</Text>}
-                  
-                  {cityQuery.length > 0 && searchResults.length > 0 && (
-                    <View style={{ marginTop: 8, backgroundColor: BG, borderRadius: 8, borderWidth: 1, borderColor: BORDER }}>
-                      {searchResults.map((item, idx) => (
-                        <TouchableOpacity 
-                          key={idx} 
-                          style={{ padding: 12, borderBottomWidth: 1, borderBottomColor: BORDER }}
-                          onPress={() => { setSelectedCity(item); setCityQuery(''); setSearchResults([]); }}
-                        >
-                          <Text style={{ fontSize: 15, color: TEXT }}>{item}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
-                  {cityQuery.length > 2 && !isSearching && searchResults.length === 0 && (
-                     <Text style={{ marginTop: 8, color: TEXT3, fontSize: 13 }}>Sonuç bulunamadı</Text>
-                  )}
-                </View>
-              )}
-            </View>
-          </ScrollView>
-          
-          <TouchableOpacity style={[styles.saveBtn, { marginTop: 16 }]} onPress={handleSaveProfile} activeOpacity={0.85}>
-            <Text style={styles.saveBtnText}>Kaydet</Text>
-          </TouchableOpacity>
-        </View>
-      </Modal>
 
     </SafeAreaView>
   );
@@ -616,18 +450,10 @@ const styles = StyleSheet.create({
   actionRow: { flexDirection: 'row', paddingHorizontal: 16, marginBottom: 12 },
   proBadge: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: SURFACE, borderRadius: 5, paddingVertical: 10, borderWidth: 1, borderColor: BORDER },
   proBadgeText: { fontSize: 13, fontWeight: '700' },
-  upgradeBtn: { flexDirection: 'row', gap: 8, backgroundColor: '#E60023', borderRadius: 8, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', width: '100%' },
+  upgradeBtn: { flexDirection: 'row', gap: 8, backgroundColor: '#00bf63', borderRadius: 8, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', width: '100%' },
   upgradeBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' },
   editProfileBtn: { backgroundColor: SURFACE, borderRadius: 8, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: BORDER },
   editProfileBtnText: { color: TEXT, fontSize: 14, fontWeight: '700' },
-  editModalContainer: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#FFFFFF', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 24, paddingBottom: 40, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 10 },
-  editModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
-  editModalTitle: { fontSize: 18, fontWeight: 'bold', color: TEXT },
-  editInputGroup: { marginBottom: 24 },
-  editInputLabel: { fontSize: 13, color: TEXT2, marginBottom: 8, fontWeight: '600' },
-  editInput: { borderBottomWidth: 1.5, borderBottomColor: TEXT, fontSize: 16, paddingVertical: 8, color: TEXT, fontWeight: '500' },
-  saveBtn: { backgroundColor: TEXT, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
-  saveBtnText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
   tabs: { flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: BORDER, marginHorizontal: 16 },
   tab: { flex: 1, paddingVertical: 12, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
   tabActive: { borderBottomColor: TEXT },
@@ -635,10 +461,18 @@ const styles = StyleSheet.create({
   tabTextActive: { color: TEXT, fontWeight: '800' },
   tabContent: { padding: 16 },
   emptyMsg: { textAlign: 'center', color: TEXT3, fontSize: 14, paddingTop: 30 },
-  routineRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, gap: 12, borderBottomWidth: 0.5, borderBottomColor: BORDER },
-  routineDot: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  routineName: { fontSize: 15, color: TEXT, fontWeight: '700' },
-  routineMeta: { fontSize: 12, color: TEXT2, marginTop: 3 },
+  setBlock: { marginBottom: 12, backgroundColor: CARD, borderRadius: 16, overflow: 'hidden' },
+  setHeader: { flexDirection: 'row', alignItems: 'center', padding: 14 },
+  setTitle: { fontSize: 15, color: TEXT, fontWeight: '800', letterSpacing: -0.3 },
+  setTitleInactive: { color: TEXT3 },
+  setMeta: { fontSize: 11, color: TEXT3, marginTop: 2 },
+  setActionBtn: { margin: 12, marginTop: 4, borderRadius: 10, paddingVertical: 11, alignItems: 'center', backgroundColor: SURFACE },
+  setActionBtnActive: { backgroundColor: RED + '15' },
+  setActionTxt: { fontSize: 13, fontWeight: '700', color: TEXT2 },
+  routineRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 14, gap: 10, borderTopWidth: 0.5, borderTopColor: BORDER },
+  routineDot: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  routineName: { fontSize: 13, color: TEXT, fontWeight: '600' },
+  routineMeta: { fontSize: 11, color: TEXT3, marginTop: 2 },
   photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 2 },
   photoAdd: { width: PHOTO_SIZE, height: PHOTO_SIZE, backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center', borderRadius: 10, borderWidth: 1.5, borderColor: BORDER, borderStyle: 'dashed', gap: 6 },
   photoAddText: { fontSize: 11, color: TEXT3, fontWeight: '600' },

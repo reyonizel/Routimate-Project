@@ -1,18 +1,49 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Dimensions, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Dimensions, TextInput, Image, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
 import { useStore } from '../../store/useStore';
 import { TimeField } from './create';
+import { Audio } from 'expo-av';
+
+const SOUND_FILES = {
+  correct: require('../../assets/images/dragon-studio-correct-472358.mp3'),
+  apple_pay: require('../../assets/images/ksjsbwuil-apple-pay-success-sound-effect-481188.mp3'),
+  success: require('../../assets/images/meldix-success-340660.mp3'),
+  notify: require('../../assets/images/notification_message-notify-7-310750.mp3'),
+  iphone_msg: require('../../assets/images/son_duquotidient-message-envoye-iphone-apple-391098.mp3'),
+  level_up: require('../../assets/images/tithuh-level-up-02-528919.mp3'),
+  notify_022: require('../../assets/images/universfield-new-notification-022-370046.mp3'),
+  notify_037: require('../../assets/images/universfield-new-notification-037-485898.mp3'),
+  notify_054: require('../../assets/images/universfield-new-notification-054-494259.mp3'),
+  notify_057: require('../../assets/images/universfield-new-notification-057-494255.mp3'),
+};
+
+const playCompletionSound = async (soundId: string) => {
+  if (!soundId || soundId === 'none' || soundId === 'default') return;
+  const file = SOUND_FILES[soundId as keyof typeof SOUND_FILES];
+  if (!file) return;
+  try {
+    const { sound } = await Audio.Sound.createAsync(file);
+    await sound.playAsync();
+    sound.setOnPlaybackStatusUpdate((status) => {
+      if (status.isLoaded && status.didJustFinish) {
+        sound.unloadAsync();
+      }
+    });
+  } catch (e) {}
+};
 
 const { height: SH } = Dimensions.get('window');
 const today = new Date().toISOString().split('T')[0];
 
 const BG='#FFFFFF'; const CARD='#F4F4F4'; const SURFACE='#EEEEEE';
 const TEXT='#111111'; const TEXT2='#767676'; const TEXT3='#ABABAB';
-const RED='#E60023'; const GREEN='#008800'; const GOLD='#D4860A';
+const RED='#00bf63'; const GREEN='#008800'; const GOLD='#D4860A';
 const BORDER='#E8E8E8'; const PILL=999;
 
 const FREQ_COLOR: Record<string,string> = { daily:'#2980b9', weekly:'#8e44ad', monthly:'#d35400' };
@@ -26,7 +57,9 @@ export default function HomeScreen() {
   const toggleRestDay = useStore(s => s.toggleRestDay);
   const deleteRoutine = useStore(s => s.deleteRoutine);
   const updateRoutine = useStore(s => s.updateRoutine);
+  const addRoutineProof = useStore(s => s.addRoutineProof);
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const accent = user.gender === 'female' ? '#e91e63' : '#3498db';
   const isRestDay = user.restDays.includes(today);
 
@@ -35,6 +68,31 @@ export default function HomeScreen() {
   const [selectedDate, setSelectedDate] = useState<string|null>(null);
   const [sheetVisible, setSheetVisible] = useState(false);
   const [expandedRoutineId, setExpandedRoutineId] = useState<string | null>(null);
+
+  const handleToggleDone = (routineId: string, dateStr: string, wasDone: boolean) => {
+    toggleRoutineComplete(routineId, dateStr);
+    if (!wasDone) {
+      playCompletionSound(user.completionSound || 'correct');
+    }
+  };
+
+  const [proofPhoto, setProofPhoto] = useState<{ routineId: string; uri: string } | null>(null);
+
+  const handleCameraPress = async (routineId: string) => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('İzin Gerekli', 'Fotoğraf çekebilmek için kamera iznine ihtiyacımız var.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+      allowsEditing: false,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setProofPhoto({ routineId, uri: result.assets[0].uri });
+    }
+  };
 
   const [quickEditRoutineId, setQuickEditRoutineId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
@@ -63,6 +121,12 @@ export default function HomeScreen() {
     const dow = new Date(dateStr + 'T12:00:00').getDay();
     const dayOfMonth = new Date(dateStr + 'T12:00:00').getDate();
     return user.routines.filter(r => {
+      // inactive set check
+      if (r.setName && (user.inactiveSets ?? []).includes(r.setName)) return false;
+      // scope check
+      if (r.scope === 'once' && r.onceRange) {
+        if (dateStr < r.onceRange.start || dateStr > r.onceRange.end) return false;
+      }
       if (r.frequency === 'daily') return true;
       if (r.frequency === 'weekly') {
         if (!r.targetDays || r.targetDays.length === 0) return true;
@@ -74,7 +138,7 @@ export default function HomeScreen() {
       }
       return true;
     });
-  }, [user.routines]);
+  }, [user.routines, user.inactiveSets]);
 
   const getRate = useCallback((dateStr: string) => {
     if (user.restDays.includes(dateStr)) return -1; // rest day sentinel
@@ -88,6 +152,16 @@ export default function HomeScreen() {
   const todayRoutines = getApplicable(today);
   const doneToday = todayRoutines.filter(r => r.completedDates.includes(today)).length;
   const todayPct = todayRoutines.length > 0 ? Math.round((doneToday / todayRoutines.length) * 100) : 0;
+
+  const todayGroups = (() => {
+    const map = new Map<string, typeof todayRoutines>();
+    todayRoutines.forEach(r => {
+      const key = r.setName ?? '';
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(r);
+    });
+    return Array.from(map.entries()).map(([key, rs]) => ({ setName: key || undefined, routines: rs }));
+  })();
 
   // Calendar
   const year = calMonth.getFullYear();
@@ -135,8 +209,12 @@ export default function HomeScreen() {
               <Ionicons name="calendar-outline" size={17} color={view==='calendar' ? '#fff' : TEXT2} />
             </TouchableOpacity>
           </View>
-          <TouchableOpacity style={s.settBtn} onPress={() => router.push('/modal')}>
-            <Ionicons name="settings-outline" size={20} color={TEXT2} />
+          <TouchableOpacity
+            style={[s.settBtn, isRestDay && s.settBtnRest]}
+            onPress={() => toggleRestDay(today)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name={isRestDay ? 'moon' : 'moon-outline'} size={20} color={isRestDay ? '#fff' : TEXT2} />
           </TouchableOpacity>
         </View>
       </View>
@@ -144,39 +222,6 @@ export default function HomeScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         {view === 'list' ? (
           <>
-            {/* Top Cards Row */}
-            <View style={s.topCardsRow}>
-              {/* Progress OR Native Ad */}
-              {isRestDay ? (
-                <View style={[s.topCard, { padding: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1a1a1a' }]}>
-                  <View style={{ position: 'absolute', top: 8, left: 8, backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, zIndex: 10 }}>
-                    <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800' }}>AD</Text>
-                  </View>
-                  <Ionicons name="play-circle" size={36} color="rgba(255,255,255,0.9)" />
-                  <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 10, marginTop: 6, fontWeight: '600' }}>Sponsorlu Video</Text>
-                </View>
-              ) : (
-                <View style={s.topCard}>
-                  <Text style={s.topCardLabel}>İlerleme</Text>
-                  <Text style={[s.topCardVal, {color: todayPct===100 ? GREEN : accent}]}>{doneToday}<Text style={s.topCardDenom}>/{todayRoutines.length}</Text></Text>
-                  <View style={s.track}>
-                    <View style={[s.fill, {width: `${todayPct}%` as any, backgroundColor: todayPct===100 ? GREEN : accent}]} />
-                  </View>
-                </View>
-              )}
-
-              {/* Rest Day */}
-              <TouchableOpacity
-                style={[s.topCard, isRestDay && s.topCardRestOn]}
-                onPress={() => toggleRestDay(today)}
-                activeOpacity={0.8}
-              >
-                <Text style={[s.topCardLabel, isRestDay && {color:'rgba(255,255,255,0.8)'}]}>Dinlenme</Text>
-                <Text style={[s.topCardVal, isRestDay ? {color: '#fff'} : {color: TEXT}]}>{isRestDay ? 'Aktif' : 'Pasif'}</Text>
-                <Ionicons name={isRestDay ? 'moon' : 'moon-outline'} size={16} color={isRestDay ? '#fff' : TEXT3} style={s.topCardIcon} />
-              </TouchableOpacity>
-            </View>
-
             {/* List */}
             {isRestDay ? (
               <View style={s.empty}>
@@ -192,60 +237,106 @@ export default function HomeScreen() {
               </View>
             ) : (
               <View style={s.list}>
-                {[...todayRoutines]
-                  .sort((a, b) => {
+                {todayGroups.map((group, idx) => {
+                  const groupDone = group.routines.filter(r => r.completedDates.includes(today)).length;
+                  const groupPct = group.routines.length > 0 ? Math.round((groupDone / group.routines.length) * 100) : 0;
+                  const barColor = groupPct === 100 ? GREEN : accent;
+                  const sorted = [...group.routines].sort((a, b) => {
                     const aDone = a.completedDates.includes(today);
                     const bDone = b.completedDates.includes(today);
                     return aDone === bDone ? 0 : aDone ? -1 : 1;
-                  })
-                  .map(r => {
-                  const done = r.completedDates.includes(today);
-                  const isExpanded = expandedRoutineId === r.id;
+                  });
                   return (
-                    <Animated.View layout={LinearTransition} key={r.id} style={{ borderBottomWidth: 0.5, borderBottomColor: BORDER }}>
-                      <View 
-                        ref={el => { routineRefs.current[r.id] = el; }}
-                        style={[s.row, { borderBottomWidth: 0, paddingVertical: 0 }]} 
-                      >
-                        <TouchableOpacity 
-                          style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingVertical: 12 }}
-                          onPress={() => toggleRoutineComplete(r.id, today)} 
-                          onLongPress={() => handleLongPress(r.id)}
-                          delayLongPress={200}
-                          activeOpacity={0.7}
-                        >
-                          <View style={[s.check, {borderColor: done ? GREEN : GOLD, marginRight: 10}]}>
-                            {done 
-                              ? <Ionicons name="checkmark" size={14} color={GREEN} />
-                              : <Ionicons name="hourglass-outline" size={10} color={GOLD} />}
+                    <React.Fragment key={group.setName ?? '__none__'}>
+                      {idx > 0 && <View style={s.setDivider} />}
+                      <View style={[s.setGroup, idx % 2 !== 0 && s.setGroupAlt]}>
+                        {group.setName && (
+                          <View style={s.setGroupHeader}>
+                            <Ionicons name="layers-outline" size={12} color={TEXT2} />
+                            <Text style={s.setGroupTitle}>{group.setName}</Text>
                           </View>
-                          <View style={{flex:1}}>
-                            <Text style={[s.rowName, done && {color: TEXT2}]}>{r.name}</Text>
-                            <Text style={[s.rowMeta, done && {color: TEXT3}]}>{FREQ_LABEL[r.frequency]} · {r.notificationTime}</Text>
-                          </View>
-                        </TouchableOpacity>
-                        
-                        {r.description ? (
-                          <TouchableOpacity 
-                            style={{ paddingVertical: 12, paddingLeft: 12, paddingRight: 4 }} 
-                            onPress={() => toggleExpand(r.id)}
-                            activeOpacity={0.6}
-                          >
-                            <Ionicons 
-                              name={isExpanded ? "chevron-up" : "chevron-down"} 
-                              size={18} 
-                              color={TEXT3} 
-                            />
-                          </TouchableOpacity>
-                        ) : null}
+                        )}
+                        <View style={s.storyBar}>
+                          {group.routines.map(r => {
+                            const done = r.completedDates.includes(today);
+                            return (
+                              <View key={r.id} style={[s.storySegment, { backgroundColor: done ? barColor : SURFACE }]} />
+                            );
+                          })}
+                        </View>
+                        <View style={{ gap: 7 }}>
+                          {sorted.map(r => {
+                            const done = r.completedDates.includes(today);
+                            const isExpanded = expandedRoutineId === r.id;
+                            const hasProof = r.proofPhotos?.some(p => p.date === today) ?? false;
+                            return (
+                              <Animated.View layout={LinearTransition} key={r.id} style={s.routineRow}>
+                                <TouchableOpacity
+                                  style={[s.checkBtn, done ? s.checkBtnDone : s.checkBtnPending]}
+                                  onPress={() => handleToggleDone(r.id, today, done)}
+                                  activeOpacity={0.8}
+                                >
+                                  {done
+                                    ? <Ionicons name="checkmark" size={14} color="#fff" />
+                                    : <Ionicons name="hourglass-outline" size={11} color="#fff" />}
+                                </TouchableOpacity>
+                                <View
+                                  ref={el => { routineRefs.current[r.id] = el; }}
+                                  style={[s.routineCard, done && s.routineCardDone]}
+                                >
+                                  <View style={s.routineCardRow}>
+                                    <TouchableOpacity
+                                      style={s.routineCardMain}
+                                      onLongPress={() => handleLongPress(r.id)}
+                                      delayLongPress={200}
+                                      activeOpacity={0.7}
+                                    >
+                                      <View style={{ flex: 1 }}>
+                                        <Text style={[s.rowName, done && { color: '#fff' }]}>{r.name}</Text>
+                                        <Text style={[s.rowMeta, done && { color: 'rgba(255,255,255,0.75)' }]}>{FREQ_LABEL[r.frequency]} · {r.notificationTime}</Text>
+                                      </View>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                      style={[s.routineCardCamera, done && s.routineCardCameraDone]}
+                                      onPress={() => handleCameraPress(r.id)}
+                                      activeOpacity={0.7}
+                                    >
+                                      {hasProof ? (
+                                        <Image
+                                          source={{ uri: r.proofPhotos!.find(p => p.date === today)!.uri }}
+                                          style={{ width: 28, height: 28, borderRadius: 8 }}
+                                          resizeMode="cover"
+                                        />
+                                      ) : (
+                                        <Ionicons name="camera-outline" size={13} color={done ? 'rgba(255,255,255,0.7)' : TEXT2} />
+                                      )}
+                                    </TouchableOpacity>
+                                    {r.description ? (
+                                      <TouchableOpacity
+                                        style={s.routineCardChevron}
+                                        onPress={() => toggleExpand(r.id)}
+                                        activeOpacity={0.6}
+                                      >
+                                        <Ionicons
+                                          name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                                          size={16}
+                                          color={done ? 'rgba(255,255,255,0.7)' : TEXT3}
+                                        />
+                                      </TouchableOpacity>
+                                    ) : null}
+                                  </View>
+                                  {isExpanded && r.description ? (
+                                    <Animated.View entering={FadeIn} exiting={FadeOut} style={s.routineCardDesc}>
+                                      <Text style={{ fontSize: 13, color: done ? 'rgba(255,255,255,0.8)' : TEXT2, lineHeight: 18 }}>{r.description}</Text>
+                                    </Animated.View>
+                                  ) : null}
+                                </View>
+                              </Animated.View>
+                            );
+                          })}
+                        </View>
                       </View>
-                      
-                      {isExpanded && r.description ? (
-                        <Animated.View entering={FadeIn} exiting={FadeOut} style={{ paddingLeft: 30, paddingRight: 16, paddingBottom: 14, marginTop: -4 }}>
-                          <Text style={{ fontSize: 13, color: TEXT2, lineHeight: 18 }}>{r.description}</Text>
-                        </Animated.View>
-                      ) : null}
-                    </Animated.View>
+                    </React.Fragment>
                   );
                 })}
               </View>
@@ -318,6 +409,15 @@ export default function HomeScreen() {
         <View style={{height:80}} />
       </ScrollView>
 
+      {/* ── FAB ── */}
+      <TouchableOpacity
+        style={[s.fab, { bottom: 16 + insets.bottom }]}
+        onPress={() => router.push('/create')}
+        activeOpacity={0.85}
+      >
+        <Ionicons name="add" size={28} color="#fff" />
+      </TouchableOpacity>
+
       {/* ── Day Detail Sheet ── */}
       <Modal visible={sheetVisible} transparent animationType="slide" onRequestClose={() => setSheetVisible(false)}>
         <TouchableOpacity style={s.sheetBg} activeOpacity={1} onPress={() => setSheetVisible(false)} />
@@ -374,7 +474,7 @@ export default function HomeScreen() {
                     <View style={[s.sheetRow, { borderBottomWidth: 0, paddingVertical: 0 }]}>
                       <TouchableOpacity
                         style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingVertical: 12 }}
-                        onPress={() => canToggle && selectedDate && toggleRoutineComplete(r.id, selectedDate)}
+                        onPress={() => canToggle && selectedDate && handleToggleDone(r.id, selectedDate, done)}
                         activeOpacity={canToggle ? 0.7 : 1}
                       >
                         <View style={[s.check, {borderColor: done ? GREEN : GOLD, marginRight: 10}, !canToggle && s.checkLocked]}>
@@ -573,12 +673,39 @@ export default function HomeScreen() {
           </View>
         </Modal>
       )}
+
+      {/* Proof Photo Modal */}
+      {proofPhoto && (
+        <Modal transparent visible animationType="fade" onRequestClose={() => setProofPhoto(null)}>
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center' }}>
+            <Image source={{ uri: proofPhoto.uri }} style={{ width: '90%', height: '65%', borderRadius: 20 }} resizeMode="cover" />
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 24 }}>
+              <TouchableOpacity
+                style={{ backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 14, paddingVertical: 13, paddingHorizontal: 28 }}
+                onPress={() => setProofPhoto(null)}
+              >
+                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Yeniden Çek</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ backgroundColor: RED, borderRadius: 14, paddingVertical: 13, paddingHorizontal: 28 }}
+                onPress={() => {
+                  addRoutineProof(proofPhoto.routineId, today, proofPhoto.uri);
+                  setProofPhoto(null);
+                }}
+              >
+                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Kaydet</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
   container: {flex:1, backgroundColor:BG},
+  fab: {position:'absolute', right:20, width:56, height:56, borderRadius:28, backgroundColor:RED, alignItems:'center', justifyContent:'center', shadowColor:'#000', shadowOffset:{width:0,height:4}, shadowOpacity:0.2, shadowRadius:8, elevation:6},
   header: {flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingHorizontal:16, paddingTop:12, paddingBottom:8},
   sub: {fontSize:12, color:TEXT2, marginBottom:3},
   title: {fontSize:24, color:TEXT, fontWeight:'900', letterSpacing:-0.5},
@@ -587,24 +714,38 @@ const s = StyleSheet.create({
   toggleBtn: {padding:8, borderRadius:8},
   toggleBtnOn: {backgroundColor:TEXT},
   settBtn: {width:40, height:40, borderRadius:20, backgroundColor:SURFACE, alignItems:'center', justifyContent:'center'},
+  settBtnRest: {backgroundColor:'#34495e'},
 
-  // Top Cards
-  topCardsRow: {flexDirection:'row', gap:12, paddingHorizontal:16, marginBottom:16, marginTop:8},
-  topCard: {flex:1, backgroundColor:BG, borderRadius:16, padding:14, borderWidth:1, borderColor:BORDER, position: 'relative', overflow: 'hidden'},
-  topCardRestOn: {backgroundColor:'#34495e', borderColor:'#2c3e50'},
-  topCardLabel: {fontSize:12, color:TEXT2, fontWeight:'600', marginBottom:8},
-  topCardVal: {fontSize:24, fontWeight:'900', color:TEXT, marginBottom:8, letterSpacing:-0.5},
-  topCardDenom: {fontSize:14, color:TEXT3, fontWeight:'700'},
-  topCardIcon: {position:'absolute', right:14, top:14},
-  track: {height:5, backgroundColor:SURFACE, borderRadius:3, overflow:'hidden'},
-  fill: {height:5, borderRadius:3},
+  // Story Progress Bar
+  storyBar: {flexDirection:'row', gap:4, marginBottom:8},
+  storySegment: {flex:1, height:3, borderRadius:2},
 
   // List
-  list: {paddingHorizontal:16, gap:0},
+  list: {},
+  setDivider: {height:0.5, backgroundColor:BORDER, marginVertical:2},
+  setGroup: {paddingHorizontal:16, paddingTop:10, paddingBottom:6, backgroundColor:RED+'10'},
+  setGroupAlt: {backgroundColor:RED+'1C'},
+  setGroupHeader: {flexDirection:'row', alignItems:'center', gap:5, alignSelf:'flex-start', backgroundColor:SURFACE, borderRadius:8, paddingHorizontal:8, paddingVertical:4, marginBottom:7},
+  setGroupTitle: {fontSize:12, fontWeight:'700', color:TEXT, letterSpacing:0.2},
   row: {flexDirection:'row', alignItems:'center', gap:10, paddingVertical:12, borderBottomWidth:0.5, borderBottomColor:BORDER},
-  check: {width:20, height:20, borderRadius:10, borderWidth:1, alignItems:'center', justifyContent:'center', backgroundColor:BG},
-  rowName: {fontSize:14, color:TEXT, fontWeight:'500'},
+  check: {width:18, height:18, borderRadius:9, borderWidth:1.5, alignItems:'center', justifyContent:'center', backgroundColor:'transparent'},
+  rowName: {fontSize:13, color:TEXT, fontWeight:'600', letterSpacing:-0.2},
   rowMeta: {fontSize:11, color:TEXT3, marginTop:1},
+
+  // Routine Cards
+  routineRow: {flexDirection:'row', alignItems:'center', gap:8},
+  checkBtn: {width:34, height:34, borderRadius:17, alignItems:'center', justifyContent:'center'},
+  checkBtnDone: {backgroundColor:RED},
+  checkBtnPending: {backgroundColor:GOLD},
+  routineCard: {flex:1, backgroundColor:CARD, borderRadius:12, overflow:'hidden'},
+  routineCardDone: {backgroundColor:RED},
+  routineCardRow: {flexDirection:'row', alignItems:'center'},
+  routineStripe: {width:4, alignSelf:'stretch'},
+  routineCardMain: {flex:1, paddingVertical:11, paddingLeft:14, paddingRight:8},
+  routineCardCamera: {marginRight:10, width:28, height:28, borderRadius:8, backgroundColor:SURFACE, alignItems:'center', justifyContent:'center'},
+  routineCardCameraDone: {backgroundColor:'rgba(255,255,255,0.25)'},
+  routineCardChevron: {paddingVertical:11, paddingLeft:4, paddingRight:12},
+  routineCardDesc: {paddingHorizontal:14, paddingBottom:10, paddingTop:1},
 
   // Empty
   empty: {alignItems:'center', paddingTop:60, gap:12},

@@ -1,0 +1,241 @@
+version: "2"
+type: frontend
+tech_stack:
+  - language: TypeScript
+  - framework: React Native (Expo ~54.0.33) with expo-router v6
+  - ui_library: React Native core components, React Native Reanimated, Expo Vector Icons
+  - other: Zustand (state management), Supabase (auth + database), AsyncStorage
+routes:
+  - path: /
+    file: app/index.tsx
+    auth_required: false
+    description: Splash/redirect screen - routes to welcome or tabs based on auth state
+  - path: /welcome
+    file: app/welcome.tsx
+    auth_required: false
+    description: Welcome landing screen with login/register entry points
+  - path: /auth
+    file: app/auth.tsx
+    auth_required: false
+    description: Authentication screen with login and register tabs, OTP email verification
+  - path: /onboarding
+    file: app/onboarding.tsx
+    auth_required: true
+    description: New user onboarding flow to set up profile (interests, gender, etc.)
+  - path: /(tabs)
+    file: app/(tabs)/_layout.tsx
+    auth_required: true
+    description: Main tab navigator layout
+  - path: /(tabs)/
+    file: app/(tabs)/index.tsx
+    auth_required: true
+    description: Home screen showing daily routines with list and calendar views
+  - path: /(tabs)/create
+    file: app/(tabs)/create.tsx
+    auth_required: true
+    description: Create new routine screen with frequency, time, and day selection
+  - path: /(tabs)/mate
+    file: app/(tabs)/mate.tsx
+    auth_required: true
+    description: Match discovery screen to find and send match requests to other users
+  - path: /(tabs)/dm
+    file: app/(tabs)/dm.tsx
+    auth_required: true
+    description: Direct messages screen for chatting with matched mate
+  - path: /(tabs)/profile
+    file: app/(tabs)/profile.tsx
+    auth_required: true
+    description: User profile screen with bio, photos, stats, and settings
+  - path: /mate-profile
+    file: app/mate-profile.tsx
+    auth_required: true
+    description: View matched mate's profile with their routines and photos
+  - path: /modal
+    file: app/modal.tsx
+    auth_required: false
+    description: Generic modal screen
+  - path: /debug
+    file: app/debug.tsx
+    auth_required: false
+    description: Debug/development utility screen
+features:
+  - name: User Registration
+    description: Register with email, password, and display name; verify with OTP code
+    files:
+      - app/auth.tsx
+      - lib/supabase.ts
+    entry_route: /auth
+    user_interactions:
+      - Select "Kayıt Ol" (register) tab
+      - Fill in display name field
+      - Fill in email field
+      - Fill in password field
+      - Click register button
+      - Enter 6-digit OTP code from email
+      - Get redirected to onboarding on success
+    api_calls:
+      - method: POST
+        endpoint: Supabase auth.signUp
+      - method: POST
+        endpoint: Supabase auth.verifyOtp
+    auth_required: false
+  - name: User Login
+    description: Login with existing email and password credentials
+    files:
+      - app/auth.tsx
+      - lib/supabase.ts
+    entry_route: /auth
+    user_interactions:
+      - Select "Giriş Yap" (login) tab
+      - Fill in email field
+      - Fill in password field
+      - Click login button
+      - Get redirected to home tabs on success
+    api_calls:
+      - method: POST
+        endpoint: Supabase auth.signInWithPassword
+    auth_required: false
+  - name: Onboarding
+    description: New user profile setup with interests, gender, and personal details
+    files:
+      - app/onboarding.tsx
+    entry_route: /onboarding
+    user_interactions:
+      - Select gender
+      - Enter bio / personal info
+      - Select interests from list
+      - Complete onboarding to reach main app
+    api_calls:
+      - method: POST
+        endpoint: Supabase profiles table (upsert)
+    auth_required: true
+  - name: Routine Management
+    description: Create, view, edit, delete, and complete daily/weekly/monthly routines
+    files:
+      - app/(tabs)/index.tsx
+      - app/(tabs)/create.tsx
+      - store/useStore.ts
+      - lib/api.ts
+    entry_route: /(tabs)/
+    user_interactions:
+      - View routines in list or calendar view
+      - Tap routine to mark as complete/incomplete
+      - Swipe or long-press routine to delete
+      - Tap edit icon to quick-edit routine name or time
+      - Tap "+" button to navigate to create routine screen
+      - Fill routine name, select frequency (daily/weekly/monthly)
+      - Set notification time
+      - Select target days for weekly routines
+      - Save new routine
+    api_calls:
+      - method: GET
+        endpoint: Supabase routines table
+      - method: POST
+        endpoint: Supabase routines table
+      - method: PATCH
+        endpoint: Supabase routines table
+      - method: DELETE
+        endpoint: Supabase routines table
+      - method: POST
+        endpoint: Supabase routine_completions table
+    auth_required: true
+  - name: Rest Day Toggle
+    description: Mark today as a rest day to skip routine completion
+    files:
+      - app/(tabs)/index.tsx
+      - store/useStore.ts
+    entry_route: /(tabs)/
+    user_interactions:
+      - Tap rest day button on home screen
+      - Confirm rest day toggled
+    api_calls:
+      - method: POST
+        endpoint: Supabase rest_days table
+    auth_required: true
+  - name: Match Discovery
+    description: Browse other users and send match requests to find a routine mate
+    files:
+      - app/(tabs)/mate.tsx
+      - store/useStore.ts
+      - lib/api.ts
+    entry_route: /(tabs)/mate
+    user_interactions:
+      - View discovery user cards
+      - Tap send match request button on a user card
+      - See incoming match requests
+      - Accept or reject a match request
+    api_calls:
+      - method: GET
+        endpoint: Supabase profiles discovery query
+      - method: POST
+        endpoint: Supabase match_requests table
+      - method: PATCH
+        endpoint: Supabase match_requests table (accept/reject)
+    auth_required: true
+  - name: Direct Messages
+    description: Chat with matched mate (only available after a match is made)
+    files:
+      - app/(tabs)/dm.tsx
+      - store/useStore.ts
+      - lib/api.ts
+    entry_route: /(tabs)/dm
+    user_interactions:
+      - View message history with mate
+      - Type message in text input
+      - Send message
+      - See sent and received messages
+      - Access DM tab (blocked if no match)
+    api_calls:
+      - method: GET
+        endpoint: Supabase messages table
+      - method: POST
+        endpoint: Supabase messages table
+    auth_required: true
+  - name: User Profile
+    description: View and edit personal profile including bio, photos, and account settings
+    files:
+      - app/(tabs)/profile.tsx
+      - store/useStore.ts
+      - lib/api.ts
+    entry_route: /(tabs)/profile
+    user_interactions:
+      - View profile stats (achievement score, routines count)
+      - Edit bio and personal info
+      - Upload profile photo
+      - Add/delete/pin photos in gallery
+      - Toggle Pro status
+      - Log out
+    api_calls:
+      - method: GET
+        endpoint: Supabase profiles table
+      - method: PATCH
+        endpoint: Supabase profiles table
+      - method: POST
+        endpoint: Supabase Storage (photo upload)
+      - method: DELETE
+        endpoint: Supabase Storage (photo delete)
+    auth_required: true
+  - name: Mate Profile View
+    description: View matched mate's profile, routines, and photos
+    files:
+      - app/mate-profile.tsx
+    entry_route: /mate-profile
+    user_interactions:
+      - View mate's routines list
+      - View mate's photo gallery
+      - View mate's bio and stats
+      - Tap unmatch button
+    api_calls:
+      - method: GET
+        endpoint: Supabase profiles table (mate)
+    auth_required: true
+known_limitations:
+  - issue: DM tab is guarded — shows a lock screen if user has no active match
+    location: app/(tabs)/dm.tsx
+    impact: Users without a match cannot access the DM feature
+  - issue: Zustand store uses AsyncStorage which is not SSR-compatible; custom webStorage adapter added as workaround
+    location: lib/supabase.ts
+    impact: Web build required a custom localStorage-based adapter to prevent SSR crash
+  - issue: Real-time messaging uses polling via loadUserData rather than Supabase Realtime subscriptions
+    location: store/useStore.ts
+    impact: Messages are not pushed in real-time; user must refresh to see new messages

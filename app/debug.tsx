@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -7,7 +7,7 @@ import { useStore } from '../store/useStore';
 
 const BG = '#FFFFFF'; const CARD = '#F4F4F4'; const SURFACE = '#EEEEEE';
 const TEXT = '#111111'; const TEXT2 = '#767676'; const TEXT3 = '#ABABAB';
-const RED = '#E60023'; const GREEN = '#008800'; const GOLD = '#D4860A'; const BLUE = '#3498db';
+const RED = '#00bf63'; const GREEN = '#008800'; const GOLD = '#D4860A'; const BLUE = '#3498db';
 const BORDER = '#E8E8E8'; const PILL = 999;
 
 type ActionColor = string;
@@ -23,7 +23,6 @@ export default function DebugScreen() {
   const router = useRouter();
   const user = useStore((s) => s.user);
   const mate = useStore((s) => s.mate);
-  const forceNewMatch = useStore((s) => s.forceNewMatch);
   const togglePro = useStore((s) => s.togglePro);
   const addRoutine = useStore((s) => s.addRoutine);
   const setLoggedIn = useStore((s) => s.setLoggedIn);
@@ -31,12 +30,11 @@ export default function DebugScreen() {
   const handleAction = (key: string) => {
     switch (key) {
       case 'match':
-        forceNewMatch();
-        Alert.alert('✓ Yeni Eşleşme', 'Mate yenilendi, sayaç sıfırlandı.');
+        Alert.alert('Bilgi', 'Yeni eşleşme zorla henüz desteklenmiyor.');
         break;
       case 'pro':
         togglePro();
-        Alert.alert('✓ Pro Toggle', `Pro: ${!user.isPro ? 'açıldı' : 'kapatıldı'}`);
+        Alert.alert('✓ Pro Toggle', `Pro: ${!user?.isPro ? 'açıldı' : 'kapatıldı'}`);
         break;
       case 'mock': {
         const today = new Date().toISOString().split('T')[0];
@@ -62,12 +60,12 @@ export default function DebugScreen() {
   };
 
   const STATE = [
-    { label: 'Kullanıcı', value: `@${user.username}` },
-    { label: 'Mate', value: `@${mate.username}` },
-    { label: 'Pro', value: user.isPro ? 'Aktif ✓' : 'Değil ✗', color: user.isPro ? GREEN : RED },
-    { label: 'Cinsiyet', value: user.gender === 'male' ? 'Erkek' : 'Kadın' },
-    { label: 'Rutin Sayısı', value: `${user.routines.length}` },
-    { label: 'Başarı Oranı', value: `%${user.achievementScore}` },
+    { label: 'Kullanıcı', value: user ? `@${user.username}` : '—' },
+    { label: 'Mate', value: mate ? `@${mate.username}` : 'Yok' },
+    { label: 'Pro', value: user?.isPro ? 'Aktif ✓' : 'Değil ✗', color: user?.isPro ? GREEN : RED },
+    { label: 'Cinsiyet', value: user?.gender === 'male' ? 'Erkek' : user?.gender === 'female' ? 'Kadın' : '—' },
+    { label: 'Rutin Sayısı', value: `${user?.routines?.length ?? 0}` },
+    { label: 'Başarı Oranı', value: `%${user?.achievementScore ?? 0}` },
   ];
 
   return (
@@ -130,6 +128,7 @@ export default function DebugScreen() {
             { label: 'Welcome Ekranı', sub: 'Karşılama / Landing', icon: 'rocket-outline' as const, color: '#7C3AED', route: '/welcome' },
             { label: 'Auth Ekranı', sub: 'Kayıt Ol / Giriş Yap', icon: 'key-outline' as const, color: '#2563EB', route: '/auth' },
             { label: 'Onboarding', sub: '3 adımlı kurulum akışı', icon: 'person-add-outline' as const, color: GREEN, route: '/onboarding' },
+            { label: 'Pro Yükseltme', sub: 'Pro üyelik satın alma akışı', icon: 'star-outline' as const, color: GOLD, route: '/pro-upgrade' },
           ].map(item => (
             <TouchableOpacity
               key={item.route}
