@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "943811807626",
+    "project_id": "routinmate",
+    "storage_bucket": "routinmate.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:943811807626:android:e1ebea748b073f36072073",
+        "android_client_info": {
+          "package_name": "com.routinmate.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDVriOZ_09B6aR7_DFJGJBMqD7VIE24Sk8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

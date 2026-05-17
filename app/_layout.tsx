@@ -63,6 +63,7 @@ export default function RootLayout() {
       // even before loadUserData fully completes
       const currentId = useStore.getState().user.id;
       if (!currentId) updateUser({ id: session.user.id });
+      await Notifications.requestPermissionsAsync();
       const result = await loadUserData();
       if (result === 'ok') {
         requestPushPermission().then(token => { if (token) savePushToken(token); }).catch(() => {});
@@ -81,6 +82,7 @@ export default function RootLayout() {
         setLoggedIn(false);
         router.replace('/welcome');
       } else if (event === 'SIGNED_IN' && session) {
+        await Notifications.requestPermissionsAsync();
         const result = await loadUserData();
         if (result === 'ok') {
           requestPushPermission().then(token => { if (token) savePushToken(token); }).catch(() => {});
