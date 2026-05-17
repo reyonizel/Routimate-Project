@@ -94,6 +94,68 @@ export const StorageAPI = {
   },
 };
 
+// ─── Discovery scoring helpers ───────────────────────────────────────────────
+
+const AGE_GROUPS: [number, number][] = [
+  [13, 17], [17, 25], [25, 35], [35, 45],
+  [45, 55], [55, 65], [65, 86],
+];
+
+function getAgeGroup(birthDate?: string | null): number {
+  if (!birthDate) return -1;
+  const age = Math.floor((Date.now() - new Date(birthDate).getTime()) / (365.25 * 24 * 3600 * 1000));
+  return AGE_GROUPS.findIndex(([lo, hi]) => age >= lo && age < hi);
+}
+
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const toRad = (d: number) => d * (Math.PI / 180);
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+type DiscoveryUserProfile = {
+  birthDate?: string;
+  locationLat?: number;
+  locationLon?: number;
+  gender: Gender;
+  achievementScore: number;
+};
+
+function scoreCandidate(user: DiscoveryUserProfile, c: any): number {
+  let score = 0;
+
+  // 1. Yaş grubu — baskın kriter
+  const ug = getAgeGroup(user.birthDate);
+  const cg = getAgeGroup(c.birth_date);
+  if (ug >= 0 && cg >= 0) {
+    if (ug === cg) score += 1000;
+    else if (Math.abs(ug - cg) === 1) score += 300;
+  }
+
+  // 2. Konum mesafesi — ikincil kriter
+  if (user.locationLat && user.locationLon && c.location_lat && c.location_lon) {
+    const km = haversineKm(user.locationLat, user.locationLon, c.location_lat, c.location_lon);
+    if (km < 10)       score += 500;
+    else if (km < 50)  score += 300;
+    else if (km < 100) score += 150;
+    else if (km < 300) score += 50;
+  }
+
+  // 3. Cinsiyet — üçüncül kriter
+  if (user.gender === c.gender) score += 100;
+
+  // 4. Başarı oranı benzerliği — dördüncül kriter
+  const diff = Math.abs((user.achievementScore ?? 0) - (c.achievement_score ?? 0));
+  score += Math.max(0, 50 - diff / 2);
+
+  return score;
+}
+
 // ─── Profile ─────────────────────────────────────────────────────────────────
 
 export const ProfileAPI = {
@@ -148,15 +210,28 @@ export const ProfileAPI = {
     }
   },
 
-  async getDiscovery(userId: string, excludeIds: string[] = []): Promise<Mate[]> {
+  async getDiscovery(
+    userId: string,
+    excludeIds: string[] = [],
+    userProfile?: DiscoveryUserProfile,
+  ): Promise<Mate[]> {
     const { data } = await supabase
       .from('profiles')
-      .select('id, username, gender, avatar_url, interests, achievement_score, routines(id, name, description, frequency, notification_time, created_at, target_days, monthly_days, set_name, scope, once_start, once_end, routine_completions(completed_date)), photos(id, uri, is_pinned, created_at, proof_meta)')
+      .select('id, username, gender, avatar_url, interests, achievement_score, birth_date, location_lat, location_lon, routines(id, name, description, frequency, notification_time, created_at, target_days, monthly_days, set_name, scope, once_start, once_end, routine_completions(completed_date)), photos(id, uri, is_pinned, created_at, proof_meta)')
       .neq('id', userId)
       .limit(50);
     if (!data) return [];
+
     const excluded = new Set(excludeIds);
-    return data.filter(p => !excluded.has(p.id)).slice(0, 30).map(dbToMate);
+    let candidates = data.filter(p => !excluded.has(p.id));
+
+    if (userProfile) {
+      candidates = [...candidates].sort(
+        (a, b) => scoreCandidate(userProfile, b) - scoreCandidate(userProfile, a)
+      );
+    }
+
+    return candidates.slice(0, 30).map(dbToMate);
   },
 };
 

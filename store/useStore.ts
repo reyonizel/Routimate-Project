@@ -247,21 +247,8 @@ export const useStore = create<AppState>()(
 
           const userId = authUser.id;
 
-          const [profileRes, routinesRes, restDaysRes, photosRes, matchRes, requestsRes, sentRes, discoveryRes, ordersRes] =
-            await Promise.allSettled([
-              ProfileAPI.get(userId),
-              RoutineAPI.getAll(userId),
-              RoutineAPI.getRestDays(userId),
-              PhotoAPI.getAll(userId),
-              MatchAPI.getActiveMatch(userId),
-              MatchAPI.getRequests(userId),
-              MatchAPI.getSentRequests(userId),
-              ProfileAPI.getDiscovery(userId),
-              OrderAPI.getAll(userId),
-            ]);
-
-          const profile = profileRes.status === 'fulfilled' ? profileRes.value : null;
-
+          // Profil önce çekilir: hem gate kontrolü hem keşfet skorlaması için gerekli
+          const profile = await ProfileAPI.get(userId);
           if (!profile) {
             const cached = get().user;
             if (cached.id === userId) {
@@ -271,6 +258,24 @@ export const useStore = create<AppState>()(
             return 'onboarding';
           }
           if (!profile.username) return 'onboarding';
+
+          const [routinesRes, restDaysRes, photosRes, matchRes, requestsRes, sentRes, discoveryRes, ordersRes] =
+            await Promise.allSettled([
+              RoutineAPI.getAll(userId),
+              RoutineAPI.getRestDays(userId),
+              PhotoAPI.getAll(userId),
+              MatchAPI.getActiveMatch(userId),
+              MatchAPI.getRequests(userId),
+              MatchAPI.getSentRequests(userId),
+              ProfileAPI.getDiscovery(userId, [], {
+                birthDate: profile.birthDate,
+                locationLat: profile.locationLat,
+                locationLon: profile.locationLon,
+                gender: profile.gender,
+                achievementScore: profile.achievementScore,
+              }),
+              OrderAPI.getAll(userId),
+            ]);
 
           const cached = get().user;
           const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -306,15 +311,14 @@ export const useStore = create<AppState>()(
           const sentReqs  = sentRes.status      === 'fulfilled' ? sentRes.value      : [];
           const orders    = ordersRes.status    === 'fulfilled' ? ordersRes.value    : get().orders;
 
-          // Pass matched mate ID + sent request IDs to filter discovery
-          const excludeIds = [
+          // Eşleşilen / istek gönderilen kullanıcıları keşfetten çıkar
+          const excludeSet = new Set<string>([
             matchData.mate?.id,
             ...sentReqs,
             ...matchReqs.map(r => r.fromUser.id),
-          ].filter(Boolean) as string[];
-          const discovery = discoveryRes.status === 'fulfilled'
-            ? discoveryRes.value
-            : await ProfileAPI.getDiscovery(userId, excludeIds);
+          ].filter(Boolean) as string[]);
+          const rawDiscovery = discoveryRes.status === 'fulfilled' ? discoveryRes.value : [];
+          const discovery = rawDiscovery.filter(u => !excludeSet.has(u.id));
 
           let messages: Message[] = [];
           if (matchData.matchId) {
