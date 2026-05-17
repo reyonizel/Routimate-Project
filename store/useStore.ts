@@ -4,6 +4,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import { supabase } from '../lib/supabase';
 import {
+  scheduleRoutineNotification,
+  cancelRoutineNotification,
+  scheduleAllRoutineNotifications,
+  cancelAllRoutineNotifications,
+} from '../lib/notifications';
+import {
   ProfileAPI, RoutineAPI, PhotoAPI, MatchAPI, MessageAPI,
   OrderAPI, StorageAPI, StoreWaitlistAPI, SessionAPI, generateId,
 } from '../lib/api';
@@ -165,6 +171,7 @@ interface AppState {
   uploadAvatar: (localUri: string) => Promise<void>;
   joinStoreWaitlist: (email: string) => Promise<'ok' | 'already' | 'error'>;
   refreshAchievementScore: () => Promise<void>;
+  savePushToken: (token: string) => Promise<void>;
 }
 
 const BLANK_USER: User = {
@@ -325,6 +332,7 @@ export const useStore = create<AppState>()(
           }
 
           SessionAPI.record(userId).catch(() => {});
+          scheduleAllRoutineNotifications(routines).catch(() => {});
 
           set({
             user: {
@@ -397,6 +405,7 @@ export const useStore = create<AppState>()(
         if (userId) {
           RoutineAPI.create(userId, routineWithId).catch(console.error);
         }
+        scheduleRoutineNotification(routineWithId).catch(() => {});
       },
 
       addRoutines: (routines) => {
@@ -408,6 +417,7 @@ export const useStore = create<AppState>()(
         if (userId) {
           withIds.forEach(r => RoutineAPI.create(userId, r).catch(console.error));
         }
+        scheduleAllRoutineNotifications(get().user.routines).catch(() => {});
       },
 
       deleteRoutine: (routineId) => {
@@ -415,6 +425,7 @@ export const useStore = create<AppState>()(
           user: { ...s.user, routines: s.user.routines.filter((r) => r.id !== routineId) },
         }));
         RoutineAPI.delete(routineId).catch(console.error);
+        cancelRoutineNotification(routineId).catch(() => {});
       },
 
       updateRoutine: (id, updates) => {
@@ -425,6 +436,8 @@ export const useStore = create<AppState>()(
           },
         }));
         RoutineAPI.update(id, updates).catch(console.error);
+        const updated = get().user.routines.find(r => r.id === id);
+        if (updated) scheduleRoutineNotification(updated).catch(() => {});
       },
 
       // ── User ──────────────────────────────────────────────────────────────
@@ -508,9 +521,14 @@ export const useStore = create<AppState>()(
           timestamp: new Date().toISOString(),
         };
         set((s) => ({ messages: [...s.messages, msg] }));
-        const { matchId, user } = get();
+        const { matchId, user, mate } = get();
         if (matchId && user.id) {
           MessageAPI.send(matchId, user.id, text).catch(console.error);
+        }
+        if (mate?.id) {
+          supabase.functions.invoke('send-push', {
+            body: { recipientId: mate.id, title: user.username || 'Mesaj', body: text },
+          }).catch(() => {});
         }
       },
 
@@ -650,9 +668,16 @@ export const useStore = create<AppState>()(
       // ── Discovery & Matching ──────────────────────────────────────────────
       sendMatchRequest: (targetUser) => {
         set((s) => ({ sentMatchRequests: [...s.sentMatchRequests, targetUser.id] }));
-        const userId = get().user.id;
-        if (userId) {
-          MatchAPI.sendRequest(userId, targetUser.id).catch(console.error);
+        const { user } = get();
+        if (user.id) {
+          MatchAPI.sendRequest(user.id, targetUser.id).catch(console.error);
+          supabase.functions.invoke('send-push', {
+            body: {
+              recipientId: targetUser.id,
+              title: 'Yeni Esleme Istegi',
+              body: `${user.username} sana esleme istegi gonderdi`,
+            },
+          }).catch(() => {});
         }
       },
 
@@ -711,6 +736,7 @@ export const useStore = create<AppState>()(
       },
 
       resetStore: () => {
+        cancelAllRoutineNotifications().catch(() => {});
         set({
           user: BLANK_USER,
           mate: null,
@@ -722,6 +748,12 @@ export const useStore = create<AppState>()(
           matchRequests: [],
           sentMatchRequests: [],
         });
+      },
+
+      savePushToken: async (token) => {
+        const userId = get().user.id;
+        if (!userId) return;
+        await ProfileAPI.update(userId, { pushToken: token } as any);
       },
 
       joinStoreWaitlist: async (email) => {

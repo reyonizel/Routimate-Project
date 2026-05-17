@@ -205,6 +205,7 @@ export const ProfileAPI = {
     if (updates.inactiveSets !== undefined)      db.inactive_sets = updates.inactiveSets;
     if (updates.notificationSound !== undefined) db.notification_sound = updates.notificationSound;
     if (updates.completionSound !== undefined)   db.completion_sound = updates.completionSound;
+    if ((updates as any).pushToken !== undefined) db.push_token = (updates as any).pushToken;
     if (Object.keys(db).length > 0) {
       await supabase.from('profiles').update(db).eq('id', userId);
     }

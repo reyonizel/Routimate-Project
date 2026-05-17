@@ -5,9 +5,21 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StyleSheet } from 'react-native';
 import * as SystemUI from 'expo-system-ui';
 import * as SplashScreen from 'expo-splash-screen';
+import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { useStore } from '../store/useStore';
+import { requestPushPermission } from '../lib/notifications';
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 // Hold the splash until we finish initializing
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -20,6 +32,7 @@ export default function RootLayout() {
   const setLoggedIn    = useStore(s => s.setLoggedIn);
   const setInitialized = useStore(s => s.setInitialized);
   const updateUser     = useStore(s => s.updateUser);
+  const savePushToken  = useStore(s => s.savePushToken);
 
   // Prevent the auth-state listener from running loadUserData a second time
   // during the initial SIGNED_IN event that fires right after getSession()
@@ -51,6 +64,9 @@ export default function RootLayout() {
       const currentId = useStore.getState().user.id;
       if (!currentId) updateUser({ id: session.user.id });
       const result = await loadUserData();
+      if (result === 'ok') {
+        requestPushPermission().then(token => { if (token) savePushToken(token); }).catch(() => {});
+      }
       finish(result);
     }).catch(() => {
       didInit.current = true;
@@ -66,6 +82,9 @@ export default function RootLayout() {
         router.replace('/welcome');
       } else if (event === 'SIGNED_IN' && session) {
         const result = await loadUserData();
+        if (result === 'ok') {
+          requestPushPermission().then(token => { if (token) savePushToken(token); }).catch(() => {});
+        }
         if (result === 'onboarding') router.replace('/onboarding');
       } else if (event === 'TOKEN_REFRESHED' && session) {
         loadUserData().catch(() => {});
