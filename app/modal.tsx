@@ -10,6 +10,7 @@ import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import { useStore } from '../store/useStore';
 import { supabase } from '../lib/supabase';
+import { sendTestNotification } from '../lib/notifications';
 
 const BG = '#FFFFFF';
 const TEXT = '#111111'; const TEXT2 = '#767676'; const TEXT3 = '#ABABAB';
@@ -390,6 +391,19 @@ export default function ModalScreen() {
             icon="document-text-outline"
             label="Kullanıcı Sözleşmesi"
             onPress={() => Linking.openURL('https://routinmate.app/sozlesme').catch(() => Alert.alert('Hata', 'Sayfa açılamadı.'))}
+          />
+        </Section>
+
+        {/* Geliştirici */}
+        <Section title="Geliştirici">
+          <Row
+            icon="notifications-outline"
+            label="Test Bildirimi Gönder (5sn)"
+            onPress={() =>
+              sendTestNotification()
+                .then(() => Alert.alert('Gönderildi', '5 saniye sonra bildirim gelecek.'))
+                .catch(() => Alert.alert('Hata', 'Bildirim gönderilemedi.'))
+            }
           />
         </Section>
 

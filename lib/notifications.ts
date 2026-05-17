@@ -17,8 +17,26 @@ export async function requestPushPermission(): Promise<string | null> {
   }
 }
 
+export async function sendTestNotification(): Promise<void> {
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: 'Test Bildirimi',
+      body: 'Bildirimler çalışıyor!',
+      sound: true,
+      priority: 'max',
+    },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+      channelId: 'default',
+      seconds: 5,
+      repeats: false,
+    },
+  });
+}
+
 export async function scheduleRoutineNotification(r: Routine): Promise<void> {
   await cancelRoutineNotification(r.id);
+  if (!r.notificationTime) return;
   const [h, m] = r.notificationTime.split(':').map(Number);
   if (isNaN(h) || isNaN(m)) return;
 

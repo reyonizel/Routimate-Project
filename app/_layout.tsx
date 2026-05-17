@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { StyleSheet } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 import * as SystemUI from 'expo-system-ui';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Notifications from 'expo-notifications';
@@ -10,6 +10,18 @@ import { useRouter } from 'expo-router';
 import { supabase } from '../lib/supabase';
 import { useStore } from '../store/useStore';
 import { requestPushPermission } from '../lib/notifications';
+
+if (Platform.OS === 'android') {
+  Notifications.setNotificationChannelAsync('default', {
+    name: 'Rutin Bildirimleri',
+    importance: Notifications.AndroidImportance.MAX,
+    vibrationPattern: [0, 250, 250, 250],
+    lightColor: '#00bf63',
+    sound: 'default',
+    enableVibrate: true,
+    showBadge: true,
+  }).catch(() => {});
+}
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
