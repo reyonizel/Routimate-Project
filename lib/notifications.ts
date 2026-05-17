@@ -34,44 +34,69 @@ export async function sendTestNotification(): Promise<void> {
   });
 }
 
+// Returns seconds until the next occurrence of h:m each day
+function secondsUntilDaily(h: number, m: number): number {
+  const now = new Date();
+  const target = new Date(now);
+  target.setHours(h, m, 0, 0);
+  if (target <= now) target.setDate(target.getDate() + 1);
+  return Math.max(10, Math.round((target.getTime() - now.getTime()) / 1000));
+}
+
+// day: JS weekday 0=Sun … 6=Sat
+function secondsUntilWeekly(day: number, h: number, m: number): number {
+  const now = new Date();
+  const target = new Date(now);
+  target.setHours(h, m, 0, 0);
+  let daysAhead = (day - now.getDay() + 7) % 7;
+  if (daysAhead === 0 && target <= now) daysAhead = 7;
+  target.setDate(target.getDate() + daysAhead);
+  return Math.max(10, Math.round((target.getTime() - now.getTime()) / 1000));
+}
+
+// dayOfMonth: 1-31
+function secondsUntilMonthly(dayOfMonth: number, h: number, m: number): number {
+  const now = new Date();
+  const target = new Date(now.getFullYear(), now.getMonth(), dayOfMonth, h, m, 0);
+  if (target <= now) target.setMonth(target.getMonth() + 1);
+  return Math.max(10, Math.round((target.getTime() - now.getTime()) / 1000));
+}
+
+const content = (name: string): Notifications.NotificationContentInput => ({
+  title: 'Rutin Zamanı',
+  body: name,
+  sound: true,
+  priority: 'max',
+  vibrate: [0, 250, 250, 250],
+});
+
 export async function scheduleRoutineNotification(r: Routine): Promise<void> {
   await cancelRoutineNotification(r.id);
   if (!r.notificationTime) return;
   const [h, m] = r.notificationTime.split(':').map(Number);
   if (isNaN(h) || isNaN(m)) return;
 
-  const content: Notifications.NotificationContentInput = {
-    title: 'Rutin Zamanı',
-    body: r.name,
-    sound: true,
-    priority: 'max',
-    vibrate: [0, 250, 250, 250],
-  };
-
   if (r.frequency === 'daily') {
     await Notifications.scheduleNotificationAsync({
       identifier: `${PREFIX}${r.id}`,
-      content,
+      content: content(r.name),
       trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DAILY,
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
         channelId: 'default',
-        hour: h,
-        minute: m,
+        seconds: secondsUntilDaily(h, m),
+        repeats: false,
       },
     });
   } else if (r.frequency === 'weekly') {
     for (const day of r.targetDays ?? []) {
-      // Expo weekday: 1=Paz … 7=Cts | JS getDay(): 0=Paz … 6=Cts
-      const weekday = ((day % 7) + 1) as 1 | 2 | 3 | 4 | 5 | 6 | 7;
       await Notifications.scheduleNotificationAsync({
         identifier: `${PREFIX}${r.id}-d${day}`,
-        content,
+        content: content(r.name),
         trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
           channelId: 'default',
-          weekday,
-          hour: h,
-          minute: m,
+          seconds: secondsUntilWeekly(day, h, m),
+          repeats: false,
         },
       });
     }
@@ -79,13 +104,12 @@ export async function scheduleRoutineNotification(r: Routine): Promise<void> {
     for (const d of r.monthlyDays ?? []) {
       await Notifications.scheduleNotificationAsync({
         identifier: `${PREFIX}${r.id}-m${d}`,
-        content,
+        content: content(r.name),
         trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.MONTHLY,
+          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
           channelId: 'default',
-          day: d,
-          hour: h,
-          minute: m,
+          seconds: secondsUntilMonthly(d, h, m),
+          repeats: false,
         },
       });
     }
