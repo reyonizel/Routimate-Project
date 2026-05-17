@@ -1,5 +1,5 @@
 import { decode } from 'base64-arraybuffer';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { supabase } from './supabase';
 import type { User, Mate, Routine, Photo, Message, MatchRequest, Gender, Order, OrderProduct } from '../store/useStore';

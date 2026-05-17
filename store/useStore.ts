@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as FileSystem from 'expo-file-system/legacy';
 import { supabase } from '../lib/supabase';
 import {
   ProfileAPI, RoutineAPI, PhotoAPI, MatchAPI, MessageAPI,
@@ -438,15 +439,27 @@ export const useStore = create<AppState>()(
       uploadAvatar: async (localUri) => {
         const userId = get().user.id;
         if (!userId) return;
+
+        // Dosyayı önce kalıcı dizine kopyala (logout sonrası da erişilebilir)
+        const docsDir = `${FileSystem.documentDirectory}avatars/`;
+        const docsPath = `${docsDir}${userId}.jpg`;
         try {
-          const url = await StorageAPI.uploadImage('avatars', `${userId}/avatar`, localUri);
-          set((s) => ({ user: { ...s.user, avatarUri: url } }));
-          await ProfileAPI.update(userId, { avatarUri: url });
-        } catch {
-          // Fallback: keep local URI
-          set((s) => ({ user: { ...s.user, avatarUri: localUri } }));
-          await ProfileAPI.update(userId, { avatarUri: localUri });
-        }
+          await FileSystem.makeDirectoryAsync(docsDir, { intermediates: true });
+          await FileSystem.copyAsync({ from: localUri, to: docsPath });
+        } catch {}
+
+        const persistentUri = docsPath;
+        set((s) => ({ user: { ...s.user, avatarUri: persistentUri } }));
+        await ProfileAPI.update(userId, { avatarUri: persistentUri });
+
+        // Arka planda Supabase Storage'a yükle ve public URL ile güncelle
+        (async () => {
+          try {
+            const url = await StorageAPI.uploadImage('avatars', `${userId}/avatar`, persistentUri);
+            set((s) => ({ user: { ...s.user, avatarUri: url } }));
+            await ProfileAPI.update(userId, { avatarUri: url });
+          } catch {}
+        })();
       },
 
       togglePro: () => {
@@ -560,6 +573,14 @@ export const useStore = create<AppState>()(
         const routine = get().user.routines.find(r => r.id === routineId);
 
         const photoId = `proof-${routineId}-${date}`;
+
+        // Dosyayı kalıcı dizine kopyala (logout sonrası da URI geçerli kalır)
+        const docsDir = `${FileSystem.documentDirectory}proofs/`;
+        const docsPath = `${docsDir}${photoId}.jpg`;
+        FileSystem.makeDirectoryAsync(docsDir, { intermediates: true })
+          .then(() => FileSystem.copyAsync({ from: uri, to: docsPath }))
+          .catch(() => {});
+        const persistentUri = docsPath;
         const proofMeta = {
           routineId,
           routineName: routine?.name ?? '',
@@ -569,7 +590,7 @@ export const useStore = create<AppState>()(
 
         const newPhoto: Photo = {
           id: photoId,
-          uri,
+          uri: persistentUri,
           uploadedAt: new Date().toISOString(),
           proofMeta,
         };
@@ -578,7 +599,7 @@ export const useStore = create<AppState>()(
           const updatedRoutines = s.user.routines.map(r =>
             r.id !== routineId ? r : {
               ...r,
-              proofPhotos: [...(r.proofPhotos ?? []).filter(p => p.date !== date), { date, uri }],
+              proofPhotos: [...(r.proofPhotos ?? []).filter(p => p.date !== date), { date, uri: persistentUri }],
             }
           );
           const updatedPhotos = [...s.user.photos.filter(p => p.id !== photoId), newPhoto];
@@ -594,14 +615,14 @@ export const useStore = create<AppState>()(
         });
 
         if (userId) {
-          // Save to DB immediately with local URI so reloads don't lose the photo
+          // Kalıcı URI ile DB'ye kaydet (logout sonrası da geçerli)
           PhotoAPI.add(userId, newPhoto).catch(console.error);
 
-          // Background: upload to storage, then upsert with publicUrl
+          // Arka planda Supabase Storage'a yükle, public URL ile güncelle
           (async () => {
             try {
               const storagePath = `${userId}/${routineId}/${date}`;
-              const publicUrl = await StorageAPI.uploadImage('photos', storagePath, uri);
+              const publicUrl = await StorageAPI.uploadImage('photos', storagePath, persistentUri);
               const uploadedPhoto: Photo = { ...newPhoto, uri: publicUrl };
 
               set((s) => ({
