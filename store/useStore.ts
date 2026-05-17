@@ -183,34 +183,32 @@ const BLANK_USER: User = {
   completionSound: 'correct',
 };
 
-function calcAchievementScore(routines: Routine[]): number {
+function calcAchievementScore(routines: Routine[], photos: Photo[]): number {
   if (routines.length === 0) return 0;
-  const today = new Date();
-  const last30 = Array.from({ length: 30 }, (_, i) => {
-    const d = new Date(today);
-    d.setDate(today.getDate() - i);
-    return d.toISOString().split('T')[0];
+
+  const todayStr  = new Date().toISOString().split('T')[0];
+  const todayDay  = new Date().getDay();   // 0=Pazar … 6=Cumartesi
+  const todayDate = new Date().getDate();  // 1-31
+
+  // Bugün yapılması gereken rutinler
+  const applicable = routines.filter(r => {
+    if (r.frequency === 'daily')   return true;
+    if (r.frequency === 'weekly')  return (r.targetDays ?? []).includes(todayDay);
+    if (r.frequency === 'monthly') return (r.monthlyDays ?? []).includes(todayDate);
+    return false;
   });
-  let totalExpected = 0;
-  let totalDone = 0;
-  for (const r of routines) {
-    const expected = last30.filter(date => {
-      if (r.frequency === 'daily') return true;
-      if (r.frequency === 'weekly') {
-        const day = new Date(date).getDay();
-        return (r.targetDays ?? []).includes(day);
-      }
-      if (r.frequency === 'monthly') {
-        const dayOfMonth = new Date(date).getDate();
-        return (r.monthlyDays ?? []).includes(dayOfMonth);
-      }
-      return false;
-    }).length || 1;
-    const done = r.completedDates.filter(d => last30.includes(d)).length;
-    totalExpected += expected;
-    totalDone += done;
-  }
-  return Math.round((totalDone / totalExpected) * 100);
+  if (applicable.length === 0) return 0;
+
+  const n = applicable.length;
+
+  // %70 — tamamlanan görevler
+  const completed = applicable.filter(r => r.completedDates.includes(todayStr)).length;
+
+  // %30 — bugün fotoğraf eklenen görevler (proof-{routineId}-{today} ID'siyle)
+  const photoIds = new Set(photos.map(p => p.id));
+  const withPhoto = applicable.filter(r => photoIds.has(`proof-${r.id}-${todayStr}`)).length;
+
+  return Math.round((completed / n) * 70 + (withPhoto / n) * 30);
 }
 
 export const useStore = create<AppState>()(
@@ -372,7 +370,7 @@ export const useStore = create<AppState>()(
                 : [...r.completedDates, date],
             };
           });
-          const newScore = calcAchievementScore(updatedRoutines);
+          const newScore = calcAchievementScore(updatedRoutines, s.user.photos);
           return {
             user: {
               ...s.user,
@@ -385,14 +383,7 @@ export const useStore = create<AppState>()(
         const userId = get().user.id;
         if (userId) {
           RoutineAPI.setCompletion(routineId, userId, date, nowCompleted).catch(console.error);
-          // Local score güncellendi. DB'den kesin skoru arka planda al ve kaydet.
-          SessionAPI.calculateScore(userId).then(score => {
-            set((s) => ({ user: { ...s.user, achievementScore: score } }));
-            ProfileAPI.update(userId, { achievementScore: score }).catch(console.error);
-          }).catch(() => {
-            const localScore = get().user.achievementScore;
-            ProfileAPI.update(userId, { achievementScore: localScore }).catch(console.error);
-          });
+          ProfileAPI.update(userId, { achievementScore: get().user.achievementScore }).catch(console.error);
         }
       },
 
@@ -583,18 +574,24 @@ export const useStore = create<AppState>()(
           proofMeta,
         };
 
-        set((s) => ({
-          user: {
-            ...s.user,
-            routines: s.user.routines.map(r =>
-              r.id !== routineId ? r : {
-                ...r,
-                proofPhotos: [...(r.proofPhotos ?? []).filter(p => p.date !== date), { date, uri }],
-              }
-            ),
-            photos: [...s.user.photos.filter(p => p.id !== photoId), newPhoto],
-          },
-        }));
+        set((s) => {
+          const updatedRoutines = s.user.routines.map(r =>
+            r.id !== routineId ? r : {
+              ...r,
+              proofPhotos: [...(r.proofPhotos ?? []).filter(p => p.date !== date), { date, uri }],
+            }
+          );
+          const updatedPhotos = [...s.user.photos.filter(p => p.id !== photoId), newPhoto];
+          const newScore = calcAchievementScore(updatedRoutines, updatedPhotos);
+          return {
+            user: {
+              ...s.user,
+              routines: updatedRoutines,
+              photos: updatedPhotos,
+              achievementScore: newScore,
+            },
+          };
+        });
 
         if (userId) {
           // Save to DB immediately with local URI so reloads don't lose the photo
@@ -712,11 +709,11 @@ export const useStore = create<AppState>()(
       },
 
       refreshAchievementScore: async () => {
-        const userId = get().user.id;
-        if (!userId) return;
-        const score = await SessionAPI.calculateScore(userId);
+        const { user } = get();
+        if (!user.id) return;
+        const score = calcAchievementScore(user.routines, user.photos);
         set((s) => ({ user: { ...s.user, achievementScore: score } }));
-        ProfileAPI.update(userId, { achievementScore: score }).catch(console.error);
+        ProfileAPI.update(user.id, { achievementScore: score }).catch(console.error);
       },
     }),
     {
