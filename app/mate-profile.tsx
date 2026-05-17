@@ -28,7 +28,7 @@ export default function MateProfileScreen() {
 
   if (!mate) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         <View style={styles.navbar}>
           <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
             <Ionicons name="chevron-back" size={20} color={TEXT} />
@@ -53,7 +53,7 @@ export default function MateProfileScreen() {
   const dash = (mate.achievementScore / 100) * circ;
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* Navbar — always on top */}
       <View style={styles.navbar}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>

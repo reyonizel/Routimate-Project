@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Dimensions, TextInput, Image, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Dimensions, Image, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,7 +7,6 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { useStore } from '../../store/useStore';
-import { TimeField } from './create';
 import { Audio } from 'expo-av';
 
 const SOUND_FILES = {
@@ -56,7 +55,6 @@ export default function HomeScreen() {
   const toggleRoutineComplete = useStore(s => s.toggleRoutineComplete);
   const toggleRestDay = useStore(s => s.toggleRestDay);
   const deleteRoutine = useStore(s => s.deleteRoutine);
-  const updateRoutine = useStore(s => s.updateRoutine);
   const addRoutineProof = useStore(s => s.addRoutineProof);
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -93,12 +91,6 @@ export default function HomeScreen() {
       setProofPhoto({ routineId, uri: result.assets[0].uri });
     }
   };
-
-  const [quickEditRoutineId, setQuickEditRoutineId] = useState<string | null>(null);
-  const [editName, setEditName] = useState('');
-  const [editDesc, setEditDesc] = useState('');
-  const [editHour, setEditHour] = useState('');
-  const [editMin, setEditMin] = useState('');
 
   const toggleExpand = (id: string) => {
     setExpandedRoutineId(prev => prev === id ? null : id);
@@ -268,7 +260,8 @@ export default function HomeScreen() {
                           {sorted.map(r => {
                             const done = r.completedDates.includes(today);
                             const isExpanded = expandedRoutineId === r.id;
-                            const hasProof = r.proofPhotos?.some(p => p.date === today) ?? false;
+                            const proofPhoto = user.photos.find(p => p.id === `proof-${r.id}-${today}`);
+                            const hasProof = !!proofPhoto;
                             return (
                               <Animated.View layout={LinearTransition} key={r.id} style={s.routineRow}>
                                 <TouchableOpacity
@@ -303,7 +296,7 @@ export default function HomeScreen() {
                                     >
                                       {hasProof ? (
                                         <Image
-                                          source={{ uri: r.proofPhotos!.find(p => p.date === today)!.uri }}
+                                          source={{ uri: proofPhoto!.uri }}
                                           style={{ width: 28, height: 28, borderRadius: 8 }}
                                           resizeMode="cover"
                                         />
@@ -562,22 +555,6 @@ export default function HomeScreen() {
                     : { borderBottomWidth: 8, borderBottomColor: '#fff', borderTopWidth: 0 })
                 }} />
 
-                <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', padding: 14, borderBottomWidth: 0.5, borderBottomColor: '#E8E8E8' }} onPress={() => { 
-                  const r = user.routines.find(rt => rt.id === popover.id);
-                  if (r) {
-                    setEditName(r.name);
-                    setEditDesc(r.description || '');
-                    const [h, m] = r.notificationTime.split(':');
-                    setEditHour(h);
-                    setEditMin(m);
-                    setQuickEditRoutineId(r.id);
-                  }
-                  setPopover(null); 
-                }}>
-                  <Ionicons name="pencil" size={18} color={TEXT} style={{ marginRight: 10 }} />
-                  <Text style={{ fontSize: 15, color: TEXT, fontWeight: '600' }}>Düzenle</Text>
-                </TouchableOpacity>
-
                 <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', padding: 14 }} onPress={() => { deleteRoutine(popover.id); setPopover(null); }}>
                   <Ionicons name="trash" size={18} color={RED} style={{ marginRight: 10 }} />
                   <Text style={{ fontSize: 15, color: RED, fontWeight: '600' }}>Rutini Sil</Text>
@@ -585,92 +562,6 @@ export default function HomeScreen() {
               </View>
             );
           })()}
-        </Modal>
-      )}
-
-      {/* Quick Edit Modal */}
-      {quickEditRoutineId && (
-        <Modal transparent visible={true} animationType="slide" onRequestClose={() => setQuickEditRoutineId(null)}>
-          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' }}>
-            <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setQuickEditRoutineId(null)} activeOpacity={1} />
-            <View style={{ backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 40, shadowColor: '#000', shadowOffset: { width: 0, height: -5 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 10 }}>
-              
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-                <Text style={{ fontSize: 20, fontWeight: '800', color: TEXT }}>Rutini Düzenle</Text>
-                <TouchableOpacity onPress={() => setQuickEditRoutineId(null)}>
-                  <Ionicons name="close-circle" size={24} color={TEXT3} />
-                </TouchableOpacity>
-              </View>
-
-              <View style={{ marginBottom: 24 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: BORDER }}>
-                  <TextInput 
-                    style={{ flex: 1, fontSize: 22, fontWeight: '600', color: TEXT, paddingVertical: 12 }}
-                    value={editName}
-                    onChangeText={setEditName}
-                    placeholder="Başlık (örn: Sabah Koşusu)"
-                    placeholderTextColor={TEXT3}
-                  />
-                  {editName.length > 0 && (
-                    <TouchableOpacity onPress={() => setEditName('')}>
-                      <Ionicons name="close-circle" size={18} color={TEXT3} />
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-
-              <View style={{ marginBottom: 24 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'flex-start', borderBottomWidth: 1, borderBottomColor: BORDER }}>
-                  <TextInput 
-                    style={{ flex: 1, fontSize: 16, fontWeight: '400', color: TEXT, paddingVertical: 12, minHeight: 60, textAlignVertical: 'top' }}
-                    value={editDesc}
-                    onChangeText={setEditDesc}
-                    placeholder="Açıklama (opsiyonel)"
-                    placeholderTextColor={TEXT3}
-                    multiline
-                  />
-                  {editDesc.length > 0 && (
-                    <TouchableOpacity onPress={() => setEditDesc('')} style={{ marginTop: 14 }}>
-                      <Ionicons name="close-circle" size={18} color={TEXT3} />
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-
-              <View style={{ marginBottom: 32, marginHorizontal: -16 }}>
-                <TimeField 
-                  label=""
-                  hour={editHour}
-                  min={editMin}
-                  onTimeChange={(h: string, m: string) => {
-                    setEditHour(h);
-                    setEditMin(m);
-                  }}
-                />
-              </View>
-
-              <TouchableOpacity 
-                style={{ backgroundColor: RED, borderRadius: 8, paddingVertical: 14, alignItems: 'center' }}
-                activeOpacity={0.8}
-                onPress={() => {
-                  let h = parseInt(editHour || '0');
-                  let m = parseInt(editMin || '0');
-                  if (h > 23) h = 23;
-                  if (m > 59) m = 59;
-                  const formattedTime = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-
-                  updateRoutine(quickEditRoutineId, {
-                    name: editName.trim() || 'İsimsiz Rutin',
-                    description: editDesc.trim() || undefined,
-                    notificationTime: formattedTime
-                  });
-                  setQuickEditRoutineId(null);
-                }}
-              >
-                <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold' }}>Güncelle</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
         </Modal>
       )}
 

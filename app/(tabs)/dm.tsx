@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, TextInput,
   FlatList, Dimensions, KeyboardAvoidingView, Platform, Modal, ScrollView,
@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { useStore, Message } from '../../store/useStore';
 import { useRouter } from 'expo-router';
+import { MessageAPI } from '../../lib/api';
 
 const { width: SW } = Dimensions.get('window');
 
@@ -23,32 +24,6 @@ const SURFACE = '#F4F4F4';
 const GOLD    = '#D4860A';
 const GREEN   = '#00bf63';
 
-// ── Mock data ─────────────────────────────────────────────────────────────────
-const _now = new Date();
-const ts = (m: number) => new Date(_now.getTime() - m * 60000).toISOString();
-
-const MOCK_MATE = {
-  id: 'mock-1', username: 'ayse_kaya', fullName: 'Ayşe',
-  gender: 'female' as const,
-  avatarUri: 'https://i.pravatar.cc/150?img=47',
-  interests: ['Yoga', 'Meditasyon', 'Koşu'],
-  routines: [], photos: [], achievementScore: 89,
-};
-
-const MOCK_MESSAGES: Message[] = [
-  { id: 'm1',  text: 'Merhaba! Bugün rutinlerin nasıl gidiyor? 😊',          sentByMe: false, timestamp: ts(62) },
-  { id: 'm2',  text: 'Sabah yogasını az önce bitirdim, harikaydı!',           sentByMe: true,  timestamp: ts(60) },
-  { id: 'm3',  text: 'Sen ne kadar yaptın?',                                  sentByMe: true,  timestamp: ts(59) },
-  { id: 'm4',  text: 'Ben de meditasyonu yaptım ama koşuyu es geçtim 😅',    sentByMe: false, timestamp: ts(57) },
-  { id: 'm5',  text: 'Haha olmaz, akşama koşmak zorundasın!',                 sentByMe: true,  timestamp: ts(55) },
-  { id: 'm6',  text: 'Biliyorum 😂 akşama kesinlikle çıkacağım',             sentByMe: false, timestamp: ts(54) },
-  { id: 'm7',  text: 'Söz mü?',                                               sentByMe: false, timestamp: ts(53) },
-  { id: 'm8',  text: 'Bu hafta hedeflerime tam gaz ilerliyorum. Ya sen?',      sentByMe: false, timestamp: ts(20) },
-  { id: 'm9',  text: 'Ben de! 5 günlük seri yaptım 🔥',                      sentByMe: true,  timestamp: ts(18) },
-  { id: 'm10', text: 'Süper! Beni de motive ediyorsun ❤️',                  sentByMe: false, timestamp: ts(16) },
-  { id: 'm11', text: 'Birlikte başaracağız! Rutinleri es geçme 💪',          sentByMe: true,  timestamp: ts(8)  },
-  { id: 'm12', text: 'Kesinlikle! Bugün hangi rutini tamamladın? 🎯',         sentByMe: false, timestamp: ts(3)  },
-];
 
 // ── Quick-reply answer map ────────────────────────────────────────────────────
 const QR_ANSWER_MAP: { keys: string[]; replies: string[] }[] = [
@@ -236,15 +211,27 @@ const QuickReplyList = React.memo(({ replies, onSend }: { replies: string[]; onS
 // ── Main screen ───────────────────────────────────────────────────────────────
 export default function DMScreen() {
   const isPro         = useStore(s => s.user.isPro);
+  const userId        = useStore(s => s.user.id);
   const storeMate     = useStore(s => s.mate);
+  const matchId       = useStore(s => s.matchId);
   const storeMessages = useStore(s => s.messages);
   const sendMessage   = useStore(s => s.sendMessage);
   const deleteMessage = useStore(s => s.deleteMessage);
+  const appendMessage = useStore(s => s.appendMessage);
   const unmatch       = useStore(s => s.unmatch);
   const router        = useRouter();
 
-  const mate     = storeMate ?? MOCK_MATE;
-  const messages = storeMessages.length > 0 ? storeMessages : (!storeMate ? MOCK_MESSAGES : []);
+  const mate     = storeMate;
+  const messages = storeMessages;
+
+  // Supabase Realtime subscription for live messages
+  useEffect(() => {
+    if (!matchId || !userId) return;
+    const channel = MessageAPI.subscribeToMatch(matchId, userId, (msg) => {
+      if (!msg.sentByMe) appendMessage(msg);
+    });
+    return () => { channel.unsubscribe(); };
+  }, [matchId, userId, appendMessage]);
 
   const [input, setInput]           = useState('');
   const [sheetMsgId, setSheetMsgId] = useState<string | null>(null);
@@ -254,9 +241,9 @@ export default function DMScreen() {
 
   const listRef = useRef<FlatList<ChatItem>>(null);
 
-  const mateAccent    = mate.gender === 'female' ? '#e91e63' : '#3498db';
-  const mateAvatarUri = mate.avatarUri || `https://i.pravatar.cc/150?u=${mate.username}`;
-  const displayName   = (mate as any).fullName ?? mate.username;
+  const mateAccent    = mate?.gender === 'female' ? '#e91e63' : '#3498db';
+  const mateAvatarUri = mate?.avatarUri || '';
+  const displayName   = (mate as any)?.fullName ?? mate?.username ?? '';
 
   const chatItems = useMemo(() => buildChatItems(messages), [messages]);
 
@@ -277,6 +264,18 @@ export default function DMScreen() {
     }
     return <Bubble item={item} mateAvatarUri={mateAvatarUri} mateAccent={mateAccent} isPro={isPro} onLongPress={setSheetMsgId} />;
   }, [mateAvatarUri, mateAccent, isPro, send]);
+
+  if (!mate) {
+    return (
+      <SafeAreaView style={s.container} edges={['top']}>
+        <View style={s.noMatchWrap}>
+          <Ionicons name="chatbubbles-outline" size={56} color="#CCCCCC" />
+          <Text style={s.noMatchTitle}>Henüz eşleşmen yok</Text>
+          <Text style={s.noMatchSub}>Keşfet sekmesinden birileriyle eşleş,{'\n'}mesajlaşmaya başla!</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
@@ -451,6 +450,11 @@ export default function DMScreen() {
 // ── Styles ────────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFFFFF' },
+
+  // No match empty state
+  noMatchWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 32 },
+  noMatchTitle: { fontSize: 20, fontWeight: '800', color: TEXT, letterSpacing: -0.4 },
+  noMatchSub:   { fontSize: 14, color: TEXT2, textAlign: 'center', lineHeight: 20 },
 
   // Header
   header: {

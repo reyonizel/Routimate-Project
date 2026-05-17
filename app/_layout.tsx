@@ -19,6 +19,7 @@ export default function RootLayout() {
   const loadUserData   = useStore(s => s.loadUserData);
   const setLoggedIn    = useStore(s => s.setLoggedIn);
   const setInitialized = useStore(s => s.setInitialized);
+  const updateUser     = useStore(s => s.updateUser);
 
   // Prevent the auth-state listener from running loadUserData a second time
   // during the initial SIGNED_IN event that fires right after getSession()
@@ -45,6 +46,10 @@ export default function RootLayout() {
         finish('unverified');
         return;
       }
+      // Set user.id immediately from session so Supabase inserts work
+      // even before loadUserData fully completes
+      const currentId = useStore.getState().user.id;
+      if (!currentId) updateUser({ id: session.user.id });
       const result = await loadUserData();
       finish(result);
     }).catch(() => {
@@ -80,8 +85,10 @@ export default function RootLayout() {
         <Stack.Screen name="pro-upgrade" />
         <Stack.Screen name="edit-profile" />
         <Stack.Screen name="product-detail" />
+        <Stack.Screen name="cart" />
+        <Stack.Screen name="orders" />
         <Stack.Screen name="mate-profile" />
-        <Stack.Screen name="debug" />
+        <Stack.Screen name="debug" options={{ href: null } as any} />
         <Stack.Screen name="welcome"     options={{ animation: 'fade' }} />
         <Stack.Screen name="auth"        options={{ animation: 'slide_from_bottom' }} />
         <Stack.Screen name="onboarding"  options={{ animation: 'slide_from_right', gestureEnabled: false }} />

@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useStore, Routine } from '../../store/useStore';
+import { generateId } from '../../lib/api';
 
 const BG = '#FFFFFF'; const CARD = '#F4F4F4'; const SURFACE = '#EEEEEE';
 const TEXT = '#111111'; const TEXT2 = '#767676'; const TEXT3 = '#ABABAB';
@@ -122,9 +123,8 @@ export default function CreateScreen() {
   const handleSave = () => {
     if (!setName.trim()) { setNameError(true); return; }
     if (items.length === 0) return;
-    const now = Date.now();
-    const routines: Routine[] = items.map((item, i) => ({
-      id: `${now}-${i}`,
+    const routines: Routine[] = items.map((item) => ({
+      id: generateId(),
       name: item.title,
       frequency: item.freq,
       notificationTime: `${item.hour}:${item.min}`,
@@ -393,43 +393,53 @@ const s = StyleSheet.create({
   header: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12 },
   headerTitle: { fontSize: 24, color: TEXT, fontWeight: '900', letterSpacing: -0.5 },
 
-  // Main card
-  card: { marginHorizontal: 16, backgroundColor: CARD, borderRadius: 20 },
+  // Main card — shadow yerine clean card
+  card: {
+    marginHorizontal: 16, backgroundColor: CARD, borderRadius: 24,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 12, elevation: 3,
+  },
 
-  setNameInput: { fontSize: 18, fontWeight: '700', color: TEXT, paddingHorizontal: 18, paddingVertical: 18 },
+  setNameInput: {
+    fontSize: 18, fontWeight: '700', color: TEXT,
+    paddingHorizontal: 20, paddingVertical: 20,
+  },
 
-  divider: { height: 1, backgroundColor: BORDER, marginHorizontal: 0 },
+  divider: { height: 0.5, backgroundColor: BORDER },
 
   itemsSection: {},
-  itemRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 18, paddingVertical: 13 },
+  itemRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 14 },
   itemRowBorder: { borderBottomWidth: 0.5, borderBottomColor: BORDER },
   itemDot: { width: 8, height: 8, borderRadius: 4 },
   itemTitle: { fontSize: 13, fontWeight: '600', color: TEXT },
-  itemMeta: { fontSize: 11, color: TEXT3, marginTop: 1 },
+  itemMeta: { fontSize: 11, color: TEXT3, marginTop: 2 },
 
   // Inline form
-  form: { padding: 16, gap: 14 },
+  form: { padding: 16, gap: 12 },
   formTitleInput: {
     fontSize: 16, fontWeight: '600', color: TEXT,
-    borderBottomWidth: 1, borderBottomColor: BORDER, paddingBottom: 10,
+    backgroundColor: SURFACE, borderRadius: 14,
+    paddingHorizontal: 16, paddingVertical: 14,
   },
 
   dropdownTrigger: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: SURFACE, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 11,
+    backgroundColor: SURFACE, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13,
   },
-  dropdownValue: { fontSize: 14, fontWeight: '600', color: TEXT },
+  dropdownValue: { fontSize: 14, fontWeight: '700', color: TEXT },
   dropdownList: {
     position: 'absolute',
-    backgroundColor: BG, borderRadius: 12,
-    borderWidth: 1, borderColor: BORDER,
+    backgroundColor: BG, borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#000', shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1, shadowRadius: 12, elevation: 10,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12, shadowRadius: 20, elevation: 12,
   },
-  dropdownItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingVertical: 12 },
+  dropdownItem: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingVertical: 13,
+  },
   dropdownItemBorder: { borderBottomWidth: 0.5, borderBottomColor: BORDER },
-  dropdownItemOn: { backgroundColor: GREEN + '0d' },
+  dropdownItemOn: { backgroundColor: GREEN + '12' },
   dropdownItemTxt: { fontSize: 14, color: TEXT2, fontWeight: '500' },
   dropdownItemTxtOn: { color: TEXT, fontWeight: '700' },
 
@@ -439,37 +449,40 @@ const s = StyleSheet.create({
   dayChipTxt: { fontSize: 11, fontWeight: '700', color: TEXT2 },
 
   calGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
-  calCell: { width: '12%', aspectRatio: 1, borderRadius: 8, backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center' },
+  calCell: { width: '12%', aspectRatio: 1, borderRadius: 10, backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center' },
   calCellOn: { backgroundColor: GREEN },
   calCellTxt: { fontSize: 12, fontWeight: '700', color: TEXT2 },
 
   timeBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start',
-    backgroundColor: SURFACE, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: SURFACE, borderRadius: 14,
+    paddingHorizontal: 16, paddingVertical: 13,
   },
   timeLbl: { fontSize: 13, color: TEXT2, flex: 1 },
-  timeBtnTxt: { fontSize: 15, fontWeight: '700', color: TEXT, letterSpacing: 0.5 },
+  timeBtnTxt: { fontSize: 16, fontWeight: '800', color: TEXT, letterSpacing: 0.5 },
 
-  formBtns: { flexDirection: 'row', gap: 8, marginTop: 2 },
-  cancelBtn: { flex: 1, borderRadius: 12, paddingVertical: 12, alignItems: 'center', backgroundColor: SURFACE },
-  cancelTxt: { fontSize: 14, color: TEXT2, fontWeight: '600' },
-  addBtn: { flex: 2, borderRadius: 12, paddingVertical: 12, alignItems: 'center', backgroundColor: GREEN },
+  formBtns: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  cancelBtn: { flex: 1, borderRadius: 999, paddingVertical: 13, alignItems: 'center', backgroundColor: SURFACE },
+  cancelTxt: { fontSize: 14, color: TEXT2, fontWeight: '700' },
+  addBtn: { flex: 2, borderRadius: 999, paddingVertical: 13, alignItems: 'center', backgroundColor: GREEN },
   addBtnOff: { backgroundColor: SURFACE },
-  addBtnTxt: { fontSize: 14, color: '#fff', fontWeight: '700' },
+  addBtnTxt: { fontSize: 14, color: '#fff', fontWeight: '800' },
 
-  addRowBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 16 },
-  addRowTxt: { fontSize: 14, color: GREEN, fontWeight: '600' },
+  addRowBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingVertical: 16 },
+  addRowTxt: { fontSize: 14, color: GREEN, fontWeight: '700' },
 
-  // Save
+  // Save — full-width sticky pill
   saveBtn: {
-    marginHorizontal: 16, marginTop: 12, backgroundColor: GREEN,
-    borderRadius: 16, paddingVertical: 15, alignItems: 'center',
+    marginHorizontal: 16, marginTop: 14, backgroundColor: GREEN,
+    borderRadius: 999, paddingVertical: 16, alignItems: 'center',
+    shadowColor: GREEN, shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3, shadowRadius: 12, elevation: 6,
   },
-  saveTxt: { fontSize: 16, color: '#fff', fontWeight: '800' },
+  saveTxt: { fontSize: 16, color: '#fff', fontWeight: '900', letterSpacing: 0.2 },
 
   // TimeField (for index.tsx)
   tfField: { marginBottom: 20 },
   tfLabel: { fontSize: 11, color: TEXT3, fontWeight: '700', letterSpacing: 1.5, marginBottom: 10 },
-  tfAndroid: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: BORDER },
+  tfAndroid: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: BORDER },
   tfAndroidTxt: { fontSize: 22, color: TEXT, fontWeight: '600', letterSpacing: 1 },
 });

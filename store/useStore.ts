@@ -2,7 +2,10 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
-import { ProfileAPI, RoutineAPI, PhotoAPI, MatchAPI, MessageAPI, generateId } from '../lib/api';
+import {
+  ProfileAPI, RoutineAPI, PhotoAPI, MatchAPI, MessageAPI,
+  OrderAPI, StorageAPI, StoreWaitlistAPI, SessionAPI, generateId,
+} from '../lib/api';
 
 export type Gender = 'male' | 'female';
 
@@ -45,6 +48,28 @@ export interface Message {
   text: string;
   sentByMe: boolean;
   timestamp: string;
+}
+
+export interface OrderProduct {
+  id: string;
+  name: string;
+  price: number;
+  emoji: string;
+}
+
+export type OrderStatus = 'Hazırlanıyor' | 'Kargoya Verildi' | 'Teslim Edildi';
+
+export interface Order {
+  id: string;
+  products: OrderProduct[];
+  total: number;
+  city: string;
+  district: string;
+  neighborhood: string;
+  address: string;
+  phone: string;
+  status: OrderStatus;
+  createdAt: string;
 }
 
 export interface User {
@@ -100,12 +125,14 @@ interface AppState {
   mate: Mate | null;
   matchId: string | null;
   messages: Message[];
+  orders: Order[];
   isLoggedIn: boolean;
   isInitializing: boolean;
   discoveryUsers: Mate[];
   matchRequests: MatchRequest[];
   sentMatchRequests: string[];
 
+  addOrder: (order: Order) => void;
   loadUserData: () => Promise<'ok' | 'unverified' | 'onboarding' | 'no_user' | 'error'>;
   setInitialized: () => void;
 
@@ -121,6 +148,7 @@ interface AppState {
   pinPhoto: (id: string) => void;
   sendMessage: (text: string) => void;
   deleteMessage: (id: string) => void;
+  appendMessage: (msg: Message) => void;
   setLoggedIn: (value: boolean) => void;
   toggleRestDay: (date: string) => void;
 
@@ -132,6 +160,10 @@ interface AppState {
   rejectMatchRequest: (requestId: string) => void;
   unmatch: () => void;
   resetStore: () => void;
+
+  uploadAvatar: (localUri: string) => Promise<void>;
+  joinStoreWaitlist: (email: string) => Promise<'ok' | 'already' | 'error'>;
+  refreshAchievementScore: () => Promise<void>;
 }
 
 const BLANK_USER: User = {
@@ -151,6 +183,36 @@ const BLANK_USER: User = {
   completionSound: 'correct',
 };
 
+function calcAchievementScore(routines: Routine[]): number {
+  if (routines.length === 0) return 0;
+  const today = new Date();
+  const last30 = Array.from({ length: 30 }, (_, i) => {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    return d.toISOString().split('T')[0];
+  });
+  let totalExpected = 0;
+  let totalDone = 0;
+  for (const r of routines) {
+    const expected = last30.filter(date => {
+      if (r.frequency === 'daily') return true;
+      if (r.frequency === 'weekly') {
+        const day = new Date(date).getDay();
+        return (r.targetDays ?? []).includes(day);
+      }
+      if (r.frequency === 'monthly') {
+        const dayOfMonth = new Date(date).getDate();
+        return (r.monthlyDays ?? []).includes(dayOfMonth);
+      }
+      return false;
+    }).length || 1;
+    const done = r.completedDates.filter(d => last30.includes(d)).length;
+    totalExpected += expected;
+    totalDone += done;
+  }
+  return Math.round((totalDone / totalExpected) * 100);
+}
+
 export const useStore = create<AppState>()(
   persist(
     (set, get) => ({
@@ -158,6 +220,7 @@ export const useStore = create<AppState>()(
       mate: null,
       matchId: null,
       messages: [],
+      orders: [],
       isLoggedIn: false,
       isInitializing: true,
       discoveryUsers: [],
@@ -166,10 +229,17 @@ export const useStore = create<AppState>()(
 
       setInitialized: () => set({ isInitializing: false }),
 
+      addOrder: (order) => {
+        set((s) => ({ orders: [order, ...s.orders] }));
+        const userId = get().user.id;
+        if (userId) {
+          OrderAPI.create(userId, order).catch(console.error);
+        }
+      },
+
       // ── Load all user data from Supabase ──────────────────────────────────
       loadUserData: async () => {
         try {
-          // getSession() reads from AsyncStorage cache — works offline
           const { data: { session } } = await supabase.auth.getSession();
           if (!session?.user) return 'no_user';
           const authUser = session.user;
@@ -177,8 +247,7 @@ export const useStore = create<AppState>()(
 
           const userId = authUser.id;
 
-          // allSettled so a single failing endpoint doesn't crash everything
-          const [profileRes, routinesRes, restDaysRes, photosRes, matchRes, requestsRes, sentRes, discoveryRes] =
+          const [profileRes, routinesRes, restDaysRes, photosRes, matchRes, requestsRes, sentRes, discoveryRes, ordersRes] =
             await Promise.allSettled([
               ProfileAPI.get(userId),
               RoutineAPI.getAll(userId),
@@ -188,12 +257,12 @@ export const useStore = create<AppState>()(
               MatchAPI.getRequests(userId),
               MatchAPI.getSentRequests(userId),
               ProfileAPI.getDiscovery(userId),
+              OrderAPI.getAll(userId),
             ]);
 
           const profile = profileRes.status === 'fulfilled' ? profileRes.value : null;
 
           if (!profile) {
-            // Network failed but session is valid — fall back to cached store data
             const cached = get().user;
             if (cached.id === userId) {
               set({ isLoggedIn: true });
@@ -203,18 +272,56 @@ export const useStore = create<AppState>()(
           }
           if (!profile.username) return 'onboarding';
 
-          const routines   = routinesRes.status   === 'fulfilled' ? routinesRes.value   : [];
-          const restDays   = restDaysRes.status   === 'fulfilled' ? restDaysRes.value   : [];
-          const photos     = photosRes.status     === 'fulfilled' ? photosRes.value     : [];
-          const matchData  = matchRes.status      === 'fulfilled' ? matchRes.value      : { matchId: null, matchedSince: null, mate: null };
-          const matchReqs  = requestsRes.status   === 'fulfilled' ? requestsRes.value   : [];
-          const sentReqs   = sentRes.status       === 'fulfilled' ? sentRes.value       : [];
-          const discovery  = discoveryRes.status  === 'fulfilled' ? discoveryRes.value  : [];
+          const cached = get().user;
+          const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+          // Resolve routines: DB is authoritative when it has rows.
+          // If DB is empty but cache has rows, migrate cache → DB (fixes old
+          // non-UUID ids from the create screen bug).
+          const dbRoutines = routinesRes.status === 'fulfilled' ? routinesRes.value : null;
+          let routines: Routine[];
+          if (dbRoutines !== null && dbRoutines.length > 0) {
+            routines = dbRoutines;
+          } else if (dbRoutines !== null && dbRoutines.length === 0 && cached.routines.length > 0) {
+            // Re-sync: fix any non-UUID ids before inserting
+            routines = cached.routines.map(r =>
+              UUID_RE.test(r.id) ? r : { ...r, id: generateId() }
+            );
+            routines.forEach(r => RoutineAPI.create(userId, r).catch(console.error));
+          } else {
+            routines = dbRoutines ?? cached.routines;
+          }
+          const restDays  = restDaysRes.status  === 'fulfilled' ? restDaysRes.value  : cached.restDays;
+
+          // Merge: DB is authoritative, but preserve cached photos not yet synced to DB
+          const dbPhotos  = photosRes.status    === 'fulfilled' ? photosRes.value    : null;
+          const photos    = dbPhotos !== null
+            ? [
+                ...dbPhotos,
+                ...cached.photos.filter(p => !dbPhotos.some(d => d.id === p.id)),
+              ]
+            : cached.photos;
+          const matchData = matchRes.status     === 'fulfilled' ? matchRes.value     : { matchId: null, matchedSince: null, mate: null };
+          const matchReqs = requestsRes.status  === 'fulfilled' ? requestsRes.value  : [];
+          const sentReqs  = sentRes.status      === 'fulfilled' ? sentRes.value      : [];
+          const orders    = ordersRes.status    === 'fulfilled' ? ordersRes.value    : get().orders;
+
+          // Pass matched mate ID + sent request IDs to filter discovery
+          const excludeIds = [
+            matchData.mate?.id,
+            ...sentReqs,
+            ...matchReqs.map(r => r.fromUser.id),
+          ].filter(Boolean) as string[];
+          const discovery = discoveryRes.status === 'fulfilled'
+            ? discoveryRes.value
+            : await ProfileAPI.getDiscovery(userId, excludeIds);
 
           let messages: Message[] = [];
           if (matchData.matchId) {
             try { messages = await MessageAPI.getAll(matchData.matchId, userId); } catch {}
           }
+
+          SessionAPI.record(userId).catch(() => {});
 
           set({
             user: {
@@ -230,11 +337,11 @@ export const useStore = create<AppState>()(
             matchRequests: matchReqs,
             sentMatchRequests: sentReqs,
             discoveryUsers: discovery,
+            orders,
             isLoggedIn: true,
           });
           return 'ok';
         } catch {
-          // On unexpected error, keep user logged in if we have cached data
           const cached = get().user;
           if (cached.id) {
             set({ isLoggedIn: true });
@@ -251,24 +358,37 @@ export const useStore = create<AppState>()(
         const wasCompleted = routine?.completedDates.includes(date) ?? false;
         const nowCompleted = !wasCompleted;
 
-        set((s) => ({
-          user: {
-            ...s.user,
-            routines: s.user.routines.map((r) => {
-              if (r.id !== routineId) return r;
-              return {
-                ...r,
-                completedDates: wasCompleted
-                  ? r.completedDates.filter((d) => d !== date)
-                  : [...r.completedDates, date],
-              };
-            }),
-          },
-        }));
+        set((s) => {
+          const updatedRoutines = s.user.routines.map((r) => {
+            if (r.id !== routineId) return r;
+            return {
+              ...r,
+              completedDates: wasCompleted
+                ? r.completedDates.filter((d) => d !== date)
+                : [...r.completedDates, date],
+            };
+          });
+          const newScore = calcAchievementScore(updatedRoutines);
+          return {
+            user: {
+              ...s.user,
+              routines: updatedRoutines,
+              achievementScore: newScore,
+            },
+          };
+        });
 
         const userId = get().user.id;
         if (userId) {
           RoutineAPI.setCompletion(routineId, userId, date, nowCompleted).catch(console.error);
+          // Local score güncellendi. DB'den kesin skoru arka planda al ve kaydet.
+          SessionAPI.calculateScore(userId).then(score => {
+            set((s) => ({ user: { ...s.user, achievementScore: score } }));
+            ProfileAPI.update(userId, { achievementScore: score }).catch(console.error);
+          }).catch(() => {
+            const localScore = get().user.achievementScore;
+            ProfileAPI.update(userId, { achievementScore: localScore }).catch(console.error);
+          });
         }
       },
 
@@ -317,6 +437,20 @@ export const useStore = create<AppState>()(
         const userId = get().user.id;
         if (userId) {
           ProfileAPI.update(userId, updates).catch(console.error);
+        }
+      },
+
+      uploadAvatar: async (localUri) => {
+        const userId = get().user.id;
+        if (!userId) return;
+        try {
+          const url = await StorageAPI.uploadImage('avatars', `${userId}/avatar`, localUri);
+          set((s) => ({ user: { ...s.user, avatarUri: url } }));
+          await ProfileAPI.update(userId, { avatarUri: url });
+        } catch {
+          // Fallback: keep local URI
+          set((s) => ({ user: { ...s.user, avatarUri: localUri } }));
+          await ProfileAPI.update(userId, { avatarUri: localUri });
         }
       },
 
@@ -374,6 +508,15 @@ export const useStore = create<AppState>()(
 
       deleteMessage: (id) => {
         set((s) => ({ messages: s.messages.filter((m) => m.id !== id) }));
+        MessageAPI.delete(id).catch(console.error);
+      },
+
+      appendMessage: (msg) => {
+        set((s) => {
+          const exists = s.messages.some(m => m.id === msg.id);
+          if (exists) return s;
+          return { messages: [...s.messages, msg] };
+        });
       },
 
       // ── Auth & Misc ───────────────────────────────────────────────────────
@@ -401,44 +544,85 @@ export const useStore = create<AppState>()(
         set((s) => {
           const inactive = s.user.inactiveSets ?? [];
           const isInactive = inactive.includes(setName);
+          const newInactive = isInactive
+            ? inactive.filter(n => n !== setName)
+            : [...inactive, setName];
+          const userId = s.user.id;
+          if (userId) {
+            ProfileAPI.update(userId, { inactiveSets: newInactive }).catch(console.error);
+          }
           return {
             user: {
               ...s.user,
-              inactiveSets: isInactive
-                ? inactive.filter(n => n !== setName)
-                : [...inactive, setName],
+              inactiveSets: newInactive,
             },
           };
         });
       },
 
       addRoutineProof: (routineId, date, uri) => {
-        set((s) => {
-          const routine = s.user.routines.find(r => r.id === routineId);
-          const newPhoto: Photo = {
-            id: `proof-${routineId}-${date}`,
-            uri,
-            uploadedAt: new Date().toISOString(),
-            proofMeta: {
-              routineId,
-              routineName: routine?.name ?? '',
-              setName: routine?.setName,
-              capturedAt: new Date().toISOString(),
-            },
-          };
-          return {
-            user: {
-              ...s.user,
-              routines: s.user.routines.map(r =>
-                r.id !== routineId ? r : {
-                  ...r,
-                  proofPhotos: [...(r.proofPhotos ?? []).filter(p => p.date !== date), { date, uri }],
-                }
-              ),
-              photos: [...s.user.photos.filter(p => p.id !== newPhoto.id), newPhoto],
-            },
-          };
-        });
+        const userId = get().user.id;
+        const routine = get().user.routines.find(r => r.id === routineId);
+
+        const photoId = `proof-${routineId}-${date}`;
+        const proofMeta = {
+          routineId,
+          routineName: routine?.name ?? '',
+          setName: routine?.setName,
+          capturedAt: new Date().toISOString(),
+        };
+
+        const newPhoto: Photo = {
+          id: photoId,
+          uri,
+          uploadedAt: new Date().toISOString(),
+          proofMeta,
+        };
+
+        set((s) => ({
+          user: {
+            ...s.user,
+            routines: s.user.routines.map(r =>
+              r.id !== routineId ? r : {
+                ...r,
+                proofPhotos: [...(r.proofPhotos ?? []).filter(p => p.date !== date), { date, uri }],
+              }
+            ),
+            photos: [...s.user.photos.filter(p => p.id !== photoId), newPhoto],
+          },
+        }));
+
+        if (userId) {
+          // Save to DB immediately with local URI so reloads don't lose the photo
+          PhotoAPI.add(userId, newPhoto).catch(console.error);
+
+          // Background: upload to storage, then upsert with publicUrl
+          (async () => {
+            try {
+              const storagePath = `${userId}/${routineId}/${date}`;
+              const publicUrl = await StorageAPI.uploadImage('photos', storagePath, uri);
+              const uploadedPhoto: Photo = { ...newPhoto, uri: publicUrl };
+
+              set((s) => ({
+                user: {
+                  ...s.user,
+                  photos: s.user.photos.map(p => p.id === photoId ? uploadedPhoto : p),
+                  routines: s.user.routines.map(r =>
+                    r.id !== routineId ? r : {
+                      ...r,
+                      proofPhotos: (r.proofPhotos ?? []).map(p => p.date === date ? { date, uri: publicUrl } : p),
+                    }
+                  ),
+                },
+              }));
+
+              // Upsert to replace local URI with publicUrl in DB
+              await PhotoAPI.add(userId, uploadedPhoto);
+            } catch {
+              // Local URI already persisted in DB — acceptable fallback
+            }
+          })();
+        }
       },
 
       // ── Discovery & Matching ──────────────────────────────────────────────
@@ -510,11 +694,25 @@ export const useStore = create<AppState>()(
           mate: null,
           matchId: null,
           messages: [],
+          orders: [],
           isLoggedIn: false,
           discoveryUsers: [],
           matchRequests: [],
           sentMatchRequests: [],
         });
+      },
+
+      joinStoreWaitlist: async (email) => {
+        const userId = get().user.id || null;
+        return StoreWaitlistAPI.join(userId, email);
+      },
+
+      refreshAchievementScore: async () => {
+        const userId = get().user.id;
+        if (!userId) return;
+        const score = await SessionAPI.calculateScore(userId);
+        set((s) => ({ user: { ...s.user, achievementScore: score } }));
+        ProfileAPI.update(userId, { achievementScore: score }).catch(console.error);
       },
     }),
     {
@@ -525,6 +723,7 @@ export const useStore = create<AppState>()(
         mate: s.mate,
         matchId: s.matchId,
         messages: s.messages,
+        orders: s.orders,
         discoveryUsers: s.discoveryUsers,
         matchRequests: s.matchRequests,
         sentMatchRequests: s.sentMatchRequests,

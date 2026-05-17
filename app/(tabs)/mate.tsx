@@ -59,25 +59,6 @@ const INTEREST_ICON: Record<string, React.ComponentProps<typeof Ionicons>['name'
   'Spor':        'basketball-outline',
 };
 
-const MOCK_DISCOVERY: Mate[] = [
-  { id: 'm1', username: 'ayse_kaya',    fullName: 'Ayşe',   gender: 'female', avatarUri: 'https://i.pravatar.cc/150?img=47', interests: ['Yoga', 'Meditasyon', 'Koşu'],     routines: [], photos: [], achievementScore: 89 },
-  { id: 'm2', username: 'mehmet_demir', fullName: 'Mehmet', gender: 'male',   avatarUri: 'https://i.pravatar.cc/150?img=12', interests: ['Fitness', 'Soğuk Duş', 'Kitap'],  routines: [], photos: [], achievementScore: 76 },
-  { id: 'm3', username: 'zeynep_ar',    fullName: 'Zeynep', gender: 'female', avatarUri: 'https://i.pravatar.cc/150?img=32', interests: ['Pilates', 'Beslenme', 'Uyku'],    routines: [], photos: [], achievementScore: 92 },
-  { id: 'm4', username: 'can_yildiz',   fullName: 'Can',    gender: 'male',   avatarUri: 'https://i.pravatar.cc/150?img=53', interests: ['Koşu', 'Bisiklet', 'Müzik'],      routines: [], photos: [], achievementScore: 68 },
-  { id: 'm5', username: 'elif_sahin',   fullName: 'Elif',   gender: 'female', avatarUri: 'https://i.pravatar.cc/150?img=44', interests: ['Meditasyon', 'Yoga', 'Yazarlık'], routines: [], photos: [], achievementScore: 81 },
-  { id: 'm6', username: 'emre_celik',   fullName: 'Emre',   gender: 'male',   avatarUri: 'https://i.pravatar.cc/150?img=8',  interests: ['Spor', 'Beslenme', 'Uyku'],       routines: [], photos: [], achievementScore: 73 },
-];
-
-const MOCK_REQUESTS: MatchRequest[] = [
-  {
-    id: 'req1',
-    fromUser: {
-      id: 'r1', username: 'berkay_y', avatarUri: 'https://i.pravatar.cc/150?img=15',
-      interests: ['Koşu', 'Meditasyon'], achievementScore: 84, gender: 'male',
-    },
-    timestamp: new Date().toISOString(),
-  },
-];
 
 export default function MateScreen() {
   const user = useStore(s => s.user);
@@ -99,10 +80,7 @@ export default function MateScreen() {
     return common.length;
   };
 
-  const effectiveDiscovery = discoveryUsers.length > 0 ? discoveryUsers : MOCK_DISCOVERY;
-  const effectiveRequests  = matchRequests.length > 0  ? matchRequests  : MOCK_REQUESTS;
-
-  const sortedDiscovery = [...effectiveDiscovery]
+  const sortedDiscovery = [...discoveryUsers]
     .filter(u => u.id !== user.id)
     .sort((a, b) => calculateSimilarity(b) - calculateSimilarity(a));
 
@@ -193,10 +171,10 @@ export default function MateScreen() {
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={{ height: 16 }} />
 
-        {effectiveRequests.length > 0 && (
+        {matchRequests.length > 0 && (
           <View style={s.requestSection}>
             <Text style={s.sectionHeaderDiscovery}>Eşleşme İstekleri</Text>
-            {effectiveRequests.map(req => {
+            {matchRequests.map(req => {
               const reqAccent = req.fromUser.gender === 'female' ? '#e91e63' : '#3498db';
               return (
                 <View key={req.id} style={s.requestCard}>
@@ -222,6 +200,13 @@ export default function MateScreen() {
 
         <View style={s.discoverySection}>
           <Text style={s.sectionHeaderDiscovery}>Önerilen Kişiler</Text>
+          {sortedDiscovery.length === 0 && (
+            <View style={s.empty}>
+              <Ionicons name="people-outline" size={40} color={TEXT3} />
+              <Text style={s.emptyTxt}>Şu an önerilecek kimse yok</Text>
+              <Text style={[s.emptyTxt, { fontSize: 12, marginTop: 4 }]}>Profil doldurunca eşleşmeler başlar</Text>
+            </View>
+          )}
           {sortedDiscovery.map(item => {
             const isSent = sentRequests.includes(item.id);
             const similarity = calculateSimilarity(item);

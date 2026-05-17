@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-export default function ProductDetailScreen() {
+export default function OrdersScreen() {
   const router = useRouter();
   return (
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
@@ -13,9 +13,9 @@ export default function ProductDetailScreen() {
         <Ionicons name="chevron-back" size={22} color="#111" />
       </TouchableOpacity>
       <View style={s.body}>
-        <Text style={s.emoji}>🛍️</Text>
+        <Text style={s.emoji}>📦</Text>
         <Text style={s.title}>Mağaza Yakında Açılıyor</Text>
-        <Text style={s.sub}>Ürün detayları mağaza açıldığında kullanılabilir olacak.</Text>
+        <Text style={s.sub}>Siparişlerim sayfası mağaza açıldığında kullanılabilir olacak.</Text>
       </View>
     </SafeAreaView>
   );

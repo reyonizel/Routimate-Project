@@ -1,5 +1,8 @@
+import { decode } from 'base64-arraybuffer';
+import * as FileSystem from 'expo-file-system';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { supabase } from './supabase';
-import type { User, Mate, Routine, Photo, Message, MatchRequest, Gender } from '../store/useStore';
+import type { User, Mate, Routine, Photo, Message, MatchRequest, Gender, Order, OrderProduct } from '../store/useStore';
 
 export function generateId(): string {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
@@ -20,6 +23,11 @@ function dbToRoutine(r: any): Routine {
     createdAt: r.created_at,
     targetDays: r.target_days ?? undefined,
     monthlyDays: r.monthly_days ?? undefined,
+    setName: r.set_name ?? undefined,
+    scope: (r.scope ?? 'recurring') as Routine['scope'],
+    onceRange: r.once_start && r.once_end
+      ? { start: r.once_start, end: r.once_end }
+      : undefined,
   };
 }
 
@@ -29,6 +37,7 @@ function dbToPhoto(p: any): Photo {
     uri: p.uri,
     uploadedAt: p.created_at,
     isPinned: p.is_pinned ?? false,
+    proofMeta: p.proof_meta ?? undefined,
   };
 }
 
@@ -44,6 +53,46 @@ function dbToMate(p: any): Mate {
     photos: (p.photos ?? []).map(dbToPhoto),
   };
 }
+
+// ─── Storage ──────────────────────────────────────────────────────────────────
+
+export const StorageAPI = {
+  async uploadImage(
+    bucket: 'avatars' | 'photos',
+    path: string,
+    localUri: string,
+    opts?: { maxWidth?: number; quality?: number }
+  ): Promise<string> {
+    const maxWidth = opts?.maxWidth ?? (bucket === 'avatars' ? 400 : 1200);
+    const quality  = opts?.quality  ?? (bucket === 'avatars' ? 0.85 : 0.82);
+
+    const webp = await manipulateAsync(
+      localUri,
+      [{ resize: { width: maxWidth } }],
+      { compress: quality, format: SaveFormat.WEBP }
+    );
+
+    const base64 = await FileSystem.readAsStringAsync(webp.uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .upload(`${path}.webp`, decode(base64), { contentType: 'image/webp', upsert: true });
+
+    if (error) throw error;
+
+    const { data: { publicUrl } } = supabase.storage
+      .from(bucket)
+      .getPublicUrl(data.path);
+
+    return publicUrl;
+  },
+
+  async deleteImage(bucket: 'avatars' | 'photos', path: string): Promise<void> {
+    await supabase.storage.from(bucket).remove([path]);
+  },
+};
 
 // ─── Profile ─────────────────────────────────────────────────────────────────
 
@@ -62,6 +111,8 @@ export const ProfileAPI = {
       bio: data.bio ?? undefined,
       birthDate: data.birth_date ?? undefined,
       locationName: data.location_name ?? undefined,
+      locationLat: data.location_lat ?? undefined,
+      locationLon: data.location_lon ?? undefined,
       gender: data.gender as Gender,
       avatarUri: data.avatar_url ?? null,
       isPro: data.is_pro ?? false,
@@ -69,34 +120,43 @@ export const ProfileAPI = {
       achievementScore: data.achievement_score ?? 0,
       matchedSince: data.matched_since ?? null,
       inactiveSets: data.inactive_sets ?? [],
+      notificationSound: data.notification_sound ?? 'default',
+      completionSound: data.completion_sound ?? 'correct',
     };
   },
 
   async update(userId: string, updates: Partial<User>): Promise<void> {
     const db: Record<string, any> = {};
-    if (updates.username !== undefined)      db.username = updates.username;
-    if (updates.fullName !== undefined)      db.full_name = updates.fullName;
-    if (updates.bio !== undefined)           db.bio = updates.bio;
-    if (updates.birthDate !== undefined)     db.birth_date = updates.birthDate;
-    if (updates.locationName !== undefined)  db.location_name = updates.locationName;
-    if (updates.gender !== undefined)        db.gender = updates.gender;
-    if (updates.avatarUri !== undefined)     db.avatar_url = updates.avatarUri;
-    if (updates.isPro !== undefined)         db.is_pro = updates.isPro;
-    if (updates.interests !== undefined)     db.interests = updates.interests;
-    if (updates.achievementScore !== undefined) db.achievement_score = updates.achievementScore;
+    if (updates.username !== undefined)          db.username = updates.username;
+    if (updates.fullName !== undefined)          db.full_name = updates.fullName;
+    if (updates.bio !== undefined)               db.bio = updates.bio;
+    if (updates.birthDate !== undefined)         db.birth_date = updates.birthDate;
+    if (updates.locationName !== undefined)      db.location_name = updates.locationName;
+    if (updates.locationLat !== undefined)       db.location_lat = updates.locationLat;
+    if (updates.locationLon !== undefined)       db.location_lon = updates.locationLon;
+    if (updates.gender !== undefined)            db.gender = updates.gender;
+    if (updates.avatarUri !== undefined)         db.avatar_url = updates.avatarUri;
+    if (updates.isPro !== undefined)             db.is_pro = updates.isPro;
+    if (updates.interests !== undefined)         db.interests = updates.interests;
+    if (updates.achievementScore !== undefined)  db.achievement_score = updates.achievementScore;
+    if (updates.matchedSince !== undefined)      db.matched_since = updates.matchedSince;
+    if (updates.inactiveSets !== undefined)      db.inactive_sets = updates.inactiveSets;
+    if (updates.notificationSound !== undefined) db.notification_sound = updates.notificationSound;
+    if (updates.completionSound !== undefined)   db.completion_sound = updates.completionSound;
     if (Object.keys(db).length > 0) {
       await supabase.from('profiles').update(db).eq('id', userId);
     }
   },
 
-  async getDiscovery(userId: string): Promise<Mate[]> {
+  async getDiscovery(userId: string, excludeIds: string[] = []): Promise<Mate[]> {
     const { data } = await supabase
       .from('profiles')
-      .select('id, username, gender, avatar_url, interests, achievement_score, routines(id, name, description, frequency, notification_time, created_at, target_days, monthly_days, routine_completions(completed_date)), photos(id, uri, is_pinned, created_at)')
+      .select('id, username, gender, avatar_url, interests, achievement_score, routines(id, name, description, frequency, notification_time, created_at, target_days, monthly_days, set_name, scope, once_start, once_end, routine_completions(completed_date)), photos(id, uri, is_pinned, created_at, proof_meta)')
       .neq('id', userId)
-      .limit(30);
+      .limit(50);
     if (!data) return [];
-    return data.map(dbToMate);
+    const excluded = new Set(excludeIds);
+    return data.filter(p => !excluded.has(p.id)).slice(0, 30).map(dbToMate);
   },
 };
 
@@ -114,7 +174,7 @@ export const RoutineAPI = {
   },
 
   async create(userId: string, routine: Routine): Promise<void> {
-    await supabase.from('routines').insert({
+    const { error } = await supabase.from('routines').insert({
       id: routine.id,
       user_id: userId,
       name: routine.name,
@@ -123,8 +183,13 @@ export const RoutineAPI = {
       notification_time: routine.notificationTime,
       target_days: routine.targetDays ?? [],
       monthly_days: routine.monthlyDays ?? [],
+      set_name: routine.setName ?? null,
+      scope: routine.scope ?? 'recurring',
+      once_start: routine.onceRange?.start ?? null,
+      once_end: routine.onceRange?.end ?? null,
       created_at: routine.createdAt,
     });
+    if (error && __DEV__) console.error('[RoutineAPI.create]', error.message, error.code);
   },
 
   async update(id: string, updates: Partial<Routine>): Promise<void> {
@@ -135,6 +200,7 @@ export const RoutineAPI = {
     if (updates.notificationTime !== undefined) db.notification_time = updates.notificationTime;
     if (updates.targetDays !== undefined)       db.target_days = updates.targetDays;
     if (updates.monthlyDays !== undefined)      db.monthly_days = updates.monthlyDays;
+    if (updates.setName !== undefined)          db.set_name = updates.setName;
     if (Object.keys(db).length > 0) {
       await supabase.from('routines').update(db).eq('id', id);
     }
@@ -187,14 +253,16 @@ export const PhotoAPI = {
     return data.map(dbToPhoto);
   },
 
-  async add(userId: string, photo: Photo): Promise<void> {
-    await supabase.from('photos').insert({
+  async add(userId: string, photo: Photo): Promise<string> {
+    const { data } = await supabase.from('photos').upsert({
       id: photo.id,
       user_id: userId,
       uri: photo.uri,
       is_pinned: photo.isPinned ?? false,
       created_at: photo.uploadedAt,
-    });
+      proof_meta: photo.proofMeta ?? null,
+    }, { onConflict: 'id' }).select('id').single();
+    return data?.id ?? photo.id;
   },
 
   async delete(id: string): Promise<void> {
@@ -203,6 +271,47 @@ export const PhotoAPI = {
 
   async setPin(id: string, isPinned: boolean): Promise<void> {
     await supabase.from('photos').update({ is_pinned: isPinned }).eq('id', id);
+  },
+};
+
+// ─── Orders ──────────────────────────────────────────────────────────────────
+
+export const OrderAPI = {
+  async getAll(userId: string): Promise<Order[]> {
+    const { data } = await supabase
+      .from('user_orders')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    if (!data) return [];
+    return data.map(r => ({
+      id: r.id,
+      products: r.products as OrderProduct[],
+      total: r.total,
+      city: r.city,
+      district: r.district,
+      neighborhood: r.neighborhood ?? '',
+      address: r.address,
+      phone: r.phone,
+      status: r.status as Order['status'],
+      createdAt: r.created_at,
+    }));
+  },
+
+  async create(userId: string, order: Order): Promise<void> {
+    await supabase.from('user_orders').insert({
+      id: order.id,
+      user_id: userId,
+      products: order.products,
+      total: order.total,
+      city: order.city,
+      district: order.district,
+      neighborhood: order.neighborhood,
+      address: order.address,
+      phone: order.phone,
+      status: order.status,
+      created_at: order.createdAt,
+    });
   },
 };
 
@@ -251,16 +360,17 @@ export const MatchAPI = {
   },
 
   async accept(fromUserId: string, toUserId: string, requestId: string): Promise<string | null> {
-    const [user1_id, user2_id] = fromUserId < toUserId
+    const [user_a, user_b] = fromUserId < toUserId
       ? [fromUserId, toUserId]
       : [toUserId, fromUserId];
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('matches')
-      .insert({ user1_id, user2_id })
+      .insert({ user_a, user_b, status: 'active' })
       .select('id')
       .single();
 
+    if (error && __DEV__) console.error('[MatchAPI.accept]', error.message);
     await supabase.from('match_requests').delete().eq('id', requestId);
 
     return data?.id ?? null;
@@ -275,25 +385,38 @@ export const MatchAPI = {
     matchId: string | null;
     matchedSince: string | null;
   }> {
-    const { data } = await supabase
+    const { data: match, error } = await supabase
       .from('matches')
-      .select('id, matched_since, user1_id, user2_id, user1:user1_id(id, username, gender, avatar_url, interests, achievement_score, routines(id, name, description, frequency, notification_time, created_at, target_days, monthly_days, routine_completions(completed_date)), photos(id, uri, is_pinned, created_at)), user2:user2_id(id, username, gender, avatar_url, interests, achievement_score, routines(id, name, description, frequency, notification_time, created_at, target_days, monthly_days, routine_completions(completed_date)), photos(id, uri, is_pinned, created_at))')
-      .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
+      .select('id, matched_at, user_a, user_b')
+      .or(`user_a.eq.${userId},user_b.eq.${userId}`)
+      .eq('status', 'active')
       .limit(1)
       .maybeSingle();
 
-    if (!data) return { mate: null, matchId: null, matchedSince: null };
+    if (error && __DEV__) console.error('[MatchAPI.getActiveMatch]', error.message);
+    if (!match) return { mate: null, matchId: null, matchedSince: null };
 
-    const mateRaw: any = (data as any).user1_id === userId ? (data as any).user2 : (data as any).user1;
+    const mateId = (match as any).user_a === userId
+      ? (match as any).user_b
+      : (match as any).user_a;
+
+    const { data: mateRaw } = await supabase
+      .from('profiles')
+      .select('id, username, gender, avatar_url, interests, achievement_score, routines(id, name, description, frequency, notification_time, created_at, target_days, monthly_days, set_name, scope, once_start, once_end, routine_completions(completed_date)), photos(id, uri, is_pinned, created_at, proof_meta)')
+      .eq('id', mateId)
+      .maybeSingle();
+
     return {
-      mate: dbToMate(mateRaw),
-      matchId: data.id,
-      matchedSince: data.matched_since,
+      mate: mateRaw ? dbToMate(mateRaw) : null,
+      matchId: match.id,
+      matchedSince: (match as any).matched_at ?? null,
     };
   },
 
   async unmatch(matchId: string): Promise<void> {
-    await supabase.from('matches').delete().eq('id', matchId);
+    await supabase.from('matches')
+      .update({ status: 'ended', ended_at: new Date().toISOString() })
+      .eq('id', matchId);
   },
 };
 
@@ -317,5 +440,74 @@ export const MessageAPI = {
 
   async send(matchId: string, senderId: string, text: string): Promise<void> {
     await supabase.from('messages').insert({ match_id: matchId, sender_id: senderId, text });
+  },
+
+  async delete(messageId: string): Promise<void> {
+    await supabase.from('messages').delete().eq('id', messageId);
+  },
+
+  subscribeToMatch(matchId: string, userId: string, onMessage: (msg: Message) => void) {
+    return supabase
+      .channel(`match:${matchId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages', filter: `match_id=eq.${matchId}` },
+        (payload) => {
+          const m = payload.new as any;
+          onMessage({
+            id: m.id,
+            text: m.text,
+            sentByMe: m.sender_id === userId,
+            timestamp: m.created_at,
+          });
+        }
+      )
+      .subscribe();
+  },
+};
+
+// ─── Store Waitlist ───────────────────────────────────────────────────────────
+
+export const StoreWaitlistAPI = {
+  async join(userId: string | null, email: string): Promise<'ok' | 'already' | 'error'> {
+    const cleanEmail = email.trim().toLowerCase();
+
+    const { error } = await supabase
+      .from('store_waitlist')
+      .insert({ user_id: userId || null, email: cleanEmail });
+
+    if (!error) return 'ok';
+    if (error.code === '23505') return 'already'; // unique e-mail
+
+    // FK ihlali (user_id profiles'da yok) → user_id olmadan tekrar dene
+    if (error.code === '23503') {
+      const { error: e2 } = await supabase
+        .from('store_waitlist')
+        .insert({ email: cleanEmail });
+      if (!e2) return 'ok';
+      if (e2.code === '23505') return 'already';
+      if (__DEV__) console.error('[StoreWaitlistAPI.join] retry', e2.code, e2.message);
+      return 'error';
+    }
+
+    if (__DEV__) console.error('[StoreWaitlistAPI.join]', error.code, error.message, error.details);
+    return 'error';
+  },
+};
+
+// ─── Session (başarı skoru metriği) ───────────────────────────────────────────
+
+export const SessionAPI = {
+  async record(userId: string): Promise<void> {
+    const today = new Date().toISOString().split('T')[0];
+    await supabase
+      .from('app_sessions')
+      .upsert({ user_id: userId, session_date: today }, { onConflict: 'user_id,session_date' });
+  },
+
+  async calculateScore(userId: string): Promise<number> {
+    const { data, error } = await supabase.rpc('calculate_achievement_score', { p_user_id: userId });
+    if (error || data === null) return 0;
+    return data as number;
   },
 };

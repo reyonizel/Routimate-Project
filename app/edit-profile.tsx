@@ -22,6 +22,7 @@ export default function EditProfileScreen() {
   const router = useRouter();
   const user = useStore(s => s.user);
   const updateUser = useStore(s => s.updateUser);
+  const uploadAvatar = useStore(s => s.uploadAvatar);
 
   const [fullName, setFullName] = useState(user.fullName ?? '');
   const [username, setUsername] = useState(user.username ?? '');
@@ -83,16 +84,22 @@ export default function EditProfileScreen() {
     if (usernameStatus === 'checking') { showError('Lütfen Bekle', ValidationErrors.usernameChecking); return; }
     if (user.bio && bio.trim().length > 200) { showError('Biyografi Çok Uzun', ValidationErrors.bioTooLong); return; }
     try {
-      updateUser({
+      // Upload avatar to Storage if it's a local file URI
+      const finalAvatarUri = avatarUri;
+      const profileUpdates: Parameters<typeof updateUser>[0] = {
         fullName: fullName.trim() || undefined,
         username: trimmed,
         bio: bio.trim() || undefined,
-        avatarUri,
         birthDate: birthDate ? birthDate.toISOString() : undefined,
         locationName: (locationData?.label ?? locationLabel) || undefined,
         locationLat: locationData?.lat,
         locationLon: locationData?.lon,
-      });
+      };
+      updateUser(profileUpdates);
+
+      if (finalAvatarUri && finalAvatarUri !== user.avatarUri) {
+        uploadAvatar(finalAvatarUri);
+      }
       router.back();
     } catch (err) {
       handleError(err, 'Profil kaydedilemedi.');

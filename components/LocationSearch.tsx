@@ -41,22 +41,22 @@ export default function LocationSearch({
     if (text.trim().length < 2) { setResults([]); return; }
     setLoading(true);
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 8000);
+    const timer = setTimeout(() => controller.abort(), 5000);
     try {
       const res  = await fetch(
-        `https://photon.komoot.io/api/?q=${encodeURIComponent(text)}&limit=6&lang=tr`,
+        `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(text)}&count=8&language=tr&format=json`,
         { signal: controller.signal }
       );
       const data = await res.json();
-      const features: any[] = data.features ?? [];
-      setResults(features.map(f => {
-        const p = f.properties;
+      const items: any[] = data.results ?? [];
+      setResults(items.map(r => {
+        const parts = [r.name, r.admin1 !== r.name ? r.admin1 : null, r.country].filter(Boolean);
         return {
-          label:   [p.name, p.state, p.country].filter(Boolean).join(', '),
-          city:    p.name ?? p.city ?? '',
-          country: p.country ?? '',
-          lat: f.geometry.coordinates[1],
-          lon: f.geometry.coordinates[0],
+          label:   parts.join(', '),
+          city:    r.name ?? '',
+          country: r.country ?? '',
+          lat: r.latitude,
+          lon: r.longitude,
         };
       }));
     } catch {
@@ -70,7 +70,7 @@ export default function LocationSearch({
   const handleChange = (text: string) => {
     setQuery(text);
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => search(text), 400);
+    debounceRef.current = setTimeout(() => search(text), 300);
   };
 
   const handleOpen = () => {
@@ -95,16 +95,17 @@ export default function LocationSearch({
     <View>
       {/* Trigger — tapping opens the search modal */}
       <TouchableOpacity
-        style={[s.trigger, { borderColor: selectedLabel ? accentColor : BORDER }]}
+        style={s.trigger}
         onPress={handleOpen}
         activeOpacity={0.8}
       >
-        <Ionicons
-          name={selectedLabel ? 'location' : 'search-outline'}
-          size={20}
-          color={selectedLabel ? accentColor : TEXT3}
-          style={{ marginRight: 10 }}
-        />
+        <View style={[s.triggerIconWrap, { backgroundColor: selectedLabel ? accentColor + '18' : CARD }]}>
+          <Ionicons
+            name={selectedLabel ? 'location' : 'search-outline'}
+            size={18}
+            color={selectedLabel ? accentColor : TEXT3}
+          />
+        </View>
         <Text style={[s.triggerTxt, !selectedLabel && s.triggerPlaceholder]} numberOfLines={1}>
           {selectedLabel || placeholder}
         </Text>
@@ -192,11 +193,12 @@ export default function LocationSearch({
 const s = StyleSheet.create({
   // Trigger button
   trigger: {
-    flexDirection: 'row', alignItems: 'center',
-    borderWidth: 1.5, borderRadius: 16,
-    backgroundColor: CARD, paddingHorizontal: 16, paddingVertical: 14,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: CARD, borderRadius: 16,
+    paddingHorizontal: 14, paddingVertical: 13,
   },
-  triggerTxt:         { flex: 1, fontSize: 16, color: TEXT },
+  triggerIconWrap: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  triggerTxt:         { flex: 1, fontSize: 15, color: TEXT },
   triggerPlaceholder: { color: TEXT3 },
 
   // Modal shell

@@ -1,3 +1,4 @@
+// STORE_DEFERRED — Mağaza MVP'de kapalı. Bu dosya ileride DB'den beslenecek.
 export type Product = {
   id: string;
   name: string;

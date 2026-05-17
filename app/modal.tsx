@@ -181,7 +181,7 @@ export default function ModalScreen() {
   };
 
   const handleWhatsapp = () => {
-    const phone = '+905000000000';
+    const phone = '+905551579682';
     const msg = encodeURIComponent('Merhaba, RoutinMate hakkında destek almak istiyorum.');
     Linking.openURL(`https://wa.me/${phone}?text=${msg}`).catch(() =>
       Alert.alert('Hata', 'WhatsApp açılamadı.')
@@ -253,7 +253,7 @@ export default function ModalScreen() {
   const currentCompSound = SOUNDS.find(s => s.id === (user.completionSound || 'correct')) ?? SOUNDS[1];
 
   return (
-    <SafeAreaView style={s.container} edges={['top']}>
+    <SafeAreaView style={s.container} edges={['top', 'bottom']}>
       {/* Drag Handle */}
       <View style={s.handle} />
 
@@ -400,38 +400,6 @@ export default function ModalScreen() {
           <Row icon="trash-outline" label="Hesabı Sil" danger onPress={handleDeleteAccount} />
         </Section>
 
-        {/* Dev Panel */}
-        <Section title="🛠 Geliştirici Paneli">
-          {([
-            { icon: 'home-outline',           label: 'Ana Sayfa',          route: '/(tabs)/index' },
-            { icon: 'search-outline',         label: 'Mate Keşfi',         route: '/(tabs)/mate' },
-            { icon: 'storefront-outline',     label: 'Mağaza',             route: '/(tabs)/store' },
-            { icon: 'chatbubble-outline',     label: 'Mesajlar',           route: '/(tabs)/dm' },
-            { icon: 'person-outline',         label: 'Profil',             route: '/(tabs)/profile' },
-            { icon: 'add-circle-outline',     label: 'Rutin Oluştur',      route: '/(tabs)/create' },
-            { icon: 'create-outline',         label: 'Profili Düzenle',    route: '/edit-profile' },
-            { icon: 'bag-outline',            label: 'Ürün Detayı',        route: '/product-detail?id=1' },
-            { icon: 'people-outline',         label: 'Mate Profili',       route: '/mate-profile' },
-            { icon: 'person-add-outline',     label: 'Karşılama',          route: '/welcome' },
-            { icon: 'log-in-outline',         label: 'Giriş / Kayıt',      route: '/auth' },
-            { icon: 'clipboard-outline',      label: 'Onboarding',         route: '/onboarding' },
-            { icon: 'star-outline',           label: 'Pro Yükseltme',       route: '/pro-upgrade' },
-            { icon: 'bug-outline',            label: 'Debug Paneli',        route: '/debug' },
-          ] as { icon: React.ComponentProps<typeof Ionicons>['name']; label: string; route: string }[]).map(
-            (item, i, arr) => (
-              <React.Fragment key={item.route}>
-                <Row
-                  icon={item.icon}
-                  label={item.label}
-                  iconBg="#F0F0F0"
-                  onPress={() => { router.back(); setTimeout(() => router.push(item.route as any), 250); }}
-                />
-                {i < arr.length - 1 && <Divider />}
-              </React.Fragment>
-            )
-          )}
-        </Section>
-
       </ScrollView>
 
       {/* Sound Bottom Sheet */}
@@ -516,10 +484,6 @@ const s = StyleSheet.create({
   cancelTxt:   { color: TEXT2, fontWeight: '700', fontSize: 14 },
   saveBtn:     { flex: 1, backgroundColor: RED, borderRadius: PILL, paddingVertical: 12, alignItems: 'center' },
   saveTxt:     { color: '#fff', fontWeight: '900', fontSize: 14 },
-
-  // Dev
-  devBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginHorizontal: 16, marginTop: 20, paddingVertical: 14, borderRadius: PILL, borderWidth: 1, borderColor: BORDER },
-  devTxt: { color: TEXT3, fontSize: 13, fontWeight: '500' },
 
   // Sound Sheet
   sheet:       { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: BG, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 40, paddingHorizontal: 20 },
