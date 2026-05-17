@@ -22,12 +22,21 @@ export async function scheduleRoutineNotification(r: Routine): Promise<void> {
   const [h, m] = r.notificationTime.split(':').map(Number);
   if (isNaN(h) || isNaN(m)) return;
 
+  const content: Notifications.NotificationContentInput = {
+    title: 'Rutin Zamanı',
+    body: r.name,
+    sound: true,
+    priority: 'max',
+    vibrate: [0, 250, 250, 250],
+  };
+
   if (r.frequency === 'daily') {
     await Notifications.scheduleNotificationAsync({
       identifier: `${PREFIX}${r.id}`,
-      content: { title: 'Rutin Zamanı', body: r.name, sound: true },
+      content,
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DAILY,
+        channelId: 'default',
         hour: h,
         minute: m,
       },
@@ -38,9 +47,10 @@ export async function scheduleRoutineNotification(r: Routine): Promise<void> {
       const weekday = ((day % 7) + 1) as 1 | 2 | 3 | 4 | 5 | 6 | 7;
       await Notifications.scheduleNotificationAsync({
         identifier: `${PREFIX}${r.id}-d${day}`,
-        content: { title: 'Rutin Zamanı', body: r.name, sound: true },
+        content,
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+          channelId: 'default',
           weekday,
           hour: h,
           minute: m,
@@ -49,15 +59,15 @@ export async function scheduleRoutineNotification(r: Routine): Promise<void> {
     }
   } else if (r.frequency === 'monthly') {
     for (const d of r.monthlyDays ?? []) {
-      const now = new Date();
-      const date = new Date(now.getFullYear(), now.getMonth(), d, h, m);
-      if (date <= now) date.setMonth(date.getMonth() + 1);
       await Notifications.scheduleNotificationAsync({
         identifier: `${PREFIX}${r.id}-m${d}`,
-        content: { title: 'Rutin Zamanı', body: r.name, sound: true },
+        content,
         trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.DATE,
-          date,
+          type: Notifications.SchedulableTriggerInputTypes.MONTHLY,
+          channelId: 'default',
+          day: d,
+          hour: h,
+          minute: m,
         },
       });
     }

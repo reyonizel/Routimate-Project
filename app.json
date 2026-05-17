@@ -30,6 +30,12 @@
       "predictiveBackGestureEnabled": false,
       "package": "com.routinmate.app",
       "googleServicesFile": "./google-services.json",
+      "permissions": [
+        "RECEIVE_BOOT_COMPLETED",
+        "SCHEDULE_EXACT_ALARM",
+        "USE_EXACT_ALARM",
+        "VIBRATE"
+      ],
       "config": {
         "googleMaps": {
           "apiKey": "$(EXPO_PUBLIC_GOOGLE_MAPS_KEY)"
