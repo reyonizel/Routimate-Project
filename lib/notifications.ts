@@ -1,16 +1,21 @@
 import * as Notifications from 'expo-notifications';
-import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 import type { Routine } from '../store/useStore';
 
 const PREFIX = 'routine-';
 
+// Returns raw FCM token on Android (prefixed with "fcm:")
+// Edge functions detect this prefix and use FCM API directly
 export async function requestPushPermission(): Promise<string | null> {
   const { status } = await Notifications.requestPermissionsAsync();
   if (status !== 'granted') return null;
-  const projectId = Constants.expoConfig?.extra?.eas?.projectId as string | undefined;
-  if (!projectId) return null;
   try {
-    const { data } = await Notifications.getExpoPushTokenAsync({ projectId });
+    if (Platform.OS === 'android') {
+      const { data } = await Notifications.getDevicePushTokenAsync();
+      return `fcm:${data}`;
+    }
+    // iOS: fallback to Expo Push (APNs via Expo)
+    const { data } = await (Notifications as any).getExpoPushTokenAsync();
     return data;
   } catch {
     return null;
