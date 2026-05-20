@@ -218,12 +218,28 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Top row: username + settings */}
+      {/* Header — home tasarımı */}
       <View style={styles.topRow}>
-        <Text style={styles.topUsername}>{user.username}</Text>
-        <TouchableOpacity style={styles.settingsBtn} onPress={() => router.push('/modal')}>
-          <Ionicons name="menu" size={28} color={TEXT} />
-        </TouchableOpacity>
+        <View style={styles.headerLeft}>
+          <TouchableOpacity onPress={pickAvatar} activeOpacity={0.85}>
+            {user.avatarUri
+              ? <Image source={{ uri: user.avatarUri }} style={styles.headerAvatar} contentFit="cover" cachePolicy="memory-disk" transition={250} />
+              : <View style={styles.headerAvatarPlaceholder}><Ionicons name="person" size={16} color={accentColor} /></View>
+            }
+          </TouchableOpacity>
+          <View>
+            <Text style={styles.headerSub}>Profilim</Text>
+            <Text style={styles.headerTitle}>{user.fullName?.split(' ')[0] || user.username}</Text>
+          </View>
+        </View>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <TouchableOpacity style={styles.settingsBtn} onPress={() => router.push('/edit-profile')} activeOpacity={0.8}>
+            <Ionicons name="create-outline" size={20} color={TEXT2} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.settingsBtn} onPress={() => router.push('/modal')} activeOpacity={0.8}>
+            <Ionicons name="menu" size={20} color={TEXT2} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -760,9 +776,13 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
-  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
-  topUsername: { fontSize: 22, color: TEXT, fontWeight: 'bold' },
-  settingsBtn: { padding: 4 },
+  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6 },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  headerAvatar: { width: 36, height: 36, borderRadius: 18 },
+  headerAvatarPlaceholder: { width: 36, height: 36, borderRadius: 18, backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center' },
+  headerSub: { fontSize: 11, color: TEXT2, marginBottom: 1 },
+  headerTitle: { fontSize: 15, color: TEXT, fontWeight: '700', letterSpacing: -0.3 },
+  settingsBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center' },
   
   instaHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
   avatarCol: { alignItems: 'center', marginRight: 24 },
