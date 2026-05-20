@@ -12,10 +12,10 @@ import { useStore } from '../store/useStore';
 import { supabase } from '../lib/supabase';
 import { sendTestNotification } from '../lib/notifications';
 
-const BG = '#FFFFFF';
-const TEXT = '#111111'; const TEXT2 = '#767676'; const TEXT3 = '#ABABAB';
-const RED = '#00cc6d'; const GOLD = '#C9920A'; const BORDER = '#F0F0F0';
-const CARD = '#F8F8F8'; const PILL = 999;
+const BG = '#FCF7F0';
+const TEXT = '#0A3B25'; const TEXT2 = '#3D6B58'; const TEXT3 = '#B2B7AA';
+const RED = '#2A6151'; const GOLD = '#D8C2A4'; const BORDER = '#B2B7AA';
+const CARD = '#FFFFFF'; const PILL = 999;
 
 // â”€â”€â”€ Animated Pro Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function ProCard({ isPro, onToggle }: { isPro: boolean; onToggle: () => void }) {
@@ -374,7 +374,7 @@ export default function ModalScreen() {
             icon="logo-whatsapp"
             label="WhatsApp Destek"
             sub="Ekibimizle iletişime geç"
-            iconBg="#E8F5E9"
+            iconBg="rgba(42,97,81,0.10)"
             onPress={handleWhatsapp}
           />
         </Section>

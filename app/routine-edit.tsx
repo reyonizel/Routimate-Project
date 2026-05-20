@@ -6,9 +6,9 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useStore } from '../store/useStore';
 
-const BG = '#FFFFFF'; const CARD = '#F4F4F4'; const SURFACE = '#EEEEEE';
-const TEXT = '#111111'; const TEXT2 = '#767676'; const TEXT3 = '#ABABAB';
-const GREEN = '#00cc6d'; const BORDER = '#E8E8E8';
+const BG = '#FCF7F0'; const CARD = '#FFFFFF'; const SURFACE = '#F5EDE0';
+const TEXT = '#0A3B25'; const TEXT2 = '#3D6B58'; const TEXT3 = '#B2B7AA';
+const GREEN = '#2A6151'; const BORDER = '#B2B7AA';
 
 type Freq = 'daily' | 'weekly' | 'monthly';
 type Scope = 'once' | 'recurring';

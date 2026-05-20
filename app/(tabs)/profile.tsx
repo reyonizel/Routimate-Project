@@ -16,10 +16,10 @@ const { width } = Dimensions.get('window');
 const PHOTO_SIZE = (width - 32 - 4) / 3;
 const today = localDateStr();
 
-const BG = '#FFFFFF'; const CARD = '#F4F4F4'; const SURFACE = '#EEEEEE';
-const TEXT = '#111111'; const TEXT2 = '#767676'; const TEXT3 = '#ABABAB';
-const RED = '#00cc6d'; const GREEN = '#008800'; const GOLD = '#D4860A';
-const BORDER = '#E8E8E8'; const PILL = 999;
+const BG = '#FCF7F0'; const CARD = '#FFFFFF'; const SURFACE = '#F5EDE0';
+const TEXT = '#0A3B25'; const TEXT2 = '#3D6B58'; const TEXT3 = '#B2B7AA';
+const RED = '#2A6151'; const GREEN = '#1A4F3A'; const GOLD = '#D8C2A4';
+const BORDER = '#B2B7AA'; const PILL = 999;
 
 function LineChart({ data, color = RED }: { data: number[]; color?: string }) {
   const cw = width - 40;
@@ -35,7 +35,7 @@ function LineChart({ data, color = RED }: { data: number[]; color?: string }) {
     <Svg width={cw} height={ch}>
       <Path d={fill} fill={color} fillOpacity={0.08} />
       <Polyline points={pts} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-      {xs.map((x, i) => <Circle key={i} cx={x} cy={ys[i]} r={3} fill={data[i] > 0 ? color : '#E0E0E0'} />)}
+      {xs.map((x, i) => <Circle key={i} cx={x} cy={ys[i]} r={3} fill={data[i] > 0 ? color : '#B2B7AA'} />)}
     </Svg>
   );
 }
@@ -234,7 +234,7 @@ export default function ProfileScreen() {
             <TouchableOpacity onPress={pickAvatar} activeOpacity={0.85} style={styles.avatarWrap}>
               <View style={[styles.avatarRing, { borderColor: accentColor }]}>
                 {user.avatarUri
-                  ? <Image source={{ uri: user.avatarUri }} style={styles.avatarImage} contentFit="cover" cachePolicy="memory-disk" transition={250} placeholder="#E8E8E8" />
+                  ? <Image source={{ uri: user.avatarUri }} style={styles.avatarImage} contentFit="cover" cachePolicy="memory-disk" transition={250} placeholder="#F5EDE0" />
                   : (
                     <View style={styles.avatarInner}>
                       <Text style={[styles.avatarLetter, { color: accentColor }]}>{(user.username || '?')[0].toUpperCase()}</Text>
@@ -606,7 +606,7 @@ export default function ProfileScreen() {
                     : { borderBottomWidth: 8, borderBottomColor: '#fff', borderTopWidth: 0 })
                 }} />
 
-                <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', padding: 14, borderBottomWidth: 0.5, borderBottomColor: '#E8E8E8' }} onPress={() => { pinPhoto(popover.id); setPopover(null); }}>
+                <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', padding: 14, borderBottomWidth: 0.5, borderBottomColor: '#B2B7AA' }} onPress={() => { pinPhoto(popover.id); setPopover(null); }}>
                   <FontAwesome5 name="thumbtack" size={16} color={TEXT} style={{ marginRight: 10, transform: [{ rotate: '-45deg' }] }} />
                   <Text style={{ fontSize: 15, color: TEXT, fontWeight: '600' }}>
                     {user.photos.find(p => p.id === popover.id)?.isPinned ? 'Tutturmayı Kaldır' : 'Başa Tuttur'}
@@ -635,7 +635,7 @@ export default function ProfileScreen() {
             >
               {user.photos.map((p) => (
                 <View key={p.id} style={{ width, height: Dimensions.get('window').height, backgroundColor: '#fff', justifyContent: 'center' }}>
-                  <Image source={{ uri: p.uri }} style={{ width: '100%', height: '100%' }} contentFit="contain" transition={200} placeholder="#E8E8E8" />
+                  <Image source={{ uri: p.uri }} style={{ width: '100%', height: '100%' }} contentFit="contain" transition={200} placeholder="#F5EDE0" />
                   
                   {/* Top Header Panel */}
                   <View style={{ position: 'absolute', top: Math.max(insets.top + 10, 40), left: 20, right: 20, flexDirection: 'row', alignItems: 'center' }}>
@@ -786,7 +786,7 @@ const styles = StyleSheet.create({
   actionRow: { flexDirection: 'row', paddingHorizontal: 16, marginBottom: 12 },
   proBadge: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: SURFACE, borderRadius: 5, paddingVertical: 10, borderWidth: 1, borderColor: BORDER },
   proBadgeText: { fontSize: 13, fontWeight: '700' },
-  upgradeBtn: { flexDirection: 'row', gap: 8, backgroundColor: '#00cc6d', borderRadius: 8, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', width: '100%' },
+  upgradeBtn: { flexDirection: 'row', gap: 8, backgroundColor: '#D8C2A4', borderRadius: 8, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', width: '100%' },
   upgradeBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' },
   editProfileBtn: { backgroundColor: SURFACE, borderRadius: 8, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: BORDER },
   editProfileBtnText: { color: TEXT, fontSize: 14, fontWeight: '700' },

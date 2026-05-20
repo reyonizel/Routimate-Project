@@ -18,7 +18,7 @@ export default function TabsLayout() {
         tabBarHideOnKeyboard: true,
         animation: 'shift',
         tabBarStyle: {
-          backgroundColor: '#EDF9F3',
+          backgroundColor: '#FCF7F0',
           borderTopWidth: 0,
           height: 60 + bottomInset,
           paddingBottom: bottomInset,
@@ -30,15 +30,15 @@ export default function TabsLayout() {
           marginTop: 0,
           marginBottom: 0,
         },
-        tabBarActiveTintColor: '#111111',
-        tabBarInactiveTintColor: '#ABABAB',
+        tabBarActiveTintColor: '#0A3B25',
+        tabBarInactiveTintColor: '#B2B7AA',
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           tabBarIcon: ({ focused }) => (
-            <Octicons name="home" size={24} color={focused ? '#111' : '#ABABAB'} />
+            <Octicons name="home" size={24} color={focused ? '#0A3B25' : '#B2B7AA'} />
           ),
         }}
       />
@@ -46,7 +46,7 @@ export default function TabsLayout() {
         name="mate"
         options={{
           tabBarIcon: ({ focused }) => (
-            <Ionicons name={focused ? 'search' : 'search-outline'} size={24} color={focused ? '#111' : '#ABABAB'} />
+            <Ionicons name={focused ? 'search' : 'search-outline'} size={24} color={focused ? '#0A3B25' : '#B2B7AA'} />
           ),
         }}
       />
@@ -58,7 +58,7 @@ export default function TabsLayout() {
         name="store"
         options={{
           tabBarIcon: ({ focused }) => (
-            <Ionicons name={focused ? 'storefront' : 'storefront-outline'} size={24} color={focused ? '#111' : '#ABABAB'} />
+            <Ionicons name={focused ? 'storefront' : 'storefront-outline'} size={24} color={focused ? '#0A3B25' : '#B2B7AA'} />
           ),
         }}
       />
@@ -66,7 +66,7 @@ export default function TabsLayout() {
         name="dm"
         options={{
           tabBarIcon: ({ focused }) => (
-            <Ionicons name={focused ? 'chatbubble' : 'chatbubble-outline'} size={24} color={focused ? '#111' : '#ABABAB'} />
+            <Ionicons name={focused ? 'chatbubble' : 'chatbubble-outline'} size={24} color={focused ? '#0A3B25' : '#B2B7AA'} />
           ),
         }}
       />
@@ -82,12 +82,12 @@ export default function TabsLayout() {
                   height: 26, 
                   borderRadius: 13, 
                   borderWidth: focused ? 2 : 0, 
-                  borderColor: '#111',
+                  borderColor: '#0A3B25',
                   opacity: focused ? 1 : 0.8 
                 }} 
               />
             ) : (
-              <Ionicons name={focused ? 'person-circle' : 'person-circle-outline'} size={28} color={focused ? '#111' : '#ABABAB'} />
+              <Ionicons name={focused ? 'person-circle' : 'person-circle-outline'} size={28} color={focused ? '#0A3B25' : '#B2B7AA'} />
             )
           ),
         }}

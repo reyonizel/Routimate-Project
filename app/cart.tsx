@@ -10,7 +10,7 @@ export default function CartScreen() {
   return (
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
       <TouchableOpacity style={s.back} onPress={() => router.back()}>
-        <Ionicons name="chevron-back" size={22} color="#111" />
+        <Ionicons name="chevron-back" size={22} color="#0A3B25" />
       </TouchableOpacity>
       <View style={s.body}>
         <Text style={s.emoji}>ğŸ›’</Text>
@@ -22,11 +22,11 @@ export default function CartScreen() {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  back: { margin: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: '#F4F4F4', alignItems: 'center', justifyContent: 'center' },
+  container: { flex: 1, backgroundColor: '#FCF7F0' },
+  back: { margin: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   body: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
   emoji: { fontSize: 48, marginBottom: 16 },
-  title: { fontSize: 20, fontWeight: '900', color: '#111', marginBottom: 8, textAlign: 'center' },
-  sub: { fontSize: 14, color: '#767676', textAlign: 'center', lineHeight: 20 },
+  title: { fontSize: 20, fontWeight: '900', color: '#0A3B25', marginBottom: 8, textAlign: 'center' },
+  sub: { fontSize: 14, color: '#3D6B58', textAlign: 'center', lineHeight: 20 },
 });
 

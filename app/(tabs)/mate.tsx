@@ -19,7 +19,7 @@ const CircularProgress = ({ size = 72, strokeWidth = 5, progress = 0, color = '#
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
       <View style={{ position: 'absolute', transform: [{ rotate: '-90deg' }] }}>
         <Svg width={size} height={size}>
-          <Circle stroke="#E8E8E8" fill="none" cx={size/2} cy={size/2} r={radius} strokeWidth={strokeWidth} />
+          <Circle stroke="#B2B7AA" fill="none" cx={size/2} cy={size/2} r={radius} strokeWidth={strokeWidth} />
           <Circle
             stroke={color}
             fill="none"
@@ -39,10 +39,10 @@ const CircularProgress = ({ size = 72, strokeWidth = 5, progress = 0, color = '#
 };
 
 const today = localDateStr();
-const BG='#FFFFFF'; const CARD='#F4F4F4'; const SURFACE='#EEEEEE';
-const TEXT='#111111'; const TEXT2='#767676'; const TEXT3='#ABABAB';
-const RED='#00cc6d'; const GREEN='#008800'; const GOLD='#D4860A';
-const BORDER='#E8E8E8'; const PILL=999;
+const BG='#FCF7F0'; const CARD='#FFFFFF'; const SURFACE='#F5EDE0';
+const TEXT='#0A3B25'; const TEXT2='#3D6B58'; const TEXT3='#B2B7AA';
+const RED='#2A6151'; const GREEN='#1A4F3A'; const GOLD='#D8C2A4';
+const BORDER='#B2B7AA'; const PILL=999;
 
 // ── Uyumluluk algoritması ─────────────────────────────────────────────────────
 function interestScore(a: string[], b: string[]): number {
@@ -327,7 +327,7 @@ export default function MateScreen() {
                         const icon = INTEREST_ICON[int] ?? 'star-outline';
                         return (
                           <View key={int} style={s.igInterestChip}>
-                            <Ionicons name={icon} size={10} color="#2E7D32" />
+                            <Ionicons name={icon} size={10} color="#2A6151" />
                             <Text style={s.igInterestTxt}>{int}</Text>
                           </View>
                         );
@@ -423,8 +423,8 @@ const s = StyleSheet.create({
   igName: {fontSize:14, color:TEXT, fontWeight:'600'},
   igCompat: {fontSize:12, color:TEXT2, fontWeight:'500'},
   igInterests: {flexDirection:'row', flexWrap:'wrap', gap:4, marginTop:4},
-  igInterestChip: {flexDirection:'row', alignItems:'center', gap:3, backgroundColor:'#E8F5E9', borderRadius:6, paddingHorizontal:8, paddingVertical:4, borderWidth:0.5, borderColor:'#C8E6C9'},
-  igInterestTxt: {fontSize:11, color:'#2E7D32', fontWeight:'600'},
+  igInterestChip: {flexDirection:'row', alignItems:'center', gap:3, backgroundColor:'rgba(42,97,81,0.10)', borderRadius:6, paddingHorizontal:8, paddingVertical:4, borderWidth:0.5, borderColor:'rgba(42,97,81,0.25)'},
+  igInterestTxt: {fontSize:11, color:'#2A6151', fontWeight:'600'},
   igNoInterests: {fontSize:11, color:TEXT3, marginTop:2},
   igFollowBtn: {backgroundColor:RED, borderRadius:8, paddingHorizontal:16, paddingVertical:7},
   igFollowTxt: {color:'#fff', fontSize:13, fontWeight:'700'},

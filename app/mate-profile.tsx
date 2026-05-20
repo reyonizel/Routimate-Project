@@ -17,10 +17,10 @@ const PHOTO_SIZE = (width - 32 - 4) / 3;
 const today = localDateStr();
 const NAVBAR_H = 56; // approximate navbar height
 
-const BG = '#FFFFFF'; const CARD = '#F4F4F4'; const SURFACE = '#EEEEEE';
-const TEXT = '#111111'; const TEXT2 = '#767676'; const TEXT3 = '#ABABAB';
-const RED = '#00cc6d'; const GREEN = '#008800'; const GOLD = '#D4860A';
-const BORDER = '#E8E8E8'; const PILL = 999;
+const BG = '#FCF7F0'; const CARD = '#FFFFFF'; const SURFACE = '#F5EDE0';
+const TEXT = '#0A3B25'; const TEXT2 = '#3D6B58'; const TEXT3 = '#B2B7AA';
+const RED = '#2A6151'; const GREEN = '#1A4F3A'; const GOLD = '#D8C2A4';
+const BORDER = '#B2B7AA'; const PILL = 999;
 
 export default function MateProfileScreen() {
   const router = useRouter();

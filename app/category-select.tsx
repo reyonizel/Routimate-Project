@@ -5,9 +5,9 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store/useStore';
 
-const BG = '#FFFFFF'; const SURFACE = '#F5F5F5'; const BORDER = '#EAEAEA';
-const TEXT = '#111111'; const TEXT2 = '#767676'; const TEXT3 = '#ABABAB';
-const GREEN = '#00cc6d';
+const BG = '#FCF7F0'; const SURFACE = '#F5EDE0'; const BORDER = '#B2B7AA';
+const TEXT = '#0A3B25'; const TEXT2 = '#3D6B58'; const TEXT3 = '#B2B7AA';
+const GREEN = '#2A6151';
 
 const SET_ICONS = [
   'star-outline', 'barbell-outline', 'walk-outline', 'bicycle-outline', 'restaurant-outline',

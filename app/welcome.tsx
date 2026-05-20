@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-const THEME_GREEN = '#00cc6d';
+const THEME_GREEN = '#2A6151';
 
 export default function WelcomeScreen() {
   const router = useRouter();

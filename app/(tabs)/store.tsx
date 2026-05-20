@@ -8,9 +8,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../../store/useStore';
 import { supabase } from '../../lib/supabase';
 
-const BG = '#FFFFFF'; const CARD = '#F4F4F4';
-const TEXT = '#111111'; const TEXT2 = '#767676'; const TEXT3 = '#ABABAB';
-const GREEN = '#00cc6d'; const BORDER = '#E8E8E8'; const PILL = 999;
+const BG = '#FCF7F0'; const CARD = '#FFFFFF';
+const TEXT = '#0A3B25'; const TEXT2 = '#3D6B58'; const TEXT3 = '#B2B7AA';
+const GREEN = '#2A6151'; const BORDER = '#B2B7AA'; const PILL = 999;
 
 const SLOGANS = [
   'İndirimleri Kaçırma',

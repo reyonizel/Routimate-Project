@@ -11,9 +11,9 @@ import { useStore } from '../store/useStore';
 import LocationSearch, { LocationResult } from '../components/LocationSearch';
 
 const { width } = Dimensions.get('window');
-const RED = '#00cc6d';
-const TEXT = '#111111'; const TEXT2 = '#767676'; const TEXT3 = '#ABABAB';
-const BORDER = '#EFEFEF'; const CARD = '#F8F8F8'; const BG = '#FFFFFF';
+const RED = '#2A6151';
+const TEXT = '#0A3B25'; const TEXT2 = '#3D6B58'; const TEXT3 = '#B2B7AA';
+const BORDER = '#B2B7AA'; const CARD = '#FFFFFF'; const BG = '#FCF7F0';
 
 const STEPS = ['Cinsiyet', 'Yaş', 'Konum', 'İlgi Alanları', 'Profil Fotoğrafı', 'Kullanıcı Adı'];
 

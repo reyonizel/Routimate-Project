@@ -16,7 +16,7 @@ if (Platform.OS === 'android') {
     name: 'Rutin Bildirimleri',
     importance: Notifications.AndroidImportance.MAX,
     vibrationPattern: [0, 250, 250, 250],
-    lightColor: '#00cc6d',
+    lightColor: '#2A6151',
     sound: 'default',
     enableVibrate: true,
     showBadge: true,
@@ -36,7 +36,7 @@ Notifications.setNotificationHandler({
 // Hold the splash until we finish initializing
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
-SystemUI.setBackgroundColorAsync('#FFFFFF');
+SystemUI.setBackgroundColorAsync('#FCF7F0');
 
 export default function RootLayout() {
   const router = useRouter();
@@ -110,8 +110,8 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={styles.root}>
-      <StatusBar style="dark" backgroundColor="#FFFFFF" translucent={false} />
-      <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right', contentStyle: { backgroundColor: '#FFFFFF' } }}>
+      <StatusBar style="dark" backgroundColor="#FCF7F0" translucent={false} />
+      <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right', contentStyle: { backgroundColor: '#FCF7F0' } }}>
         <Stack.Screen name="index"       options={{ animation: 'none' }} />
         <Stack.Screen name="(tabs)"      options={{ animation: 'fade' }} />
         <Stack.Screen name="modal"       options={{ presentation: 'modal' }} />
@@ -133,5 +133,5 @@ export default function RootLayout() {
   );
 }
 
-const styles = StyleSheet.create({ root: { flex: 1, backgroundColor: '#FFFFFF' } });
+const styles = StyleSheet.create({ root: { flex: 1, backgroundColor: '#FCF7F0' } });
 

@@ -6,9 +6,9 @@ import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { useStore } from '../store/useStore';
 
 const { width } = Dimensions.get('window');
-const BG = '#FFFFFF'; const CARD = '#F4F4F4'; const SURFACE = '#EEEEEE';
-const TEXT = '#111111'; const TEXT2 = '#767676'; const TEXT3 = '#ABABAB';
-const GREEN = '#00cc6d'; const GOLD = '#D4860A'; const BORDER = '#E8E8E8';
+const BG = '#FCF7F0'; const CARD = '#FFFFFF'; const SURFACE = '#F5EDE0';
+const TEXT = '#0A3B25'; const TEXT2 = '#3D6B58'; const TEXT3 = '#B2B7AA';
+const GREEN = '#2A6151'; const GOLD = '#D8C2A4'; const BORDER = '#B2B7AA';
 
 const FEATURES = [
   { icon: 'people-outline',       label: 'Sınırsız Mate Eşleşme',        sub: 'Her ay istediğin kadar yeni mate bul' },

@@ -13,16 +13,16 @@ import { MessageAPI } from '../../lib/api';
 const { width: SW } = Dimensions.get('window');
 
 // â”€â”€ Palette â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-const CHAT_BG = '#F0F2F5';
-const ME_BG   = '#00cc6d';
-const MATE_BG = '#E4E6EB';
-const TEXT    = '#111111';
-const TEXT2   = '#767676';
-const TEXT3   = '#ABABAB';
-const BORDER  = '#E8E8E8';
-const SURFACE = '#F4F4F4';
-const GOLD    = '#D4860A';
-const GREEN   = '#00cc6d';
+const CHAT_BG = '#FCF7F0';
+const ME_BG   = '#2A6151';
+const MATE_BG = '#F5EDE0';
+const TEXT    = '#0A3B25';
+const TEXT2   = '#3D6B58';
+const TEXT3   = '#B2B7AA';
+const BORDER  = '#B2B7AA';
+const SURFACE = '#F5EDE0';
+const GOLD    = '#D8C2A4';
+const GREEN   = '#2A6151';
 
 
 // â”€â”€ Quick-reply answer map â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -465,7 +465,7 @@ const s = StyleSheet.create({
   headerAvatar: { width: 42, height: 42, borderRadius: 21, borderWidth: 2, overflow: 'hidden', backgroundColor: SURFACE },
   headerName:   { fontSize: 16, fontWeight: '700', color: TEXT, letterSpacing: -0.2 },
   onlineRow:    { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 1 },
-  onlineDot:    { width: 7, height: 7, borderRadius: 4, backgroundColor: '#25D366' },
+  onlineDot:    { width: 7, height: 7, borderRadius: 4, backgroundColor: '#2A6151' },
   onlineTxt:    { fontSize: 12, color: TEXT2 },
   headerIcon:   { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
 

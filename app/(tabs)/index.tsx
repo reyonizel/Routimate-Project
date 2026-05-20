@@ -41,12 +41,12 @@ const playCompletionSound = async (soundId: string) => {
   } catch (e) {}
 };
 
-const BG='#FFFFFF'; const CARD='#F4F4F4'; const SURFACE='#EEEEEE';
-const TEXT='#111111'; const TEXT2='#767676'; const TEXT3='#ABABAB';
-const RED='#00cc6d'; const GREEN='#008800'; const GOLD='#D4860A';
-const BORDER='#E8E8E8'; const PILL=999;
+const BG='#FCF7F0'; const CARD='#FFFFFF'; const SURFACE='#F5EDE0';
+const TEXT='#0A3B25'; const TEXT2='#3D6B58'; const TEXT3='#B2B7AA';
+const RED='#2A6151'; const GREEN='#1A4F3A'; const GOLD='#D8C2A4';
+const BORDER='#B2B7AA'; const PILL=999;
 
-const FREQ_COLOR: Record<string,string> = { daily:'#2980b9', weekly:'#8e44ad', monthly:'#d35400' };
+const FREQ_COLOR: Record<string,string> = { daily:'#2A6151', weekly:'#0A3B25', monthly:'#B89B76' };
 const CAT_COLORS = ['#E91E63','#9C27B0','#3F51B5','#2196F3','#00ACC1','#00897B','#F4511E','#6D4C41','#546E7A','#558B2F'];
 function catColor(name: string): string {
   let h = 0;
@@ -211,7 +211,7 @@ export default function HomeScreen() {
 
   const dotColor = (rate: number|null) => {
     if (rate === null) return 'transparent';
-    if (rate === -1) return '#34495e'; // rest day
+    if (rate === -1) return '#B2B7AA'; // rest day
     if (rate === 100) return GREEN;
     if (rate >= 50) return accent;
     if (rate > 0) return GOLD;
@@ -363,7 +363,7 @@ export default function HomeScreen() {
                           overshootRight={false}
                           renderLeftActions={() => (
                             <TouchableOpacity
-                              style={[s.swipeAction, { backgroundColor: skipped ? '#27ae60' : '#34495e' }]}
+                              style={[s.swipeAction, { backgroundColor: skipped ? '#2A6151' : '#B2B7AA' }]}
                               onPress={() => { swipeRefs.current[r.id]?.close(); toggleRoutineSkip(r.id, selectedDate); }}
                               activeOpacity={0.85}
                             >
@@ -389,7 +389,7 @@ export default function HomeScreen() {
                             activeOpacity={1}
                           >
                             {/* Sol: kategori ikonu */}
-                            <View style={[s.catIcon, { backgroundColor: skipped ? '#34495e' : (r.setName ? cc : SURFACE) }]}>
+                            <View style={[s.catIcon, { backgroundColor: skipped ? '#B2B7AA' : (r.setName ? cc : SURFACE) }]}>
                               <Ionicons
                                 name={skipped ? 'cafe-outline' : ((r.setIcon as any) || 'star-outline')}
                                 size={16}
@@ -498,7 +498,7 @@ export default function HomeScreen() {
                     >
                       <Text style={[s.calNum, pastDay && s.calNumPast, todayCell && s.calNumToday]}>{day}</Text>
                       {rate === -1 ? (
-                        <View style={[s.calDot, { backgroundColor: '#A0AEC0' }]}>
+                        <View style={[s.calDot, { backgroundColor: '#B2B7AA' }]}>
                           <Text style={s.calDotTxt}>☕</Text>
                         </View>
                       ) : rate !== null ? (
@@ -520,7 +520,7 @@ export default function HomeScreen() {
               { color: accent, label: '50%+' },
               { color: GOLD, label: 'Kısmen' },
               { color: RED + '55', label: 'Yapılmadı' },
-              { color: '#A0AEC0', label: 'Dinlenme' },
+              { color: '#B2B7AA', label: 'Dinlenme' },
             ].map(i => (
               <View key={i.label} style={s.legendItem}>
                 <View style={[s.legendDot, { backgroundColor: i.color }]} />
@@ -654,11 +654,11 @@ export default function HomeScreen() {
 }
 
 const s = StyleSheet.create({
-  container: {flex:1, backgroundColor:'#EDF9F3'},
-  topBlock: {backgroundColor:'#EDF9F3'},
+  container: {flex:1, backgroundColor:'#FCF7F0'},
+  topBlock: {backgroundColor:'#FCF7F0'},
 
   // Carousel
-  carouselWrap: {flexDirection:'row', alignItems:'center', paddingVertical:4, backgroundColor:'#EDF9F3'},
+  carouselWrap: {flexDirection:'row', alignItems:'center', paddingVertical:4, backgroundColor:'#FCF7F0'},
   carArrowBtn: {width:32, height:48, alignItems:'center', justifyContent:'center'},
   carCell: {width:44, alignItems:'center', paddingVertical:6, paddingHorizontal:1, borderRadius:10, gap:1},
   carCellActive: {backgroundColor:SURFACE},
@@ -679,7 +679,7 @@ const s = StyleSheet.create({
   sub: {fontSize:11, color:TEXT2, marginBottom:1},
   title: {fontSize:15, color:TEXT, fontWeight:'500', letterSpacing:-0.3},
   settBtn: {width:40, height:40, borderRadius:20, backgroundColor:SURFACE, alignItems:'center', justifyContent:'center'},
-  settBtnRest: {backgroundColor:'#34495e'},
+  settBtnRest: {backgroundColor:'#B2B7AA'},
 
   // List
   list: {},
@@ -774,7 +774,7 @@ const s = StyleSheet.create({
 
   // Sheet rest day toggle
   sheetRestBtn: {flexDirection:'row', alignItems:'center', gap:10, backgroundColor:CARD, borderRadius:12, padding:12, marginBottom:12, borderWidth:1, borderColor:BORDER},
-  sheetRestBtnOn: {backgroundColor:'#34495e', borderColor:'#2c3e50'},
+  sheetRestBtnOn: {backgroundColor:'#B2B7AA', borderColor:'#9BA5A0'},
   sheetRestTxt: {fontSize:13, color:TEXT2, fontWeight:'700', flex:1},
 });
 

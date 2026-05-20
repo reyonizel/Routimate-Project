@@ -14,9 +14,9 @@ import LocationSearch, { LocationResult } from '../components/LocationSearch';
 import { supabase } from '../lib/supabase';
 import { handleError, ValidationErrors, showError } from '../lib/errors';
 
-const BG = '#FFFFFF'; const CARD = '#F4F4F4'; const SURFACE = '#EEEEEE';
-const TEXT = '#111111'; const TEXT2 = '#767676'; const TEXT3 = '#ABABAB';
-const GREEN = '#00cc6d'; const BORDER = '#E8E8E8';
+const BG = '#FCF7F0'; const CARD = '#FFFFFF'; const SURFACE = '#F5EDE0';
+const TEXT = '#0A3B25'; const TEXT2 = '#3D6B58'; const TEXT3 = '#B2B7AA';
+const GREEN = '#2A6151'; const BORDER = '#B2B7AA';
 
 export default function EditProfileScreen() {
   const router = useRouter();
@@ -155,7 +155,7 @@ export default function EditProfileScreen() {
                 value={username}
                 onChangeText={v => { setUsername(v); checkUsername(v); }}
                 placeholder="kullanici_adi"
-                placeholderTextColor="#ABABAB"
+                placeholderTextColor="#B2B7AA"
                 autoCapitalize="none"
                 autoCorrect={false}
                 selectionColor={GREEN}
@@ -256,12 +256,12 @@ function Field({
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor="#ABABAB"
+        placeholderTextColor="#B2B7AA"
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         multiline={multiline}
         autoCapitalize={autoCapitalize ?? 'sentences'}
-        selectionColor="#00cc6d"
+        selectionColor="#2A6151"
       />
       <View style={[f.underline, focused && f.underlineFocused]} />
     </View>
@@ -270,11 +270,11 @@ function Field({
 
 const f = StyleSheet.create({
   wrap: { marginBottom: 24 },
-  label: { fontSize: 12, fontWeight: '700', color: '#ABABAB', letterSpacing: 0.5, marginBottom: 6, textTransform: 'uppercase' },
+  label: { fontSize: 12, fontWeight: '700', color: '#B2B7AA', letterSpacing: 0.5, marginBottom: 6, textTransform: 'uppercase' },
   input: { fontSize: 16, color: '#111', paddingVertical: 6 },
   inputMulti: { minHeight: 72, textAlignVertical: 'top' },
-  underline: { height: 1, backgroundColor: '#E8E8E8', marginTop: 2 },
-  underlineFocused: { height: 1.5, backgroundColor: '#00cc6d' },
+  underline: { height: 1, backgroundColor: '#B2B7AA', marginTop: 2 },
+  underlineFocused: { height: 1.5, backgroundColor: '#2A6151' },
 });
 
 const s = StyleSheet.create({

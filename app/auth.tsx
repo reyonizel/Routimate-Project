@@ -11,10 +11,10 @@ import { supabase } from '../lib/supabase';
 import { useStore } from '../store/useStore';
 
 const { width, height } = Dimensions.get('window');
-const THEME_GREEN = '#00cc6d';
-const BG = '#FFFFFF';
-const TEXT = '#000000';
-const TEXT_MUTED = '#999999';
+const THEME_GREEN = '#2A6151';
+const BG = '#FCF7F0';
+const TEXT = '#0A3B25';
+const TEXT_MUTED = '#B2B7AA';
 
 export default function AuthScreen() {
   const router = useRouter();
@@ -416,7 +416,7 @@ const s = StyleSheet.create({
   pageSub: { fontSize: 13, color: TEXT_MUTED, lineHeight: 18 },
 
   form: { gap: 12 },
-  inputWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F7F7F7', borderRadius: 8, paddingHorizontal: 16, height: 48 },
+  inputWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5EDE0', borderRadius: 8, paddingHorizontal: 16, height: 48 },
   input: { flex: 1, fontSize: 14, color: TEXT },
 
   forgotBtn: { alignSelf: 'flex-end', marginTop: 4, marginBottom: 16 },
@@ -428,14 +428,14 @@ const s = StyleSheet.create({
   socialContainer: { marginTop: 40, alignItems: 'center' },
   socialHeader: { fontSize: 12, color: TEXT_MUTED, marginBottom: 16 },
   socialRow: { flexDirection: 'row', gap: 16 },
-  socialBtn: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#F7F7F7', alignItems: 'center', justifyContent: 'center' },
+  socialBtn: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#F5EDE0', alignItems: 'center', justifyContent: 'center' },
 
   toggleBtn: { paddingVertical: 20, alignItems: 'center', paddingBottom: Platform.OS === 'ios' ? 10 : 30, marginTop: 'auto' },
   toggleTxt: { fontSize: 13, color: TEXT_MUTED },
   toggleTxtBold: { color: THEME_GREEN, fontWeight: '600' },
 
   otpContainer: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
-  otpInput: { width: (width - 90) / 6, height: 50, backgroundColor: '#F7F7F7', borderRadius: 8, fontSize: 20, fontWeight: '600', color: TEXT },
+  otpInput: { width: (width - 90) / 6, height: 50, backgroundColor: '#F5EDE0', borderRadius: 8, fontSize: 20, fontWeight: '600', color: TEXT },
   otpInputActive: { borderWidth: 1, borderColor: THEME_GREEN, backgroundColor: '#fff' },
   
   resendBtn: { alignSelf: 'center', marginTop: 24 },
