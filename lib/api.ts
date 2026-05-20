@@ -2,13 +2,17 @@ import { decode } from 'base64-arraybuffer';
 import * as FileSystem from 'expo-file-system/legacy';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { supabase } from './supabase';
+import { localDateStr } from './date';
 import type { User, Mate, Routine, Photo, Message, MatchRequest, Gender, Order, OrderProduct } from '../store/useStore';
 
 export function generateId(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback (eski cihazlar için)
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
   });
 }
 
@@ -34,8 +38,8 @@ function dbToRoutine(r: any): Routine {
 function dbToPhoto(p: any): Photo {
   return {
     id: p.id,
-    uri: p.uri,
-    uploadedAt: p.created_at,
+    uri: p.url,
+    uploadedAt: new Date().toISOString(),
     isPinned: p.is_pinned ?? false,
     proofMeta: p.proof_meta ?? undefined,
   };
@@ -51,6 +55,9 @@ function dbToMate(p: any): Mate {
     achievementScore: p.achievement_score ?? 0,
     routines: (p.routines ?? []).map(dbToRoutine),
     photos: (p.photos ?? []).map(dbToPhoto),
+    birthDate: p.birth_date ?? undefined,
+    locationLat: p.location_lat ?? undefined,
+    locationLon: p.location_lon ?? undefined,
   };
 }
 
@@ -184,6 +191,7 @@ export const ProfileAPI = {
       inactiveSets: data.inactive_sets ?? [],
       notificationSound: data.notification_sound ?? 'default',
       completionSound: data.completion_sound ?? 'correct',
+      dayEndHour: 0,
     };
   },
 
@@ -218,7 +226,7 @@ export const ProfileAPI = {
   ): Promise<Mate[]> {
     const { data } = await supabase
       .from('profiles')
-      .select('id, username, gender, avatar_url, interests, achievement_score, birth_date, location_lat, location_lon, routines(id, name, description, frequency, notification_time, created_at, target_days, monthly_days, set_name, scope, once_start, once_end, routine_completions(completed_date)), photos(id, uri, is_pinned, created_at, proof_meta)')
+      .select('id, username, gender, avatar_url, interests, achievement_score, birth_date, location_lat, location_lon')
       .neq('id', userId)
       .limit(50);
     if (!data) return [];
@@ -323,22 +331,21 @@ export const PhotoAPI = {
       .from('photos')
       .select('*')
       .eq('user_id', userId)
-      .order('is_pinned', { ascending: false })
-      .order('created_at', { ascending: false });
+      .order('is_pinned', { ascending: false });
     if (!data) return [];
     return data.map(dbToPhoto);
   },
 
   async add(userId: string, photo: Photo): Promise<string> {
-    const { data } = await supabase.from('photos').upsert({
+    const { data, error } = await supabase.from('photos').upsert({
       id: photo.id,
       user_id: userId,
-      uri: photo.uri,
+      url: photo.uri,
       is_pinned: photo.isPinned ?? false,
-      created_at: photo.uploadedAt,
       proof_meta: photo.proofMeta ?? null,
-    }, { onConflict: 'id' }).select('id').single();
-    return data?.id ?? photo.id;
+    }, { onConflict: 'id' }).select('id');
+    if (error) throw error;
+    return data?.[0]?.id ?? photo.id;
   },
 
   async delete(id: string): Promise<void> {
@@ -575,7 +582,7 @@ export const StoreWaitlistAPI = {
 
 export const SessionAPI = {
   async record(userId: string): Promise<void> {
-    const today = new Date().toISOString().split('T')[0];
+    const today = localDateStr();
     await supabase
       .from('app_sessions')
       .upsert({ user_id: userId, session_date: today }, { onConflict: 'user_id,session_date' });

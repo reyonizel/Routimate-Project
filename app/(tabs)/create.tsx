@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useStore, Routine } from '../../store/useStore';
 import { generateId } from '../../lib/api';
+import { localDateStr } from '../../lib/date';
 
 const BG = '#FFFFFF'; const CARD = '#F4F4F4'; const SURFACE = '#EEEEEE';
 const TEXT = '#111111'; const TEXT2 = '#767676'; const TEXT3 = '#ABABAB';
@@ -50,7 +51,7 @@ const scopeLabel = (freq: Freq, scope: Scope) =>
 
 const getOnceRange = (freq: Freq): { start: string; end: string } => {
   const now = new Date();
-  const fmt = (d: Date) => d.toISOString().split('T')[0];
+  const fmt = (d: Date) => localDateStr(d);
   if (freq === 'daily') { const s = fmt(now); return { start: s, end: s }; }
   if (freq === 'weekly') {
     const day = now.getDay();

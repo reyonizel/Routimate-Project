@@ -67,15 +67,21 @@ function secondsUntilMonthly(dayOfMonth: number, h: number, m: number): number {
   return Math.max(10, Math.round((target.getTime() - now.getTime()) / 1000));
 }
 
-const content = (name: string): Notifications.NotificationContentInput => ({
-  title: 'Rutin Zamanı',
-  body: name,
-  sound: true,
-  priority: 'max',
-  vibrate: [0, 250, 250, 250],
-});
+const TEMPLATES = [
+  (first: string, task: string) => ({ title: `Harika gidiyorsun ${first}! 🔥`, body: `Sıradaki görevin: ${task}` }),
+  (first: string, task: string) => ({ title: `Hey ${first} 👋`, body: `${task} yapmayı unutma!` }),
+  (first: string, task: string) => ({ title: `${task} seni bekliyor 💪`, body: `Hadi ${first}, rutin zamanı!` }),
+  (first: string, task: string) => ({ title: `Rutinin hazır ${first} ⏰`, body: `${task} — haydi başla!` }),
+  (first: string, task: string) => ({ title: `${first}, bugün de kazanıyorsun ✨`, body: `${task} için tam zamanı` }),
+];
 
-export async function scheduleRoutineNotification(r: Routine): Promise<void> {
+function content(routineName: string, username: string): Notifications.NotificationContentInput {
+  const first = (username || 'sen').split(' ')[0];
+  const tpl = TEMPLATES[Math.floor(Math.random() * TEMPLATES.length)](first, routineName);
+  return { ...tpl, sound: true, priority: 'max', vibrate: [0, 250, 250, 250] };
+}
+
+export async function scheduleRoutineNotification(r: Routine, username = ''): Promise<void> {
   await cancelRoutineNotification(r.id);
   if (!r.notificationTime) return;
   const [h, m] = r.notificationTime.split(':').map(Number);
@@ -84,7 +90,7 @@ export async function scheduleRoutineNotification(r: Routine): Promise<void> {
   if (r.frequency === 'daily') {
     await Notifications.scheduleNotificationAsync({
       identifier: `${PREFIX}${r.id}`,
-      content: content(r.name),
+      content: content(r.name, username),
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
         channelId: 'default',
@@ -96,7 +102,7 @@ export async function scheduleRoutineNotification(r: Routine): Promise<void> {
     for (const day of r.targetDays ?? []) {
       await Notifications.scheduleNotificationAsync({
         identifier: `${PREFIX}${r.id}-d${day}`,
-        content: content(r.name),
+        content: content(r.name, username),
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
           channelId: 'default',
@@ -109,7 +115,7 @@ export async function scheduleRoutineNotification(r: Routine): Promise<void> {
     for (const d of r.monthlyDays ?? []) {
       await Notifications.scheduleNotificationAsync({
         identifier: `${PREFIX}${r.id}-m${d}`,
-        content: content(r.name),
+        content: content(r.name, username),
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
           channelId: 'default',
@@ -139,7 +145,7 @@ export async function cancelAllRoutineNotifications(): Promise<void> {
   );
 }
 
-export async function scheduleAllRoutineNotifications(routines: Routine[]): Promise<void> {
+export async function scheduleAllRoutineNotifications(routines: Routine[], username = ''): Promise<void> {
   await cancelAllRoutineNotifications();
-  await Promise.all(routines.map(r => scheduleRoutineNotification(r).catch(() => {})));
+  await Promise.all(routines.map(r => scheduleRoutineNotification(r, username).catch(() => {})));
 }

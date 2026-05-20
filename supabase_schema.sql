@@ -61,10 +61,9 @@ create table if not exists public.rest_days (
 create table if not exists public.photos (
   id         uuid primary key default gen_random_uuid(),
   user_id    uuid references public.profiles(id) on delete cascade not null,
-  uri        text not null,
+  url        text not null,
   is_pinned  boolean not null default false,
-  proof_meta jsonb,
-  created_at timestamptz not null default now()
+  proof_meta jsonb
 );
 
 -- ── Match Requests ────────────────────────────────────────────────────────────

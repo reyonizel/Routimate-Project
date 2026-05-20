@@ -6,22 +6,43 @@ import { useRouter } from 'expo-router';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useStore } from '../../store/useStore';
+import { localDateStr } from '../../lib/date';
 import { Photo, Routine } from '../../store/useStore';
 import { BlurView } from 'expo-blur';
-import Svg, { Circle, G, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, G, Text as SvgText, Polyline, Path } from 'react-native-svg';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 const { width } = Dimensions.get('window');
 const PHOTO_SIZE = (width - 32 - 4) / 3;
-const today = new Date().toISOString().split('T')[0];
+const today = localDateStr();
 
 const BG = '#FFFFFF'; const CARD = '#F4F4F4'; const SURFACE = '#EEEEEE';
 const TEXT = '#111111'; const TEXT2 = '#767676'; const TEXT3 = '#ABABAB';
 const RED = '#00bf63'; const GREEN = '#008800'; const GOLD = '#D4860A';
 const BORDER = '#E8E8E8'; const PILL = 999;
 
+function LineChart({ data, color = RED }: { data: number[]; color?: string }) {
+  const cw = width - 40;
+  const ch = 88;
+  const pL = 4, pR = 4, pT = 10, pB = 8;
+  const n = data.length;
+  if (n < 2) return null;
+  const xs = data.map((_, i) => pL + (i / (n - 1)) * (cw - pL - pR));
+  const ys = data.map(v => pT + (ch - pT - pB) * (1 - v));
+  const pts = xs.map((x, i) => `${x.toFixed(1)},${ys[i].toFixed(1)}`).join(' ');
+  const fill = `M${xs[0].toFixed(1)},${ch} ${xs.map((x,i) => `L${x.toFixed(1)},${ys[i].toFixed(1)}`).join(' ')} L${xs[n-1].toFixed(1)},${ch} Z`;
+  return (
+    <Svg width={cw} height={ch}>
+      <Path d={fill} fill={color} fillOpacity={0.08} />
+      <Polyline points={pts} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+      {xs.map((x, i) => <Circle key={i} cx={x} cy={ys[i]} r={3} fill={data[i] > 0 ? color : '#E0E0E0'} />)}
+    </Svg>
+  );
+}
+
 export default function ProfileScreen() {
   const user = useStore((s) => s.user);
+  const mate = useStore((s) => s.mate);
   const updateUser = useStore((s) => s.updateUser);
   const uploadAvatar = useStore((s) => s.uploadAvatar);
   const deletePhoto = useStore((s) => s.deletePhoto);
@@ -75,31 +96,86 @@ export default function ProfileScreen() {
     if (activeTab === 2) refreshAchievementScore().catch(() => {});
   }, [activeTab]);
 
-  // Metrik hesaplamaları (client-side approximation)
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
-  const cutoff = thirtyDaysAgo.toISOString().split('T')[0];
-
-  const totalExpected = user.routines.filter(r => r.scope !== 'once').length * 30;
-  const completedLast30 = user.routines
-    .flatMap(r => r.completedDates.filter(d => d >= cutoff)).length;
-  const completionPct = totalExpected > 0 ? Math.min(100, Math.round((completedLast30 * 100) / totalExpected)) : 0;
-
-  const totalPhotos = user.photos.length;
+  // Tüm zamanlar — recurring rutinler üzerinden hesaplanır
   const proofPhotos = user.photos.filter(p => p.proofMeta).length;
-  const proofPct = totalPhotos > 0 ? Math.min(100, Math.round((proofPhotos * 100) / totalPhotos)) : 0;
+  const recurringRoutines = user.routines.filter(r => r.scope !== 'once');
 
+  const totalDoneAllTime = recurringRoutines.reduce((s, r) => s + r.completedDates.length, 0);
+
+  const totalExpectedAllTime = recurringRoutines.reduce((sum, r) => {
+    const t = Date.parse(r.createdAt);
+    const startMs = isNaN(t) ? Date.now() : t;
+    const days = Math.max(1, Math.round((Date.now() - startMs) / 86400000) + 1);
+    if (r.frequency === 'daily') return sum + days;
+    if (r.frequency === 'weekly') return sum + Math.round(days * (r.targetDays?.length ?? 1) / 7);
+    if (r.frequency === 'monthly') return sum + Math.round(days * (r.monthlyDays?.length ?? 1) / 30.44);
+    return sum + days;
+  }, 0);
+
+  // Mevcut seri
   const streakDays = (() => {
     const completedSet = new Set(user.routines.flatMap(r => r.completedDates));
     let streak = 0;
     const d = new Date();
-    while (completedSet.has(d.toISOString().split('T')[0])) {
+    while (completedSet.has(localDateStr(d))) {
       streak++;
       d.setDate(d.getDate() - 1);
     }
     return streak;
   })();
-  const streakPct = Math.min(100, Math.round((streakDays / 14) * 100));
+
+  // Bugünün görevleri
+  const todayDow = new Date().getDay();
+  const todayMday = new Date().getDate();
+  const todayScheduled = user.routines.filter(r => {
+    if (r.scope === 'once') return false;
+    if (r.frequency === 'daily') return true;
+    if (r.frequency === 'weekly') return r.targetDays?.includes(todayDow) ?? false;
+    if (r.frequency === 'monthly') return r.monthlyDays?.includes(todayMday) ?? false;
+    return false;
+  });
+  const todayDone = todayScheduled.filter(r => r.completedDates.includes(today)).length;
+  const todayPct = todayScheduled.length > 0 ? Math.round(todayDone / todayScheduled.length * 100) : 0;
+
+  // En aktif saat
+  const capturedHours = user.photos
+    .filter(p => p.proofMeta?.capturedAt)
+    .map(p => new Date(p.proofMeta!.capturedAt).getHours());
+  const avgHour = capturedHours.length >= 3
+    ? Math.round(capturedHours.reduce((a, b) => a + b, 0) / capturedHours.length)
+    : null;
+
+  // Mate seri
+  const mateStreakDays = (() => {
+    if (!mate) return null;
+    const completedSet = new Set(mate.routines.flatMap(r => r.completedDates));
+    let streak = 0;
+    const d = new Date();
+    while (completedSet.has(localDateStr(d))) {
+      streak++;
+      d.setDate(d.getDate() - 1);
+    }
+    return streak;
+  })();
+
+  // Son 7 gün bar chart verisi
+  const TR_DAYS = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
+  const last7Data = Array.from({ length: 7 }, (_, i) => {
+    const dateStr = localDateStr(new Date(Date.now() - (6 - i) * 86400000));
+    const d = new Date(dateStr + 'T12:00:00');
+    const dw = d.getDay();
+    const dm = d.getDate();
+    const scheduled = user.routines.filter(r => {
+      if (r.scope === 'once') return false;
+      if (r.frequency === 'daily') return true;
+      if (r.frequency === 'weekly') return r.targetDays?.includes(dw) ?? false;
+      if (r.frequency === 'monthly') return r.monthlyDays?.includes(dm) ?? false;
+      return false;
+    });
+    const done = scheduled.filter(r => r.completedDates.includes(dateStr)).length;
+    const pct = scheduled.length > 0 ? done / scheduled.length : 0;
+    return { dateStr, dayLabel: TR_DAYS[dw], pct, isToday: dateStr === today };
+  });
 
   const editTimeDate = new Date();
   editTimeDate.setHours(parseInt(editHour || '7', 10));
@@ -157,7 +233,7 @@ export default function ProfileScreen() {
             <TouchableOpacity onPress={pickAvatar} activeOpacity={0.85} style={styles.avatarWrap}>
               <View style={[styles.avatarRing, { borderColor: accentColor }]}>
                 {user.avatarUri
-                  ? <Image source={{ uri: user.avatarUri }} style={styles.avatarImage} contentFit="cover" cachePolicy="memory-disk" />
+                  ? <Image source={{ uri: user.avatarUri }} style={styles.avatarImage} contentFit="cover" cachePolicy="memory-disk" transition={250} placeholder="#E8E8E8" />
                   : (
                     <View style={styles.avatarInner}>
                       <Text style={[styles.avatarLetter, { color: accentColor }]}>{(user.username || '?')[0].toUpperCase()}</Text>
@@ -356,62 +432,125 @@ export default function ProfileScreen() {
 
         {/* Tab 2: Stats */}
         {activeTab === 2 && (
-          <View style={[styles.tabContent, { alignItems: 'center' }]}>
-            <Svg width={size} height={size}>
-              <G rotation="-90" origin={`${size / 2}, ${size / 2}`}>
-                <Circle cx={size / 2} cy={size / 2} r={r} stroke={SURFACE} strokeWidth={sw} fill="none" />
-                <Circle cx={size / 2} cy={size / 2} r={r} stroke={accentColor} strokeWidth={sw} fill="none"
-                  strokeDasharray={`${dash} ${circ}`} strokeLinecap="round" />
-              </G>
-              <SvgText x={size / 2} y={size / 2 - 6} textAnchor="middle" fill={TEXT} fontSize="34" fontWeight="900">
-                {user.achievementScore}%
-              </SvgText>
-              <SvgText x={size / 2} y={size / 2 + 20} textAnchor="middle" fill={TEXT2} fontSize="13">
-                Başarı Oranı
-              </SvgText>
-            </Svg>
+          <View style={{ backgroundColor: BG }}>
 
-            {/* Metrik kartları */}
-            <View style={styles.metricGrid}>
-              {[
-                { label: 'Tamamlama', pct: completionPct, weight: '%60', icon: 'checkmark-circle-outline' as const, color: RED },
-                { label: 'Kanıt Fotoğrafı', pct: proofPct, weight: '%15', icon: 'camera-outline' as const, color: '#8B5CF6' },
-                { label: 'Giriş Tutarlılığı', pct: 0, weight: '%20', icon: 'calendar-outline' as const, color: '#F59E0B', note: 'Sunucudan hesaplanır' },
-                { label: 'Seri Bonusu', pct: streakPct, weight: '%5', icon: 'flame-outline' as const, color: '#EF4444', note: `${streakDays} gün` },
-              ].map(m => (
-                <View key={m.label} style={styles.metricCard}>
-                  <View style={[styles.metricIconWrap, { backgroundColor: m.color + '18' }]}>
-                    <Ionicons name={m.icon} size={18} color={m.color} />
-                  </View>
-                  <Text style={styles.metricLabel}>{m.label}</Text>
-                  <Text style={styles.metricWeight}>{m.weight}</Text>
-                  <View style={styles.metricBarBg}>
-                    <View style={[styles.metricBarFill, { width: `${m.pct}%` as any, backgroundColor: m.color }]} />
-                  </View>
-                  <Text style={[styles.metricPct, { color: m.color }]}>
-                    {m.note ?? `${m.pct}%`}
+            {/* Son 7 Gün — Çizgi Grafiği */}
+            <View style={st.sec}>
+              <View style={st.secHeader}>
+                <Text style={st.secTitle}>Son 7 Gün</Text>
+              </View>
+              <LineChart data={last7Data.map(d => d.pct)} />
+              <View style={st.dayRow}>
+                {last7Data.map(d => (
+                  <Text key={d.dateStr} style={[st.dayLbl, d.isToday && { color: RED, fontWeight: '800' }]}>
+                    {d.dayLabel}
                   </Text>
-                </View>
-              ))}
+                ))}
+              </View>
             </View>
 
-            {/* Per-routine bars */}
-            {user.routines.length > 0 && (
-              <View style={styles.barRow}>
-                {user.routines.slice(0, 5).map((r) => {
-                  const pct = Math.min(Math.floor((r.completedDates.length / 30) * 100), 100);
-                  return (
-                    <View key={r.id} style={styles.barItem}>
-                      <View style={styles.bar}>
-                        <View style={[styles.barFill, { height: `${pct}%` as any, backgroundColor: accentColor }]} />
-                      </View>
-                      <Text style={styles.barPct}>{pct}%</Text>
-                      <Text style={styles.barName} numberOfLines={1}>{r.name.split(' ')[0]}</Text>
-                    </View>
-                  );
-                })}
+            <View style={st.div} />
+
+            {/* Tamamlama */}
+            <View style={st.sec}>
+              <Text style={st.secTitle}>Tamamlama</Text>
+              <View style={st.numLine}>
+                <Text style={[st.numBig, { color: RED }]}>{totalDoneAllTime.toLocaleString('tr-TR')}</Text>
+                <Text style={st.numOf}>/ {totalExpectedAllTime.toLocaleString('tr-TR')} beklenen görev</Text>
               </View>
+              <View style={[st.numLine, { marginTop: 8 }]}>
+                <Text style={[st.numBig, { color: '#F59E0B' }]}>{proofPhotos}</Text>
+                <Text style={st.numOf}>/ {totalExpectedAllTime.toLocaleString('tr-TR')} kanıtlandı</Text>
+              </View>
+            </View>
+
+            <View style={st.div} />
+
+            {/* Başarı & Seri */}
+            <View style={[st.sec, { flexDirection: 'row' }]}>
+              <View style={{ flex: 1 }}>
+                <Text style={st.secTitle}>Başarı Skoru</Text>
+                <Text style={[st.bigN, {
+                  color: user.achievementScore >= 70 ? RED : user.achievementScore >= 40 ? '#F59E0B' : '#EF4444',
+                }]}>{user.achievementScore}<Text style={st.bigNUnit}>/100</Text></Text>
+              </View>
+              <View style={st.vDiv} />
+              <View style={{ flex: 1 }}>
+                <Text style={st.secTitle}>Günlük Seri</Text>
+                <Text style={[st.bigN, { color: '#8B5CF6' }]}>{streakDays}<Text style={st.bigNUnit}> gün</Text></Text>
+              </View>
+            </View>
+
+            <View style={st.div} />
+
+            {/* Bugün */}
+            <View style={st.sec}>
+              <View style={st.secHeader}>
+                <Text style={st.secTitle}>Bugün</Text>
+                <Text style={[st.badge, {
+                  color: todayPct === 100 ? RED : todayPct > 0 ? '#F59E0B' : TEXT3,
+                }]}>
+                  {todayScheduled.length > 0 ? `${todayDone}/${todayScheduled.length} tamamlandı` : 'Bugün görev yok'}
+                </Text>
+              </View>
+              {todayScheduled.length > 0 && (
+                <>
+                  <View style={st.progBg}>
+                    <View style={[st.progFill, {
+                      width: `${todayPct}%` as any,
+                      backgroundColor: todayPct === 100 ? RED : '#F59E0B',
+                    }]} />
+                  </View>
+                  {todayScheduled.map(r => {
+                    const done = r.completedDates.includes(today);
+                    return (
+                      <View key={r.id} style={st.taskRow}>
+                        <View style={[st.taskDot, done && { backgroundColor: RED, borderColor: RED }]}>
+                          {done && <Ionicons name="checkmark" size={10} color="#fff" />}
+                        </View>
+                        <Text style={[st.taskName, done && { color: TEXT3, textDecorationLine: 'line-through' }]}>
+                          {r.name}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </>
+              )}
+            </View>
+
+            {/* Mate */}
+            {mate && (
+              <>
+                <View style={st.div} />
+                <View style={[st.sec, { flexDirection: 'row' }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={st.secTitle}>Sen</Text>
+                    <Text style={[st.bigN, { color: RED }]}>{user.achievementScore}<Text style={st.bigNUnit}>/100</Text></Text>
+                    <Text style={[st.numOf, { marginTop: 4 }]}>{streakDays} gün seri</Text>
+                  </View>
+                  <View style={st.vDiv} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={st.secTitle}>@{mate.username}</Text>
+                    <Text style={[st.bigN, { color: '#8B5CF6' }]}>{mate.achievementScore}<Text style={st.bigNUnit}>/100</Text></Text>
+                    {mateStreakDays !== null && <Text style={[st.numOf, { marginTop: 4 }]}>{mateStreakDays} gün seri</Text>}
+                  </View>
+                </View>
+              </>
             )}
+
+            {/* En Aktif Saat */}
+            {avgHour !== null && (
+              <>
+                <View style={st.div} />
+                <View style={st.sec}>
+                  <Text style={st.secTitle}>En Aktif Saat</Text>
+                  <Text style={st.bigN}>{String(avgHour).padStart(2, '0')}:00</Text>
+                  <Text style={[st.numOf, { marginTop: 2 }]}>kanıt fotoğraflarına göre</Text>
+                </View>
+              </>
+            )}
+
+            <View style={{ height: 32 }} />
           </View>
         )}
 
@@ -491,7 +630,7 @@ export default function ProfileScreen() {
             >
               {user.photos.map((p) => (
                 <View key={p.id} style={{ width, height: Dimensions.get('window').height, backgroundColor: '#fff', justifyContent: 'center' }}>
-                  <Image source={{ uri: p.uri }} style={{ width: '100%', height: '100%' }} contentFit="contain" />
+                  <Image source={{ uri: p.uri }} style={{ width: '100%', height: '100%' }} contentFit="contain" transition={200} placeholder="#E8E8E8" />
                   
                   {/* Top Header Panel */}
                   <View style={{ position: 'absolute', top: Math.max(insets.top + 10, 40), left: 20, right: 20, flexDirection: 'row', alignItems: 'center' }}>
@@ -722,4 +861,33 @@ const styles = StyleSheet.create({
   editSaveTxt: { fontSize: 14, color: '#fff', fontWeight: '900' },
   editDeleteBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10 },
   editDeleteTxt: { fontSize: 13, fontWeight: '700', color: '#EF4444' },
+});
+
+const st = StyleSheet.create({
+  sec:      { paddingHorizontal: 20, paddingVertical: 18 },
+  secHeader:{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
+  secTitle: { fontSize: 12, fontWeight: '700', color: TEXT2, marginBottom: 12 },
+  div:      { height: 1, backgroundColor: BORDER },
+  vDiv:     { width: 1, backgroundColor: BORDER, marginHorizontal: 20 },
+
+  // Çizgi grafik
+  dayRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
+  dayLbl: { flex: 1, textAlign: 'center', fontSize: 10, color: TEXT3, fontWeight: '600' },
+
+  // Sayılar
+  numLine: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
+  numBig:  { fontSize: 28, fontWeight: '900', color: TEXT },
+  numOf:   { fontSize: 13, color: TEXT2 },
+
+  // Büyük sayılar
+  bigN:     { fontSize: 44, fontWeight: '900', color: TEXT, lineHeight: 48 },
+  bigNUnit: { fontSize: 16, fontWeight: '500', color: TEXT3 },
+
+  // Bugün
+  badge:    { fontSize: 13, fontWeight: '600' },
+  progBg:   { height: 4, backgroundColor: SURFACE, borderRadius: 2, overflow: 'hidden', marginBottom: 14 },
+  progFill: { height: '100%', borderRadius: 2 },
+  taskRow:  { flexDirection: 'row', alignItems: 'center', paddingVertical: 9, gap: 10, borderTopWidth: 0.5, borderTopColor: BORDER },
+  taskDot:  { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: TEXT3, alignItems: 'center', justifyContent: 'center' },
+  taskName: { flex: 1, fontSize: 14, color: TEXT, fontWeight: '500' },
 });

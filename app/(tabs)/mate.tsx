@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { useStore, User, Mate, MatchRequest } from '../../store/useStore';
+import { localDateStr } from '../../lib/date';
 import Svg, { Circle } from 'react-native-svg';
 
 const { width } = Dimensions.get('window');
@@ -37,11 +38,66 @@ const CircularProgress = ({ size = 72, strokeWidth = 5, progress = 0, color = '#
   );
 };
 
-const today = new Date().toISOString().split('T')[0];
+const today = localDateStr();
 const BG='#FFFFFF'; const CARD='#F4F4F4'; const SURFACE='#EEEEEE';
 const TEXT='#111111'; const TEXT2='#767676'; const TEXT3='#ABABAB';
 const RED='#00bf63'; const GREEN='#008800'; const GOLD='#D4860A';
 const BORDER='#E8E8E8'; const PILL=999;
+
+// ── Uyumluluk algoritması ─────────────────────────────────────────────────────
+function interestScore(a: string[], b: string[]): number {
+  if (!a.length || !b.length) return 0;
+  const common = a.filter(i => b.includes(i)).length;
+  return common / Math.min(a.length, b.length);
+}
+
+function ageScore(dA?: string, dB?: string): number {
+  if (!dA || !dB) return 0.5;
+  const age = (d: string) => (Date.now() - new Date(d).getTime()) / (365.25 * 24 * 3600 * 1000);
+  const diff = Math.abs(age(dA) - age(dB));
+  if (diff <= 2) return 1.0;
+  if (diff <= 5) return 0.8;
+  if (diff <= 10) return 0.5;
+  if (diff <= 15) return 0.2;
+  return 0.0;
+}
+
+function commitmentScore(a: number, b: number): number {
+  const diff = Math.abs(a - b);
+  if (diff <= 10) return 1.0;
+  if (diff <= 25) return 0.6;
+  if (diff <= 50) return 0.3;
+  return 0.0;
+}
+
+function locationScore(lat1?: number, lon1?: number, lat2?: number, lon2?: number): number {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return 0.5;
+  const R = 6371;
+  const toRad = (d: number) => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+  const km = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  if (km < 10) return 1.0;
+  if (km < 50) return 0.8;
+  if (km < 100) return 0.5;
+  if (km < 300) return 0.2;
+  return 0.0;
+}
+
+function calcCompat(user: User, mate: Mate): number {
+  const raw =
+    interestScore(user.interests, mate.interests)    * 0.40 +
+    ageScore(user.birthDate, mate.birthDate)          * 0.30 +
+    commitmentScore(user.achievementScore, mate.achievementScore) * 0.20 +
+    locationScore(user.locationLat, user.locationLon, mate.locationLat, mate.locationLon) * 0.10;
+  return Math.round(raw * 59) + 40; // 40–99
+}
+
+function compatLabel(pct: number): string {
+  if (pct >= 85) return 'Yüksek Uyum 🔥';
+  if (pct >= 65) return 'İyi Uyum ✓';
+  return 'Temel Uyum';
+}
 
 const INTEREST_ICON: Record<string, React.ComponentProps<typeof Ionicons>['name']> = {
   'Yoga':        'body-outline',
@@ -74,15 +130,9 @@ export default function MateScreen() {
 
   const router = useRouter();
 
-  const calculateSimilarity = (other: Mate) => {
-    if (!user.interests || !other.interests) return 0;
-    const common = user.interests.filter(i => other.interests.includes(i));
-    return common.length;
-  };
-
   const sortedDiscovery = [...discoveryUsers]
     .filter(u => u.id !== user.id)
-    .sort((a, b) => calculateSimilarity(b) - calculateSimilarity(a));
+    .sort((a, b) => calcCompat(user, b) - calcCompat(user, a));
 
   const renderActiveMatch = () => {
     if (!mate) return null;
@@ -209,9 +259,8 @@ export default function MateScreen() {
           )}
           {sortedDiscovery.map(item => {
             const isSent = sentRequests.includes(item.id);
-            const similarity = calculateSimilarity(item);
             const accentColor = item.gender === 'female' ? '#e91e63' : '#3498db';
-            const compat = Math.min(70 + similarity * 10, 99);
+            const compat = calcCompat(user, item);
             const displayName = item.fullName ?? item.username;
 
             return (
@@ -231,8 +280,10 @@ export default function MateScreen() {
                   {/* Name + compat */}
                   <View style={s.discoveryTopRow}>
                     <Text style={s.discoveryName}>{displayName}</Text>
-                    <View style={s.similarityPill}>
-                      <Text style={s.similarityTxt}>%{compat} uyum</Text>
+                    <View style={[s.similarityPill, { backgroundColor: compat >= 85 ? '#FFF0E0' : compat >= 65 ? '#E8F5E9' : '#F4F4F4' }]}>
+                      <Text style={[s.similarityTxt, { color: compat >= 85 ? '#D4860A' : compat >= 65 ? '#2E7D32' : TEXT3 }]}>
+                        {compatLabel(compat)} · %{compat}
+                      </Text>
                     </View>
                   </View>
 

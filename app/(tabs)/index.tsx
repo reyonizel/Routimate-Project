@@ -7,6 +7,8 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { useStore } from '../../store/useStore';
+import { getAppDate } from '../../lib/date';
+import SkeletonImage from '../../components/SkeletonImage';
 import { Audio } from 'expo-av';
 
 const SOUND_FILES = {
@@ -38,8 +40,6 @@ const playCompletionSound = async (soundId: string) => {
 };
 
 const { height: SH } = Dimensions.get('window');
-const today = new Date().toISOString().split('T')[0];
-
 const BG='#FFFFFF'; const CARD='#F4F4F4'; const SURFACE='#EEEEEE';
 const TEXT='#111111'; const TEXT2='#767676'; const TEXT3='#ABABAB';
 const RED='#00bf63'; const GREEN='#008800'; const GOLD='#D4860A';
@@ -52,6 +52,7 @@ const DAY_LABELS = ['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'];
 
 export default function HomeScreen() {
   const user = useStore(s => s.user);
+  const today = getAppDate(user.dayEndHour ?? 0);
   const toggleRoutineComplete = useStore(s => s.toggleRoutineComplete);
   const toggleRestDay = useStore(s => s.toggleRestDay);
   const deleteRoutine = useStore(s => s.deleteRoutine);
@@ -260,7 +261,7 @@ export default function HomeScreen() {
                           {sorted.map(r => {
                             const done = r.completedDates.includes(today);
                             const isExpanded = expandedRoutineId === r.id;
-                            const proofPhoto = user.photos.find(p => p.id === `proof-${r.id}-${today}`);
+                            const proofPhoto = user.photos.find(p => p.proofMeta?.routineId === r.id && p.proofMeta?.date === today);
                             const hasProof = !!proofPhoto;
                             return (
                               <Animated.View layout={LinearTransition} key={r.id} style={s.routineRow}>
@@ -295,10 +296,11 @@ export default function HomeScreen() {
                                       activeOpacity={0.7}
                                     >
                                       {hasProof ? (
-                                        <Image
-                                          source={{ uri: proofPhoto!.uri }}
-                                          style={{ width: 28, height: 28, borderRadius: 8 }}
-                                          resizeMode="cover"
+                                        <SkeletonImage
+                                          uri={proofPhoto!.uri}
+                                          style={{ width: 28, height: 28 }}
+                                          skeletonStyle={{ width: 28, height: 28 }}
+                                          borderRadius={8}
                                         />
                                       ) : (
                                         <Ionicons name="camera-outline" size={13} color={done ? 'rgba(255,255,255,0.7)' : TEXT2} />
@@ -579,9 +581,9 @@ export default function HomeScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={{ backgroundColor: RED, borderRadius: 14, paddingVertical: 13, paddingHorizontal: 28 }}
-                onPress={() => {
-                  addRoutineProof(proofPhoto.routineId, today, proofPhoto.uri);
+                onPress={async () => {
                   setProofPhoto(null);
+                  await addRoutineProof(proofPhoto.routineId, today, proofPhoto.uri);
                 }}
               >
                 <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15 }}>Kaydet</Text>

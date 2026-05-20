@@ -13,6 +13,7 @@ import {
   ProfileAPI, RoutineAPI, PhotoAPI, MatchAPI, MessageAPI,
   OrderAPI, StorageAPI, StoreWaitlistAPI, SessionAPI, generateId,
 } from '../lib/api';
+import { localDateStr } from '../lib/date';
 
 export type Gender = 'male' | 'female';
 
@@ -47,6 +48,7 @@ export interface Photo {
     routineName: string;
     setName?: string;
     capturedAt: string;
+    date: string;
   };
 }
 
@@ -100,6 +102,7 @@ export interface User {
   inactiveSets: string[];
   notificationSound: string;
   completionSound: string;
+  dayEndHour: number;
 }
 
 export interface Mate {
@@ -112,6 +115,9 @@ export interface Mate {
   routines: Routine[];
   photos: Photo[];
   achievementScore: number;
+  birthDate?: string;
+  locationLat?: number;
+  locationLon?: number;
 }
 
 export interface MatchRequest {
@@ -159,7 +165,7 @@ interface AppState {
   setLoggedIn: (value: boolean) => void;
   toggleRestDay: (date: string) => void;
 
-  addRoutineProof: (routineId: string, date: string, uri: string) => void;
+  addRoutineProof: (routineId: string, date: string, uri: string) => Promise<void>;
   toggleSetActive: (setName: string) => void;
   sendMatchRequest: (targetUser: Mate) => void;
   cancelMatchRequest: (targetUserId: string) => void;
@@ -189,12 +195,13 @@ const BLANK_USER: User = {
   inactiveSets: [],
   notificationSound: 'default',
   completionSound: 'correct',
+  dayEndHour: 0,
 };
 
 function calcAchievementScore(routines: Routine[], photos: Photo[]): number {
   if (routines.length === 0) return 0;
 
-  const todayStr  = new Date().toISOString().split('T')[0];
+  const todayStr  = localDateStr();
   const todayDay  = new Date().getDay();   // 0=Pazar … 6=Cumartesi
   const todayDate = new Date().getDate();  // 1-31
 
@@ -212,9 +219,10 @@ function calcAchievementScore(routines: Routine[], photos: Photo[]): number {
   // %70 — tamamlanan görevler
   const completed = applicable.filter(r => r.completedDates.includes(todayStr)).length;
 
-  // %30 — bugün fotoğraf eklenen görevler (proof-{routineId}-{today} ID'siyle)
-  const photoIds = new Set(photos.map(p => p.id));
-  const withPhoto = applicable.filter(r => photoIds.has(`proof-${r.id}-${todayStr}`)).length;
+  // %30 — bugün fotoğraf eklenen görevler
+  const withPhoto = applicable.filter(r =>
+    photos.some(p => p.proofMeta?.routineId === r.id && p.proofMeta?.date === todayStr)
+  ).length;
 
   return Math.round((completed / n) * 70 + (withPhoto / n) * 30);
 }
@@ -332,7 +340,14 @@ export const useStore = create<AppState>()(
           }
 
           SessionAPI.record(userId).catch(() => {});
-          scheduleAllRoutineNotifications(routines).catch(() => {});
+          scheduleAllRoutineNotifications(routines, profile.username).catch(() => {});
+          // Login sonrası gerçek skor hesapla (SQL function) ve kaydet
+          SessionAPI.calculateScore(userId).then(score => {
+            if (score > 0) {
+              set((s) => ({ user: { ...s.user, achievementScore: score } }));
+              ProfileAPI.update(userId, { achievementScore: score }).catch(() => {});
+            }
+          }).catch(() => {});
 
           set({
             user: {
@@ -341,6 +356,7 @@ export const useStore = create<AppState>()(
               photos,
               restDays,
               matchedSince: matchData.matchedSince ?? null,
+              dayEndHour: cached.dayEndHour ?? 0,  // kullanıcı ayarını koru
             },
             mate: matchData.mate,
             matchId: matchData.matchId,
@@ -391,8 +407,16 @@ export const useStore = create<AppState>()(
 
         const userId = get().user.id;
         if (userId) {
-          RoutineAPI.setCompletion(routineId, userId, date, nowCompleted).catch(console.error);
-          ProfileAPI.update(userId, { achievementScore: get().user.achievementScore }).catch(console.error);
+          (async () => {
+            try {
+              await RoutineAPI.setCompletion(routineId, userId, date, nowCompleted);
+              const score = await SessionAPI.calculateScore(userId);
+              set((s) => ({ user: { ...s.user, achievementScore: score } }));
+              ProfileAPI.update(userId, { achievementScore: score }).catch(console.error);
+            } catch (e) {
+              console.error('Score sync failed:', e);
+            }
+          })();
         }
       },
 
@@ -405,7 +429,7 @@ export const useStore = create<AppState>()(
         if (userId) {
           RoutineAPI.create(userId, routineWithId).catch(console.error);
         }
-        scheduleRoutineNotification(routineWithId).catch(() => {});
+        scheduleRoutineNotification(routineWithId, get().user.username).catch(() => {});
       },
 
       addRoutines: (routines) => {
@@ -417,7 +441,7 @@ export const useStore = create<AppState>()(
         if (userId) {
           withIds.forEach(r => RoutineAPI.create(userId, r).catch(console.error));
         }
-        scheduleAllRoutineNotifications(get().user.routines).catch(() => {});
+        scheduleAllRoutineNotifications(get().user.routines, get().user.username).catch(() => {});
       },
 
       deleteRoutine: (routineId) => {
@@ -586,67 +610,82 @@ export const useStore = create<AppState>()(
         });
       },
 
-      addRoutineProof: (routineId, date, uri) => {
+      addRoutineProof: async (routineId, date, uri) => {
         const userId = get().user.id;
         const routine = get().user.routines.find(r => r.id === routineId);
 
-        const photoId = `proof-${routineId}-${date}`;
-
-        // Dosyayı kalıcı dizine kopyala (logout sonrası da URI geçerli kalır)
-        const docsDir = `${FileSystem.documentDirectory}proofs/`;
-        const docsPath = `${docsDir}${photoId}.jpg`;
-        FileSystem.makeDirectoryAsync(docsDir, { intermediates: true })
-          .then(() => FileSystem.copyAsync({ from: uri, to: docsPath }))
-          .catch(() => {});
-        const persistentUri = docsPath;
+        // Kanıt fotoğrafı eklenince rutin otomatik tamamlandı sayılır
+        const alreadyDone = routine?.completedDates.includes(date) ?? false;
+        if (!alreadyDone) {
+          get().toggleRoutineComplete(routineId, date);
+        }
+        const photoUUID = generateId();
         const proofMeta = {
           routineId,
           routineName: routine?.name ?? '',
           setName: routine?.setName,
           capturedAt: new Date().toISOString(),
+          date,
         };
 
-        const newPhoto: Photo = {
-          id: photoId,
-          uri: persistentUri,
-          uploadedAt: new Date().toISOString(),
-          proofMeta,
-        };
+        // 1. Dosyayı WebP olarak kalıcı konuma kaydet (DB'ye kaydetmeden ÖNCE)
+        let persistentUri = uri;
+        try {
+          const { manipulateAsync, SaveFormat } = await import('expo-image-manipulator');
+          const docsDir = `${FileSystem.documentDirectory}proofs/`;
+          await FileSystem.makeDirectoryAsync(docsDir, { intermediates: true });
+          const docsPath = `${docsDir}${photoUUID}.webp`;
+          const result = await manipulateAsync(uri, [{ resize: { width: 1200 } }], { compress: 0.82, format: SaveFormat.WEBP });
+          await FileSystem.copyAsync({ from: result.uri, to: docsPath });
+          persistentUri = docsPath;
+        } catch (e) {
+          console.error('Proof photo convert failed:', e);
+        }
 
+        // 2. DB'ye HEMEN kaydet (logout olsa bile fotoğraf kaybolmaz)
+        if (userId) {
+          const dbPhoto: Photo = { id: photoUUID, uri: persistentUri, uploadedAt: new Date().toISOString(), proofMeta };
+          try {
+            await PhotoAPI.add(userId, dbPhoto);
+          } catch (e) {
+            console.error('Proof photo DB save failed:', e);
+          }
+        }
+
+        // 3. Store'u güncelle (fotoğraf anında görünür)
+        const finalUri = persistentUri;
         set((s) => {
           const updatedRoutines = s.user.routines.map(r =>
             r.id !== routineId ? r : {
               ...r,
-              proofPhotos: [...(r.proofPhotos ?? []).filter(p => p.date !== date), { date, uri: persistentUri }],
+              proofPhotos: [...(r.proofPhotos ?? []).filter(p => p.date !== date), { date, uri: finalUri }],
             }
           );
-          const updatedPhotos = [...s.user.photos.filter(p => p.id !== photoId), newPhoto];
-          const newScore = calcAchievementScore(updatedRoutines, updatedPhotos);
+          const updatedPhotos = [
+            ...s.user.photos.filter(p => !(p.proofMeta?.routineId === routineId && p.proofMeta?.date === date)),
+            { id: photoUUID, uri: finalUri, uploadedAt: new Date().toISOString(), proofMeta },
+          ];
           return {
             user: {
               ...s.user,
               routines: updatedRoutines,
               photos: updatedPhotos,
-              achievementScore: newScore,
+              achievementScore: calcAchievementScore(updatedRoutines, updatedPhotos),
             },
           };
         });
 
+        // 4. Arka planda: Supabase Storage'a yükle (başarısız olsa da DB'deki yerel URI kalır)
         if (userId) {
-          // Kalıcı URI ile DB'ye kaydet (logout sonrası da geçerli)
-          PhotoAPI.add(userId, newPhoto).catch(console.error);
-
-          // Arka planda Supabase Storage'a yükle, public URL ile güncelle
           (async () => {
             try {
               const storagePath = `${userId}/${routineId}/${date}`;
               const publicUrl = await StorageAPI.uploadImage('photos', storagePath, persistentUri);
-              const uploadedPhoto: Photo = { ...newPhoto, uri: publicUrl };
-
+              const cloudPhoto: Photo = { id: photoUUID, uri: publicUrl, uploadedAt: new Date().toISOString(), proofMeta };
               set((s) => ({
                 user: {
                   ...s.user,
-                  photos: s.user.photos.map(p => p.id === photoId ? uploadedPhoto : p),
+                  photos: s.user.photos.map(p => p.id === photoUUID ? cloudPhoto : p),
                   routines: s.user.routines.map(r =>
                     r.id !== routineId ? r : {
                       ...r,
@@ -655,13 +694,14 @@ export const useStore = create<AppState>()(
                   ),
                 },
               }));
-
-              // Upsert to replace local URI with publicUrl in DB
-              await PhotoAPI.add(userId, uploadedPhoto);
-            } catch {
-              // Local URI already persisted in DB — acceptable fallback
-            }
+              await PhotoAPI.add(userId, cloudPhoto);
+            } catch {}
           })();
+
+          SessionAPI.calculateScore(userId).then(score => {
+            set((s) => ({ user: { ...s.user, achievementScore: score } }));
+            ProfileAPI.update(userId, { achievementScore: score }).catch(console.error);
+          }).catch(console.error);
         }
       },
 
@@ -764,7 +804,7 @@ export const useStore = create<AppState>()(
       refreshAchievementScore: async () => {
         const { user } = get();
         if (!user.id) return;
-        const score = calcAchievementScore(user.routines, user.photos);
+        const score = await SessionAPI.calculateScore(user.id);
         set((s) => ({ user: { ...s.user, achievementScore: score } }));
         ProfileAPI.update(user.id, { achievementScore: score }).catch(console.error);
       },

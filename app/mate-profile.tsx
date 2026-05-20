@@ -8,12 +8,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { useStore } from '../store/useStore';
+import { localDateStr } from '../lib/date';
 import Svg, { Circle, G, Text as SvgText } from 'react-native-svg';
 import { BlurView } from 'expo-blur';
 
 const { width } = Dimensions.get('window');
 const PHOTO_SIZE = (width - 32 - 4) / 3;
-const today = new Date().toISOString().split('T')[0];
+const today = localDateStr();
 const NAVBAR_H = 56; // approximate navbar height
 
 const BG = '#FFFFFF'; const CARD = '#F4F4F4'; const SURFACE = '#EEEEEE';

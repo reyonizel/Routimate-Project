@@ -139,6 +139,7 @@ export default function ModalScreen() {
   const [editing, setEditing]             = useState(false);
   const [username, setUsername]           = useState(user.username);
   const [soundSheet, setSoundSheet]       = useState<'notification' | 'completion' | null>(null);
+  const [dayEndSheet, setDayEndSheet]     = useState(false);
 
   const playSound = async (file: any) => {
     if (!file) return;
@@ -252,6 +253,13 @@ export default function ModalScreen() {
 
   const currentNotifSound = SOUNDS.find(s => s.id === (user.notificationSound || 'default')) ?? SOUNDS[0];
   const currentCompSound = SOUNDS.find(s => s.id === (user.completionSound || 'correct')) ?? SOUNDS[1];
+  const dayEndHour = user.dayEndHour ?? 0;
+  const DAY_END_OPTIONS = [
+    { value: 0,  label: '00:00 (Gece Yarısı)', sub: 'Varsayılan — günü gece yarısı değiştir' },
+    { value: 1,  label: '01:00', sub: 'Saat 01:00\'de günsonu' },
+    { value: 2,  label: '02:00', sub: 'Saat 02:00\'de günsonu' },
+    { value: 3,  label: '03:00', sub: 'Saat 03:00\'de günsonu' },
+  ];
 
   return (
     <SafeAreaView style={s.container} edges={['top', 'bottom']}>
@@ -344,6 +352,13 @@ export default function ModalScreen() {
             sub={currentCompSound.label}
             onPress={() => setSoundSheet('completion')}
           />
+          <Divider />
+          <Row
+            icon="time-outline"
+            label="Günsonu Saati"
+            sub={dayEndHour === 0 ? '00:00 (Gece Yarısı)' : `0${dayEndHour}:00`}
+            onPress={() => setDayEndSheet(true)}
+          />
         </Section>
 
         {/* Destek */}
@@ -416,17 +431,52 @@ export default function ModalScreen() {
 
       </ScrollView>
 
+      {/* Day End Hour Sheet */}
+      {dayEndSheet && (
+        <Modal transparent visible animationType="slide" onRequestClose={() => setDayEndSheet(false)}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setDayEndSheet(false)}>
+            <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' }} />
+          </TouchableOpacity>
+          <View style={s.sheet}>
+            <View style={s.sheetHandle} />
+            <View style={s.sheetHeader}>
+              <Text style={s.sheetTitle}>Günsonu Saati</Text>
+              <TouchableOpacity onPress={() => setDayEndSheet(false)}>
+                <Ionicons name="close" size={22} color={TEXT} />
+              </TouchableOpacity>
+            </View>
+            {DAY_END_OPTIONS.map((opt, i) => (
+              <TouchableOpacity
+                key={opt.value}
+                style={[s.soundRow, i === DAY_END_OPTIONS.length - 1 && { borderBottomWidth: 0 }]}
+                onPress={() => { updateUser({ dayEndHour: opt.value }); setDayEndSheet(false); }}
+                activeOpacity={0.7}
+              >
+                <View style={[s.soundIcon, dayEndHour === opt.value && { backgroundColor: RED + '18' }]}>
+                  <Ionicons name="time-outline" size={18} color={dayEndHour === opt.value ? RED : TEXT2} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.soundLabel, dayEndHour === opt.value && { color: RED, fontWeight: '700' }]}>{opt.label}</Text>
+                  <Text style={s.rowSub}>{opt.sub}</Text>
+                </View>
+                {dayEndHour === opt.value && <Ionicons name="checkmark" size={18} color={RED} />}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </Modal>
+      )}
+
       {/* Sound Bottom Sheet */}
       {soundSheet && (
-        <Modal transparent visible animationType="slide" onRequestClose={() => setSoundSheet(false)}>
-          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setSoundSheet(false)}>
+        <Modal transparent visible animationType="slide" onRequestClose={() => setSoundSheet(null)}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setSoundSheet(null)}>
             <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' }} />
           </TouchableOpacity>
           <View style={s.sheet}>
             <View style={s.sheetHandle} />
             <View style={s.sheetHeader}>
               <Text style={s.sheetTitle}>Bildirim Sesi</Text>
-              <TouchableOpacity onPress={() => setSoundSheet(false)}>
+              <TouchableOpacity onPress={() => setSoundSheet(null)}>
                 <Ionicons name="close" size={22} color={TEXT} />
               </TouchableOpacity>
             </View>
