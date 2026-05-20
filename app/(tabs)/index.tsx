@@ -334,7 +334,7 @@ export default function HomeScreen() {
               contentFit="contain"
             />
             <Text style={s.emptyTitle}>Dinlenme günü</Text>
-            <Text style={s.emptySub}>İyi dinlenmeler! 😴</Text>
+            <Text style={s.emptySub}>Bunu hak ettin, {user.fullName?.split(' ')[0]}! 😴</Text>
           </View>
         ) : selRoutines.length === 0 ? (
           <View style={s.empty}>
