@@ -14,7 +14,7 @@ import { sendTestNotification } from '../lib/notifications';
 
 const BG = '#FCF7F0';
 const TEXT = '#0A3B25'; const TEXT2 = '#3D6B58'; const TEXT3 = '#B2B7AA';
-const RED = '#2A6151'; const GOLD = '#D8C2A4'; const BORDER = '#B2B7AA';
+const RED = '#2A6151'; const GOLD = '#D8C2A4'; const BORDER = '#EDE8E1';
 const CARD = '#FFFFFF'; const PILL = 999;
 
 // â”€â”€â”€ Animated Pro Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -385,7 +385,7 @@ export default function ModalScreen() {
             icon="star-outline"
             label="Bizi Puanlayın"
             sub="Görüşünü paylaş"
-            iconBg="#FFF8E1"
+            iconBg="rgba(216,194,164,0.30)"
             onPress={handleRate}
           />
           <Divider />
@@ -541,7 +541,7 @@ const s = StyleSheet.create({
 
   // Edit
   editBox:     { padding: 14 },
-  editInput:   { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#F0F0F0', borderRadius: 12, paddingHorizontal: 14, borderWidth: 1.5, borderColor: BORDER, marginBottom: 12 },
+  editInput:   { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#F5EDE0', borderRadius: 12, paddingHorizontal: 14, borderWidth: 1.5, borderColor: BORDER, marginBottom: 12 },
   editField:   { flex: 1, fontSize: 15, color: TEXT, paddingVertical: 12 },
   editActions: { flexDirection: 'row', gap: 10 },
   cancelBtn:   { flex: 1, backgroundColor: BORDER, borderRadius: PILL, paddingVertical: 12, alignItems: 'center' },
