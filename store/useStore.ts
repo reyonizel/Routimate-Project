@@ -11,7 +11,7 @@ import {
 } from '../lib/notifications';
 import {
   ProfileAPI, RoutineAPI, PhotoAPI, MatchAPI, MessageAPI,
-  OrderAPI, StorageAPI, StoreWaitlistAPI, SessionAPI, generateId,
+  OrderAPI, StorageAPI, StoreWaitlistAPI, SessionAPI, RoutineNoteAPI, generateId,
 } from '../lib/api';
 import { localDateStr } from '../lib/date';
 
@@ -34,6 +34,9 @@ export interface Routine {
   monthlyDays?: number[];
   proofPhotos?: RoutineProof[];
   setName?: string;
+  setIcon?: string;
+  notes?: { id: string; date: string; text: string }[];
+  skippedDates?: string[];
   scope?: 'recurring' | 'once';
   onceRange?: { start: string; end: string };
 }
@@ -144,16 +147,19 @@ interface AppState {
   discoveryUsers: Mate[];
   matchRequests: MatchRequest[];
   sentMatchRequests: string[];
+  selectedCategory: { name: string; icon: string } | null;
 
   addOrder: (order: Order) => void;
   loadUserData: () => Promise<'ok' | 'unverified' | 'onboarding' | 'no_user' | 'error'>;
   setInitialized: () => void;
+  setSelectedCategory: (cat: { name: string; icon: string } | null) => void;
 
   toggleRoutineComplete: (routineId: string, date: string) => void;
   addRoutine: (routine: Routine) => void;
   addRoutines: (routines: Routine[]) => void;
   deleteRoutine: (routineId: string) => void;
   updateRoutine: (id: string, updates: Partial<Routine>) => void;
+  toggleRoutineSkip: (routineId: string, date: string) => void;
   updateUser: (updates: Partial<User>) => void;
   togglePro: () => void;
   addPhoto: (photo: Photo) => void;
@@ -166,6 +172,8 @@ interface AppState {
   toggleRestDay: (date: string) => void;
 
   addRoutineProof: (routineId: string, date: string, uri: string) => Promise<void>;
+  addRoutineNote: (routineId: string, date: string, text: string) => Promise<void>;
+  deleteRoutineNote: (routineId: string, noteId: string) => void;
   toggleSetActive: (setName: string) => void;
   sendMatchRequest: (targetUser: Mate) => void;
   cancelMatchRequest: (targetUserId: string) => void;
@@ -240,8 +248,10 @@ export const useStore = create<AppState>()(
       discoveryUsers: [],
       matchRequests: [],
       sentMatchRequests: [],
+      selectedCategory: null,
 
       setInitialized: () => set({ isInitializing: false }),
+      setSelectedCategory: (cat) => set({ selectedCategory: cat }),
 
       addOrder: (order) => {
         set((s) => ({ orders: [order, ...s.orders] }));
@@ -273,7 +283,7 @@ export const useStore = create<AppState>()(
           }
           if (!profile.username) return 'onboarding';
 
-          const [routinesRes, restDaysRes, photosRes, matchRes, requestsRes, sentRes, discoveryRes, ordersRes] =
+          const [routinesRes, restDaysRes, photosRes, matchRes, requestsRes, sentRes, discoveryRes, ordersRes, notesRes] =
             await Promise.allSettled([
               RoutineAPI.getAll(userId),
               RoutineAPI.getRestDays(userId),
@@ -289,6 +299,7 @@ export const useStore = create<AppState>()(
                 achievementScore: profile.achievementScore,
               }),
               OrderAPI.getAll(userId),
+              RoutineNoteAPI.getAll(userId),
             ]);
 
           const cached = get().user;
@@ -311,6 +322,18 @@ export const useStore = create<AppState>()(
             routines = dbRoutines ?? cached.routines;
           }
           const restDays  = restDaysRes.status  === 'fulfilled' ? restDaysRes.value  : cached.restDays;
+
+          // Merge notes into routines
+          const dbNotes = notesRes.status === 'fulfilled' ? notesRes.value : [];
+          const notesByRoutine = new Map<string, { id: string; date: string; text: string }[]>();
+          dbNotes.forEach(n => {
+            if (!notesByRoutine.has(n.routine_id)) notesByRoutine.set(n.routine_id, []);
+            notesByRoutine.get(n.routine_id)!.push(...n.notes);
+          });
+          routines = routines.map(r => ({
+            ...r,
+            notes: notesByRoutine.get(r.id) ?? r.notes ?? [],
+          }));
 
           // Merge: DB is authoritative, but preserve cached photos not yet synced to DB
           const dbPhotos  = photosRes.status    === 'fulfilled' ? photosRes.value    : null;
@@ -462,6 +485,20 @@ export const useStore = create<AppState>()(
         RoutineAPI.update(id, updates).catch(console.error);
         const updated = get().user.routines.find(r => r.id === id);
         if (updated) scheduleRoutineNotification(updated).catch(() => {});
+      },
+
+      toggleRoutineSkip: (routineId, date) => {
+        set((s) => ({
+          user: {
+            ...s.user,
+            routines: s.user.routines.map((r) => {
+              if (r.id !== routineId) return r;
+              const skipped = r.skippedDates ?? [];
+              const isSkipped = skipped.includes(date);
+              return { ...r, skippedDates: isSkipped ? skipped.filter(d => d !== date) : [...skipped, date] };
+            }),
+          },
+        }));
       },
 
       // ── User ──────────────────────────────────────────────────────────────
@@ -703,6 +740,44 @@ export const useStore = create<AppState>()(
             ProfileAPI.update(userId, { achievementScore: score }).catch(console.error);
           }).catch(console.error);
         }
+      },
+
+      // ── Routine Notes ──────────────────────────────────────────────────────
+      addRoutineNote: async (routineId, date, text) => {
+        const userId = get().user.id;
+        if (!userId) return;
+        const noteId = generateId();
+        try {
+          await RoutineNoteAPI.add(userId, routineId, date, text);
+          set((s) => ({
+            user: {
+              ...s.user,
+              routines: s.user.routines.map(r =>
+                r.id !== routineId ? r : {
+                  ...r,
+                  notes: [...(r.notes ?? []), { id: noteId, date, text }],
+                }
+              ),
+            },
+          }));
+        } catch (e) {
+          console.error('Note save failed:', e);
+        }
+      },
+
+      deleteRoutineNote: (routineId, noteId) => {
+        set((s) => ({
+          user: {
+            ...s.user,
+            routines: s.user.routines.map(r =>
+              r.id !== routineId ? r : {
+                ...r,
+                notes: (r.notes ?? []).filter(n => n.id !== noteId),
+              }
+            ),
+          },
+        }));
+        RoutineNoteAPI.delete(noteId).catch(console.error);
       },
 
       // ── Discovery & Matching ──────────────────────────────────────────────

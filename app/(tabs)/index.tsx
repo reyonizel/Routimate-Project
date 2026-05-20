@@ -1,14 +1,16 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Dimensions, Image, Alert } from 'react-native';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Image, Alert, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import Animated, { useSharedValue, withSpring, useAnimatedStyle, withSequence, withRepeat, withTiming } from 'react-native-reanimated';
+import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { useStore } from '../../store/useStore';
 import { getAppDate } from '../../lib/date';
 import SkeletonImage from '../../components/SkeletonImage';
+import { SkeletonBox } from '../../components/SkeletonLoader';
 import { Audio } from 'expo-av';
 
 const SOUND_FILES = {
@@ -39,34 +41,82 @@ const playCompletionSound = async (soundId: string) => {
   } catch (e) {}
 };
 
-const { height: SH } = Dimensions.get('window');
 const BG='#FFFFFF'; const CARD='#F4F4F4'; const SURFACE='#EEEEEE';
 const TEXT='#111111'; const TEXT2='#767676'; const TEXT3='#ABABAB';
-const RED='#00bf63'; const GREEN='#008800'; const GOLD='#D4860A';
+const RED='#00cc6d'; const GREEN='#008800'; const GOLD='#D4860A';
 const BORDER='#E8E8E8'; const PILL=999;
 
 const FREQ_COLOR: Record<string,string> = { daily:'#2980b9', weekly:'#8e44ad', monthly:'#d35400' };
+const CAT_COLORS = ['#E91E63','#9C27B0','#3F51B5','#2196F3','#00ACC1','#00897B','#F4511E','#6D4C41','#546E7A','#558B2F'];
+function catColor(name: string): string {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+  return CAT_COLORS[Math.abs(h) % CAT_COLORS.length];
+}
 const FREQ_LABEL: Record<string,string> = { daily:'Günlük', weekly:'Haftalık', monthly:'Aylık' };
 const MONTHS = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
 const DAY_LABELS = ['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'];
 
 export default function HomeScreen() {
   const user = useStore(s => s.user);
+  const isInitializing = useStore(s => s.isInitializing);
   const today = getAppDate(user.dayEndHour ?? 0);
   const toggleRoutineComplete = useStore(s => s.toggleRoutineComplete);
   const toggleRestDay = useStore(s => s.toggleRestDay);
   const deleteRoutine = useStore(s => s.deleteRoutine);
   const addRoutineProof = useStore(s => s.addRoutineProof);
+  const toggleRoutineSkip = useStore(s => s.toggleRoutineSkip);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const accent = user.gender === 'female' ? '#e91e63' : '#3498db';
   const isRestDay = user.restDays.includes(today);
 
-  const [view, setView] = useState<'list'|'calendar'>('list');
   const [calMonth, setCalMonth] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState<string|null>(null);
+  const [selectedDate, setSelectedDate] = useState<string>(today);
   const [sheetVisible, setSheetVisible] = useState(false);
-  const [expandedRoutineId, setExpandedRoutineId] = useState<string | null>(null);
+  const [taskMenu, setTaskMenu] = useState<string | null>(null);
+
+  const fabOffset = useSharedValue(0);
+  const fabStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: fabOffset.value }],
+  }));
+
+  useFocusEffect(
+    useCallback(() => {
+      fabOffset.value = withRepeat(
+        withTiming(-6, { duration: 600 }),
+        -1,
+        true,
+      );
+      return () => { fabOffset.value = 0; };
+    }, []),
+  );
+
+  const carouselRef = useRef<ScrollView>(null);
+  const CELL_W = 46;
+  const CAR_W = Dimensions.get('window').width - 64;
+  const carPadding = Math.max(0, CAR_W / 2 - CELL_W / 2);
+  const todayDayNum = parseInt(today.split('-')[2]);
+
+  useEffect(() => {
+    const selYear = parseInt(selectedDate.split('-')[0]);
+    const selMonthIdx = parseInt(selectedDate.split('-')[1]) - 1;
+    const selDay = parseInt(selectedDate.split('-')[2]);
+    const isSelInView = year === selYear && month === selMonthIdx;
+    const scrollDay = isSelInView ? selDay : (year === parseInt(today.split('-')[0]) && month === parseInt(today.split('-')[1]) - 1) ? todayDayNum : 1;
+    setTimeout(() => {
+      carouselRef.current?.scrollTo({ x: Math.max(0, (scrollDay - 1) * CELL_W), animated: false });
+    }, 50);
+  }, [calMonth]);
+
+  useEffect(() => {
+    const selYear = parseInt(selectedDate.split('-')[0]);
+    const selMonthIdx = parseInt(selectedDate.split('-')[1]) - 1;
+    const selDay = parseInt(selectedDate.split('-')[2]);
+    if (year === selYear && month === selMonthIdx) {
+      carouselRef.current?.scrollTo({ x: Math.max(0, (selDay - 1) * CELL_W), animated: true });
+    }
+  }, [selectedDate]);
 
   const handleToggleDone = (routineId: string, dateStr: string, wasDone: boolean) => {
     toggleRoutineComplete(routineId, dateStr);
@@ -93,21 +143,8 @@ export default function HomeScreen() {
     }
   };
 
-  const toggleExpand = (id: string) => {
-    setExpandedRoutineId(prev => prev === id ? null : id);
-  };
-
-  const routineRefs = React.useRef<{ [id: string]: any }>({});
-  const [popover, setPopover] = useState<{ id: string, x: number, y: number, w: number, h: number } | null>(null);
-
-  const handleLongPress = (id: string) => {
-    const ref = routineRefs.current[id];
-    if (ref && ref.measureInWindow) {
-      ref.measureInWindow((x: number, y: number, w: number, h: number) => {
-        setPopover({ id, x, y, w, h });
-      });
-    }
-  };
+  const handleLongPress = (id: string) => setTaskMenu(id);
+  const swipeRefs = useRef<{ [id: string]: Swipeable | null }>({});
 
   // Get routines applicable on a date
   const getApplicable = useCallback((dateStr: string) => {
@@ -135,20 +172,18 @@ export default function HomeScreen() {
 
   const getRate = useCallback((dateStr: string) => {
     if (user.restDays.includes(dateStr)) return -1; // rest day sentinel
-    const app = getApplicable(dateStr);
+    const app = getApplicable(dateStr).filter(r => !(r.skippedDates ?? []).includes(dateStr));
     if (!app.length) return null;
     const done = app.filter(r => r.completedDates.includes(dateStr)).length;
     return Math.round((done / app.length) * 100);
   }, [getApplicable, user.restDays]);
 
-  // Today data
-  const todayRoutines = getApplicable(today);
-  const doneToday = todayRoutines.filter(r => r.completedDates.includes(today)).length;
-  const todayPct = todayRoutines.length > 0 ? Math.round((doneToday / todayRoutines.length) * 100) : 0;
-
-  const todayGroups = (() => {
-    const map = new Map<string, typeof todayRoutines>();
-    todayRoutines.forEach(r => {
+  const canToggle = selectedDate === today;
+  const selIsRestDay = user.restDays.includes(selectedDate);
+  const selRoutines = getApplicable(selectedDate);
+  const selGroups = (() => {
+    const map = new Map<string, typeof selRoutines>();
+    selRoutines.forEach(r => {
       const key = r.setName ?? '';
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(r);
@@ -171,10 +206,8 @@ export default function HomeScreen() {
     setSheetVisible(true);
   };
 
-  const selRoutines = selectedDate ? getApplicable(selectedDate) : [];
-  const isPast = selectedDate ? selectedDate < today : false;
+  const isPast = selectedDate < today;
   const isToday = selectedDate === today;
-  const selIsRestDay = selectedDate ? user.restDays.includes(selectedDate) : false;
 
   const dotColor = (rate: number|null) => {
     if (rate === null) return 'transparent';
@@ -187,385 +220,409 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
-      {/* Header */}
-      <View style={s.header}>
-        <View>
-          <Text style={s.sub}>{new Date().toLocaleDateString('tr-TR',{weekday:'long',day:'numeric',month:'long'})}</Text>
-          <Text style={s.title}>Rutinlerim</Text>
-        </View>
-        <View style={s.headerRight}>
-          <View style={s.toggle}>
-            <TouchableOpacity style={[s.toggleBtn, view==='list' && s.toggleBtnOn]} onPress={() => setView('list')}>
-              <Ionicons name="list" size={17} color={view==='list' ? '#fff' : TEXT2} />
+      {/* Top Block: Header + Calendar */}
+      <View style={s.topBlock}>
+        {/* Header */}
+        <View style={s.header}>
+          <View style={s.headerLeft}>
+            {user.avatarUri ? (
+              <SkeletonImage uri={user.avatarUri} style={s.headerAvatar} skeletonStyle={s.headerAvatar} borderRadius={14} />
+            ) : (
+              <View style={s.headerAvatarPlaceholder}>
+                <Ionicons name="person" size={16} color={accent} />
+              </View>
+            )}
+            <View>
+              <Text style={s.sub}>Hoşgeldin</Text>
+              <Text style={s.title}>{(user.fullName?.split(' ')[0] || user.username) || 'Kullanıcı'}</Text>
+            </View>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TouchableOpacity
+              style={[s.settBtn, isRestDay && s.settBtnRest]}
+              onPress={() => toggleRestDay(today)}
+              activeOpacity={0.8}
+            >
+              {isRestDay
+                ? <Ionicons name="cafe" size={20} color="#fff" />
+                : <Ionicons name="cafe-outline" size={20} color={TEXT2} />}
             </TouchableOpacity>
-            <TouchableOpacity style={[s.toggleBtn, view==='calendar' && s.toggleBtnOn]} onPress={() => setView('calendar')}>
-              <Ionicons name="calendar-outline" size={17} color={view==='calendar' ? '#fff' : TEXT2} />
+            <TouchableOpacity
+              style={s.settBtn}
+              onPress={() => setSheetVisible(true)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="calendar-outline" size={20} color={TEXT2} />
             </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            style={[s.settBtn, isRestDay && s.settBtnRest]}
-            onPress={() => toggleRestDay(today)}
-            activeOpacity={0.8}
+        </View>
+
+        {/* Month Carousel */}
+        <View style={s.carouselWrap}>
+          <TouchableOpacity style={s.carArrowBtn} onPress={() => setCalMonth(new Date(year, month - 1, 1))}>
+            <Ionicons name="chevron-back" size={18} color={TEXT2} />
+          </TouchableOpacity>
+          <ScrollView
+            ref={carouselRef}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: carPadding }}
+            style={{ flex: 1 }}
           >
-            <Ionicons name={isRestDay ? 'moon' : 'moon-outline'} size={20} color={isRestDay ? '#fff' : TEXT2} />
+            {Array.from({ length: daysInMonth }, (_, i) => {
+              const day = i + 1;
+              const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+              const isT = ds === today;
+              const isSel = ds === selectedDate;
+              const isPastD = ds < today;
+              const rate = getRate(ds);
+              const dw = new Date(ds + 'T12:00:00').getDay();
+              const dlbl = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'][dw];
+              return (
+                <TouchableOpacity
+                  key={ds}
+                  onPress={() => setSelectedDate(ds)}
+                  style={[s.carCell, (isT || isSel) && s.carCellActive, isT && s.carCellToday]}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[s.carDayName, isT && { color: '#fff' }, isSel && !isT && { color: RED }]}>
+                    {dlbl}
+                  </Text>
+                  <Text style={[s.carDayNum, isT && { color: '#fff' }, isSel && !isT && { color: RED }, isPastD && !isSel && !isT && { color: TEXT3 }]}>
+                    {day}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+          <TouchableOpacity style={s.carArrowBtn} onPress={() => setCalMonth(new Date(year, month + 1, 1))}>
+            <Ionicons name="chevron-forward" size={18} color={TEXT2} />
           </TouchableOpacity>
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {view === 'list' ? (
-          <>
-            {/* List */}
-            {isRestDay ? (
-              <View style={s.empty}>
-                <Ionicons name="moon-outline" size={48} color={TEXT3} />
-                <Text style={s.emptyTitle}>@{user.username}</Text>
-                <Text style={s.emptySub}>İyi istirahatler!</Text>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 80 }}>
+        {/* Geçmiş gün bandı */}
+        {!canToggle && (
+          <View style={s.pastBanner}>
+            <Ionicons name="lock-closed" size={11} color={TEXT3} />
+            <Text style={s.pastBannerTxt}>
+              {new Date(selectedDate + 'T12:00:00').toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })} — sadece görüntüleme
+            </Text>
+          </View>
+        )}
+
+        {isInitializing ? (
+          <View style={s.skeletonList}>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <View key={i} style={s.skeletonRow}>
+                <SkeletonBox width={40} height={40} borderRadius={10} />
+                <View style={s.skeletonTextWrap}>
+                  <SkeletonBox width="70%" height={14} borderRadius={7} />
+                  <SkeletonBox width="40%" height={10} borderRadius={5} style={{ marginTop: 6 }} />
+                </View>
+                <SkeletonBox width={30} height={30} borderRadius={15} />
               </View>
-            ) : todayRoutines.length === 0 ? (
-              <View style={s.empty}>
-                <Ionicons name="add-circle-outline" size={48} color={TEXT3} />
-                <Text style={s.emptyTitle}>Henüz rutin yok</Text>
-                <Text style={s.emptySub}>+ butonuyla rutin ekle</Text>
-              </View>
-            ) : (
-              <View style={s.list}>
-                {todayGroups.map((group, idx) => {
-                  const groupDone = group.routines.filter(r => r.completedDates.includes(today)).length;
-                  const groupPct = group.routines.length > 0 ? Math.round((groupDone / group.routines.length) * 100) : 0;
-                  const barColor = groupPct === 100 ? GREEN : accent;
-                  const sorted = [...group.routines].sort((a, b) => {
-                    const aDone = a.completedDates.includes(today);
-                    const bDone = b.completedDates.includes(today);
-                    return aDone === bDone ? 0 : aDone ? -1 : 1;
-                  });
-                  return (
-                    <React.Fragment key={group.setName ?? '__none__'}>
-                      {idx > 0 && <View style={s.setDivider} />}
-                      <View style={[s.setGroup, idx % 2 !== 0 && s.setGroupAlt]}>
-                        {group.setName && (
-                          <View style={s.setGroupHeader}>
-                            <Ionicons name="layers-outline" size={12} color={TEXT2} />
-                            <Text style={s.setGroupTitle}>{group.setName}</Text>
-                          </View>
-                        )}
-                        <View style={s.storyBar}>
-                          {group.routines.map(r => {
-                            const done = r.completedDates.includes(today);
-                            return (
-                              <View key={r.id} style={[s.storySegment, { backgroundColor: done ? barColor : SURFACE }]} />
-                            );
-                          })}
-                        </View>
-                        <View style={{ gap: 7 }}>
-                          {sorted.map(r => {
-                            const done = r.completedDates.includes(today);
-                            const isExpanded = expandedRoutineId === r.id;
-                            const proofPhoto = user.photos.find(p => p.proofMeta?.routineId === r.id && p.proofMeta?.date === today);
-                            const hasProof = !!proofPhoto;
-                            return (
-                              <Animated.View layout={LinearTransition} key={r.id} style={s.routineRow}>
-                                <TouchableOpacity
-                                  style={[s.checkBtn, done ? s.checkBtnDone : s.checkBtnPending]}
-                                  onPress={() => handleToggleDone(r.id, today, done)}
-                                  activeOpacity={0.8}
-                                >
-                                  {done
-                                    ? <Ionicons name="checkmark" size={14} color="#fff" />
-                                    : <Ionicons name="hourglass-outline" size={11} color="#fff" />}
-                                </TouchableOpacity>
-                                <View
-                                  ref={el => { routineRefs.current[r.id] = el; }}
-                                  style={[s.routineCard, done && s.routineCardDone]}
-                                >
-                                  <View style={s.routineCardRow}>
-                                    <TouchableOpacity
-                                      style={s.routineCardMain}
-                                      onLongPress={() => handleLongPress(r.id)}
-                                      delayLongPress={200}
-                                      activeOpacity={0.7}
-                                    >
-                                      <View style={{ flex: 1 }}>
-                                        <Text style={[s.rowName, done && { color: '#fff' }]}>{r.name}</Text>
-                                        <Text style={[s.rowMeta, done && { color: 'rgba(255,255,255,0.75)' }]}>{FREQ_LABEL[r.frequency]} · {r.notificationTime}</Text>
-                                      </View>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                      style={[s.routineCardCamera, done && s.routineCardCameraDone]}
-                                      onPress={() => handleCameraPress(r.id)}
-                                      activeOpacity={0.7}
-                                    >
-                                      {hasProof ? (
-                                        <SkeletonImage
-                                          uri={proofPhoto!.uri}
-                                          style={{ width: 28, height: 28 }}
-                                          skeletonStyle={{ width: 28, height: 28 }}
-                                          borderRadius={8}
-                                        />
-                                      ) : (
-                                        <Ionicons name="camera-outline" size={13} color={done ? 'rgba(255,255,255,0.7)' : TEXT2} />
-                                      )}
-                                    </TouchableOpacity>
-                                    {r.description ? (
-                                      <TouchableOpacity
-                                        style={s.routineCardChevron}
-                                        onPress={() => toggleExpand(r.id)}
-                                        activeOpacity={0.6}
-                                      >
-                                        <Ionicons
-                                          name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                                          size={16}
-                                          color={done ? 'rgba(255,255,255,0.7)' : TEXT3}
-                                        />
-                                      </TouchableOpacity>
-                                    ) : null}
-                                  </View>
-                                  {isExpanded && r.description ? (
-                                    <Animated.View entering={FadeIn} exiting={FadeOut} style={s.routineCardDesc}>
-                                      <Text style={{ fontSize: 13, color: done ? 'rgba(255,255,255,0.8)' : TEXT2, lineHeight: 18 }}>{r.description}</Text>
-                                    </Animated.View>
-                                  ) : null}
-                                </View>
-                              </Animated.View>
-                            );
-                          })}
-                        </View>
-                      </View>
-                    </React.Fragment>
-                  );
-                })}
-              </View>
-            )}
-          </>
+            ))}
+          </View>
+        ) : selIsRestDay ? (
+          <View style={s.empty}>
+            <Ionicons name="cafe-outline" size={40} color={TEXT3} />
+            <Text style={s.emptyTitle}>Dinlenme günü</Text>
+            <Text style={s.emptySub}>İyi dinlenmeler!</Text>
+          </View>
+        ) : selRoutines.length === 0 ? (
+          <View style={s.empty}>
+            <Ionicons name="add-circle-outline" size={40} color={TEXT3} />
+            <Text style={s.emptyTitle}>Bu gün için rutin yok</Text>
+            {canToggle && <Text style={s.emptySub}>+ butonuyla rutin ekle</Text>}
+          </View>
         ) : (
-          <>
-            {/* Month nav */}
-            <View style={s.calHeader}>
-              <TouchableOpacity style={s.calArrow} onPress={() => setCalMonth(new Date(year, month-1, 1))}>
-                <Ionicons name="chevron-back" size={20} color={TEXT} />
-              </TouchableOpacity>
-              <Text style={s.calTitle}>{MONTHS[month]} {year}</Text>
-              <TouchableOpacity style={s.calArrow} onPress={() => setCalMonth(new Date(year, month+1, 1))}>
-                <Ionicons name="chevron-forward" size={20} color={TEXT} />
-              </TouchableOpacity>
-            </View>
+          <View style={s.list}>
+            {selGroups.map((group) => {
+              const sorted = [...group.routines].sort((a, b) => {
+                const aDone = a.completedDates.includes(selectedDate);
+                const bDone = b.completedDates.includes(selectedDate);
+                return aDone === bDone ? 0 : aDone ? -1 : 1;
+              });
+              return (
+                <View key={group.setName ?? '__none__'}>
+                  {sorted.map(r => {
+                    const done = r.completedDates.includes(selectedDate);
+                    const skipped = (r.skippedDates ?? []).includes(selectedDate);
+                    const proof = user.photos.find(p => p.proofMeta?.routineId === r.id && p.proofMeta?.date === selectedDate);
+                    const cc = r.setName ? catColor(r.setName) : TEXT3;
+                    const noteCount = r.notes?.length ?? 0;
 
-            {/* Day labels */}
-            <View style={s.calDayRow}>
-              {DAY_LABELS.map(d => <Text key={d} style={s.calDayLabel}>{d}</Text>)}
-            </View>
-
-            {/* Grid */}
-            <View style={s.calGrid}>
-              {Array.from({length: cells.length/7}, (_,row) => (
-                <View key={row} style={s.calRow}>
-                  {cells.slice(row*7, row*7+7).map((day, col) => {
-                    if (!day) return <View key={col} style={s.calCell} />;
-                    const ds = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-                    const pastDay = ds < today;
-                    const todayCell = ds === today;
-                    const rate = getRate(ds);
                     return (
-                      <TouchableOpacity key={col} style={[s.calCell, todayCell && s.calCellToday]} onPress={() => openDay(day)} activeOpacity={0.7}>
-                        <Text style={[s.calNum, pastDay && s.calNumPast, todayCell && s.calNumToday]}>{day}</Text>
-                        {rate === -1 ? (
-                          <View style={[s.calDot, {backgroundColor:'#34495e'}]}>
-                            <Text style={s.calDotTxt}>🌙</Text>
-                          </View>
-                        ) : rate !== null ? (
-                          <View style={[s.calDot, {backgroundColor: dotColor(rate)}]}>
-                            <Text style={s.calDotTxt}>{rate}%</Text>
-                          </View>
-                        ) : null}
-                      </TouchableOpacity>
+                      <View key={r.id}>
+                        <Swipeable
+                          ref={el => { swipeRefs.current[r.id] = el; }}
+                          friction={2}
+                          overshootLeft={false}
+                          overshootRight={false}
+                          renderLeftActions={() => (
+                            <TouchableOpacity
+                              style={[s.swipeAction, { backgroundColor: skipped ? '#27ae60' : '#34495e' }]}
+                              onPress={() => { swipeRefs.current[r.id]?.close(); toggleRoutineSkip(r.id, selectedDate); }}
+                              activeOpacity={0.85}
+                            >
+                              <Ionicons name={skipped ? 'refresh-outline' : 'cafe-outline'} size={20} color="#fff" />
+                              <Text style={s.swipeLabel}>{skipped ? 'Devam' : 'Atla'}</Text>
+                            </TouchableOpacity>
+                          )}
+                          renderRightActions={() => (
+                            <TouchableOpacity
+                              style={[s.swipeAction, { backgroundColor: '#3498db' }]}
+                              onPress={() => { swipeRefs.current[r.id]?.close(); router.push(`/routine-edit?id=${r.id}`); }}
+                              activeOpacity={0.85}
+                            >
+                              <Ionicons name="create-outline" size={20} color="#fff" />
+                              <Text style={s.swipeLabel}>Düzenle</Text>
+                            </TouchableOpacity>
+                          )}
+                        >
+                          <TouchableOpacity
+                            style={[s.taskRow, skipped && s.taskRowSkipped]}
+                            onLongPress={() => handleLongPress(r.id)}
+                            delayLongPress={300}
+                            activeOpacity={1}
+                          >
+                            {/* Sol: kategori ikonu */}
+                            <View style={[s.catIcon, { backgroundColor: skipped ? '#34495e' : (r.setName ? cc : SURFACE) }]}>
+                              <Ionicons
+                                name={skipped ? 'cafe-outline' : ((r.setIcon as any) || 'star-outline')}
+                                size={16}
+                                color={skipped ? '#fff' : (r.setName ? '#fff' : TEXT3)}
+                              />
+                            </View>
+
+                            <View style={{ flex: 1 }}>
+                              <Text style={[s.taskName, (done || skipped) && s.taskNameDone]}>{r.name}</Text>
+                            </View>
+
+                            {/* Sağ: kamera + done yan yana */}
+                            <View style={s.taskActions}>
+                              {!skipped && (
+                                <TouchableOpacity
+                                  style={s.taskCamera}
+                                  onPress={() => canToggle && handleCameraPress(r.id)}
+                                  activeOpacity={canToggle ? 0.7 : 1}
+                                >
+                                  {proof ? (
+                                    <SkeletonImage uri={proof.uri} style={{ width: 28, height: 28 }} skeletonStyle={{ width: 28, height: 28 }} borderRadius={7} />
+                                  ) : (
+                                    <Ionicons name="camera-outline" size={17} color={canToggle ? TEXT2 : TEXT3} />
+                                  )}
+                                </TouchableOpacity>
+                              )}
+
+                              <TouchableOpacity
+                                style={[s.taskCheck, done && !skipped && s.taskCheckDone, skipped && s.taskCheckSkipped]}
+                                onPress={() => !skipped && canToggle && handleToggleDone(r.id, selectedDate, done)}
+                                activeOpacity={(canToggle && !skipped) ? 0.75 : 1}
+                              >
+                                {skipped
+                                  ? <Ionicons name="cafe-outline" size={12} color={TEXT3} />
+                                  : done
+                                    ? <Ionicons name="checkmark" size={16} color="#fff" />
+                                    : !canToggle
+                                      ? <Ionicons name="lock-closed" size={10} color={TEXT3} />
+                                      : null}
+                              </TouchableOpacity>
+                            </View>
+                          </TouchableOpacity>
+                        </Swipeable>
+                        <View style={s.taskDivider} />
+                      </View>
                     );
                   })}
                 </View>
-              ))}
-            </View>
-
-            {/* Legend */}
-            <View style={s.legend}>
-              {[
-                {color:GREEN,label:'Tam'},
-                {color:accent,label:'50%+'},
-                {color:GOLD,label:'Kısmen'},
-                {color:RED+'55',label:'Yapılmadı'},
-                {color:'#34495e',label:'Dinlenme'},
-              ].map(i=>(
-                <View key={i.label} style={s.legendItem}>
-                  <View style={[s.legendDot, {backgroundColor:i.color}]} />
-                  <Text style={s.legendTxt}>{i.label}</Text>
-                </View>
-              ))}
-            </View>
-          </>
+              );
+            })}
+          </View>
         )}
-        <View style={{height:80}} />
+
+        <View style={{height: 80}} />
       </ScrollView>
 
-      {/* ── FAB ── */}
-      <TouchableOpacity
-        style={[s.fab, { bottom: 16 + insets.bottom }]}
-        onPress={() => router.push('/create')}
-        activeOpacity={0.85}
-      >
-        <Ionicons name="add" size={28} color="#fff" />
-      </TouchableOpacity>
+      {/* â”€â”€ FAB â”€â”€ */}
+      <Animated.View style={[s.fabWrap, { bottom: 8, right: 16 }, fabStyle]}>
+        <TouchableOpacity
+          style={s.fab}
+          onPress={() => router.push('/create')}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="add" size={28} color="#fff" />
+        </TouchableOpacity>
+      </Animated.View>
 
-      {/* ── Day Detail Sheet ── */}
+      {/* â”€â”€ Takvim Modalı â”€â”€ */}
       <Modal visible={sheetVisible} transparent animationType="slide" onRequestClose={() => setSheetVisible(false)}>
         <TouchableOpacity style={s.sheetBg} activeOpacity={1} onPress={() => setSheetVisible(false)} />
-        <View style={s.sheet}>
+        <View style={[s.sheet, { paddingBottom: insets.bottom + 12 }]}>
           <View style={s.sheetHandle} />
-          <View style={s.sheetHead}>
-            <View style={{flex:1}}>
-              <Text style={s.sheetDate}>
-                {selectedDate ? new Date(selectedDate+'T12:00:00').toLocaleDateString('tr-TR',{weekday:'long',day:'numeric',month:'long'}) : ''}
-              </Text>
-              {isPast && (
-                <View style={s.lockRow}>
-                  <Ionicons name="lock-closed" size={11} color={RED} />
-                  <Text style={s.lockTxt}>Geçmiş gün — değiştirilemez</Text>
-                </View>
-              )}
-            </View>
-            {selectedDate && (() => {
-              const r = getRate(selectedDate);
-              if (r === -1) return <Text style={[s.sheetRate, {color:'#34495e', fontSize:20}]}>🌙 Dinlenme</Text>;
-              if (r !== null) return <Text style={[s.sheetRate, {color: r===100 ? GREEN : accent}]}>{r}%</Text>;
-              return null;
-            })()}
-          </View>
-          {/* Rest day toggle — only for today */}
-          {isToday && (
-            <TouchableOpacity
-              style={[s.sheetRestBtn, selIsRestDay && s.sheetRestBtnOn]}
-              onPress={() => selectedDate && toggleRestDay(selectedDate)}
-            >
-              <Ionicons name={selIsRestDay ? 'moon' : 'moon-outline'} size={16} color={selIsRestDay ? '#fff' : TEXT2} />
-              <Text style={[s.sheetRestTxt, selIsRestDay && {color:'#fff'}]}>
-                {selIsRestDay ? 'Dinlenme Günü ✓ — kaldırmak için dokun' : 'Dinlenme Günü Olarak İşaretle'}
-              </Text>
+
+          {/* Ay navigasyonu */}
+          <View style={s.calHeader}>
+            <TouchableOpacity style={s.calArrow} onPress={() => setCalMonth(new Date(year, month - 1, 1))}>
+              <Ionicons name="chevron-back" size={20} color={TEXT} />
             </TouchableOpacity>
-          )}
+            <Text style={s.calTitle}>{MONTHS[month]} {year}</Text>
+            <TouchableOpacity style={s.calArrow} onPress={() => setCalMonth(new Date(year, month + 1, 1))}>
+              <Ionicons name="chevron-forward" size={20} color={TEXT} />
+            </TouchableOpacity>
+          </View>
 
-          <ScrollView style={{maxHeight: SH*0.45}}>
-            {selRoutines.length === 0
-              ? <Text style={s.sheetEmpty}>Bu gün için rutin yok</Text>
-              : [...selRoutines]
-                  .sort((a, b) => {
-                    if (!selectedDate) return 0;
-                    const aDone = a.completedDates.includes(selectedDate);
-                    const bDone = b.completedDates.includes(selectedDate);
-                    return aDone === bDone ? 0 : aDone ? -1 : 1;
-                  })
-                  .map(r => {
-                const done = selectedDate ? r.completedDates.includes(selectedDate) : false;
-                const canToggle = isToday;
-                const isExpanded = expandedRoutineId === r.id;
-                return (
-                  <Animated.View layout={LinearTransition} key={r.id} style={{ borderBottomWidth: 0.5, borderBottomColor: BORDER }}>
-                    <View style={[s.sheetRow, { borderBottomWidth: 0, paddingVertical: 0 }]}>
-                      <TouchableOpacity
-                        style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingVertical: 12 }}
-                        onPress={() => canToggle && selectedDate && handleToggleDone(r.id, selectedDate, done)}
-                        activeOpacity={canToggle ? 0.7 : 1}
-                      >
-                        <View style={[s.check, {borderColor: done ? GREEN : GOLD, marginRight: 10}, !canToggle && s.checkLocked]}>
-                          {done 
-                            ? <Ionicons name="checkmark" size={14} color={!canToggle ? TEXT3 : GREEN} />
-                            : <Ionicons name="hourglass-outline" size={10} color={!canToggle ? TEXT3 : GOLD} />}
+          {/* Gün başlıkları */}
+          <View style={s.calDayRow}>
+            {DAY_LABELS.map(d => <Text key={d} style={s.calDayLabel}>{d}</Text>)}
+          </View>
+
+          {/* Izgara */}
+          <View style={s.calGrid}>
+            {Array.from({length: cells.length / 7}, (_, row) => (
+              <View key={row} style={s.calRow}>
+                {cells.slice(row * 7, row * 7 + 7).map((day, col) => {
+                  if (!day) return <View key={col} style={s.calCell} />;
+                  const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                  const pastDay = ds < today;
+                  const todayCell = ds === today;
+                  const rate = getRate(ds);
+                  return (
+                    <TouchableOpacity
+                      key={col}
+                      style={[s.calCell, todayCell && s.calCellToday]}
+                      onPress={() => { setSelectedDate(ds); setSheetVisible(false); }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[s.calNum, pastDay && s.calNumPast, todayCell && s.calNumToday]}>{day}</Text>
+                      {rate === -1 ? (
+                        <View style={[s.calDot, { backgroundColor: '#A0AEC0' }]}>
+                          <Text style={s.calDotTxt}>☕</Text>
                         </View>
-                        <View style={{flex:1}}>
-                          <Text style={[s.rowName, done && {color: TEXT2}, !canToggle && {opacity:0.6}]}>{r.name}</Text>
-                          <Text style={[s.rowMeta, done && {color: TEXT3}]}>{FREQ_LABEL[r.frequency]} · {r.notificationTime}</Text>
+                      ) : rate !== null ? (
+                        <View style={[s.calDot, { backgroundColor: dotColor(rate) }]}>
+                          <Text style={s.calDotTxt}>{rate}%</Text>
                         </View>
-                        {!canToggle && <Ionicons name="lock-closed" size={14} color={TEXT3} style={{ marginRight: r.description ? 10 : 0 }} />}
-                      </TouchableOpacity>
-                      
-                      {r.description ? (
-                        <TouchableOpacity 
-                          style={{ paddingVertical: 12, paddingLeft: 12, paddingRight: 4 }} 
-                          onPress={() => toggleExpand(r.id)}
-                          activeOpacity={0.6}
-                        >
-                          <Ionicons 
-                            name={isExpanded ? "chevron-up" : "chevron-down"} 
-                            size={18} 
-                            color={TEXT3} 
-                          />
-                        </TouchableOpacity>
                       ) : null}
-                    </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ))}
+          </View>
 
-                    {isExpanded && r.description ? (
-                      <Animated.View entering={FadeIn} exiting={FadeOut} style={{ paddingLeft: 30, paddingRight: 16, paddingBottom: 14, marginTop: -4 }}>
-                        <Text style={{ fontSize: 13, color: TEXT2, lineHeight: 18, opacity: canToggle ? 1 : 0.6 }}>{r.description}</Text>
-                      </Animated.View>
-                    ) : null}
-                  </Animated.View>
-                );
-              })
-            }
-            <View style={{height:24}} />
-          </ScrollView>
+          {/* Legend */}
+          <View style={s.legend}>
+            {[
+              { color: GREEN, label: 'Tam' },
+              { color: accent, label: '50%+' },
+              { color: GOLD, label: 'Kısmen' },
+              { color: RED + '55', label: 'Yapılmadı' },
+              { color: '#A0AEC0', label: 'Dinlenme' },
+            ].map(i => (
+              <View key={i.label} style={s.legendItem}>
+                <View style={[s.legendDot, { backgroundColor: i.color }]} />
+                <Text style={s.legendTxt}>{i.label}</Text>
+              </View>
+            ))}
+          </View>
         </View>
       </Modal>
 
-      {/* Popover Menu */}
-      {popover && (
-        <Modal transparent visible={true} animationType="fade" onRequestClose={() => setPopover(null)}>
-          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setPopover(null)}>
-            <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' }} />
-          </TouchableOpacity>
+      {/* Task Menu Bottom Sheet */}
+      {taskMenu && (() => {
+        const menuR = user.routines.find(r => r.id === taskMenu);
+        if (!menuR) return null;
+        const mcc = menuR.setName ? catColor(menuR.setName) : TEXT3;
+        return (
+          <Modal transparent visible animationType="slide" onRequestClose={() => setTaskMenu(null)}>
+            <TouchableOpacity style={s.sheetBg} activeOpacity={1} onPress={() => setTaskMenu(null)} />
+            <View style={[s.taskMenuSheet, { paddingBottom: insets.bottom + 16 }]}>
+              <View style={s.sheetHandle} />
 
-          {(() => {
-            const tipX = popover.x + popover.w / 2;
-            const isAbove = popover.y > Dimensions.get('window').height / 2;
-            const MENU_W = 180;
-            const MENU_H = 100;
-            
-            let left = tipX - MENU_W / 2;
-            if (left < 16) left = 16;
-            if (left + MENU_W > Dimensions.get('window').width - 16) left = Dimensions.get('window').width - 16 - MENU_W;
-
-            const arrowLeft = tipX - left - 8;
-
-            return (
-              <View style={{
-                position: 'absolute',
-                left,
-                top: isAbove ? popover.y - MENU_H - 12 : popover.y + popover.h + 12,
-                width: MENU_W,
-                backgroundColor: '#fff',
-                borderRadius: 14,
-                shadowColor: '#000', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.2, shadowRadius: 15, elevation: 15
-              }}>
-                {/* Arrow */}
-                <View style={{
-                  position: 'absolute',
-                  left: arrowLeft,
-                  [isAbove ? 'bottom' : 'top']: -8,
-                  width: 0, height: 0,
-                  borderLeftWidth: 8, borderRightWidth: 8,
-                  borderStyle: 'solid',
-                  backgroundColor: 'transparent',
-                  borderLeftColor: 'transparent', borderRightColor: 'transparent',
-                  ...(isAbove 
-                    ? { borderTopWidth: 8, borderTopColor: '#fff', borderBottomWidth: 0 }
-                    : { borderBottomWidth: 8, borderBottomColor: '#fff', borderTopWidth: 0 })
-                }} />
-
-                <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', padding: 14 }} onPress={() => { deleteRoutine(popover.id); setPopover(null); }}>
-                  <Ionicons name="trash" size={18} color={RED} style={{ marginRight: 10 }} />
-                  <Text style={{ fontSize: 15, color: RED, fontWeight: '600' }}>Rutini Sil</Text>
-                </TouchableOpacity>
+              {/* Rutin başlığı */}
+              <View style={s.taskMenuHeader}>
+                <View style={[s.catIcon, { backgroundColor: menuR.setName ? mcc : SURFACE }]}>
+                  <Ionicons name={(menuR.setIcon as any) || 'star-outline'} size={15} color={menuR.setName ? '#fff' : TEXT3} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.taskMenuName}>{menuR.name}</Text>
+                  {menuR.setName && <Text style={s.taskMenuSub}>{menuR.setName} · {FREQ_LABEL[menuR.frequency]}</Text>}
+                </View>
               </View>
-            );
-          })()}
-        </Modal>
-      )}
+
+              {/* Detaylar */}
+              <View style={s.menuDetailsWrap}>
+                <View style={s.menuDetailRow}>
+                  <Ionicons name="time-outline" size={13} color={TEXT3} />
+                  <Text style={s.menuDetailTxt}>Bildirim: {menuR.notificationTime}</Text>
+                </View>
+                <View style={s.menuDetailRow}>
+                  <Ionicons name="checkmark-done-outline" size={13} color={TEXT3} />
+                  <Text style={s.menuDetailTxt}>{menuR.completedDates.length} kez tamamlandı</Text>
+                </View>
+                {(menuR.notes?.length ?? 0) > 0 && (
+                  <View style={s.menuDetailRow}>
+                    <Ionicons name="document-text-outline" size={13} color={TEXT3} />
+                    <Text style={s.menuDetailTxt}>{menuR.notes!.length} not</Text>
+                  </View>
+                )}
+              </View>
+
+              {/* İşlem butonları */}
+              <View style={s.menuActionsCard}>
+                <TouchableOpacity style={s.menuActionBtn} onPress={() => { setTaskMenu(null); router.push(`/routine-edit?id=${menuR.id}`); }}>
+                  <Ionicons name="create-outline" size={19} color={TEXT} />
+                  <Text style={s.menuActionTxt}>Düzenle</Text>
+                  <Ionicons name="chevron-forward" size={15} color={TEXT3} style={{ marginLeft: 'auto' }} />
+                </TouchableOpacity>
+                <View style={s.menuActionDivider} />
+                <TouchableOpacity style={s.menuActionBtn} onPress={() => { setTaskMenu(null); router.push(`/routine-stats?id=${menuR.id}`); }}>
+                  <Ionicons name="bar-chart-outline" size={19} color={TEXT} />
+                  <Text style={s.menuActionTxt}>İstatistikler</Text>
+                  <Ionicons name="chevron-forward" size={15} color={TEXT3} style={{ marginLeft: 'auto' }} />
+                </TouchableOpacity>
+                <View style={s.menuActionDivider} />
+                <TouchableOpacity style={s.menuActionBtn} onPress={() => { setTaskMenu(null); router.push(`/routine-note?id=${menuR.id}`); }}>
+                  <Ionicons name="add-circle-outline" size={19} color={TEXT} />
+                  <Text style={s.menuActionTxt}>Not Ekle</Text>
+                  <Ionicons name="chevron-forward" size={15} color={TEXT3} style={{ marginLeft: 'auto' }} />
+                </TouchableOpacity>
+                {(menuR.notes?.length ?? 0) > 0 && (
+                  <>
+                    <View style={s.menuActionDivider} />
+                    <TouchableOpacity style={s.menuActionBtn} onPress={() => { setTaskMenu(null); router.push(`/routine-note?id=${menuR.id}`); }}>
+                      <Ionicons name="document-text-outline" size={19} color={TEXT} />
+                      <Text style={s.menuActionTxt}>Notlarım</Text>
+                      <View style={s.menuNoteBadge}>
+                        <Text style={s.menuNoteBadgeTxt}>{menuR.notes!.length}</Text>
+                      </View>
+                      <Ionicons name="chevron-forward" size={15} color={TEXT3} style={{ marginLeft: 4 }} />
+                    </TouchableOpacity>
+                  </>
+                )}
+              </View>
+
+              {/* Sil */}
+              <TouchableOpacity
+                style={s.menuDeleteBtn}
+                onPress={() => {
+                  setTaskMenu(null);
+                  Alert.alert(`"${menuR.name}" silinecek`, 'Bu rutin kalıcı olarak silinecek.', [
+                    { text: 'İptal', style: 'cancel' },
+                    { text: 'Sil', style: 'destructive', onPress: () => deleteRoutine(menuR.id) },
+                  ]);
+                }}
+              >
+                <Ionicons name="trash-outline" size={19} color="#e74c3c" />
+                <Text style={s.menuDeleteTxt}>Sil</Text>
+              </TouchableOpacity>
+            </View>
+          </Modal>
+        );
+      })()}
 
       {/* Proof Photo Modal */}
       {proofPhoto && (
@@ -597,53 +654,72 @@ export default function HomeScreen() {
 }
 
 const s = StyleSheet.create({
-  container: {flex:1, backgroundColor:BG},
-  fab: {position:'absolute', right:20, width:56, height:56, borderRadius:28, backgroundColor:RED, alignItems:'center', justifyContent:'center', shadowColor:'#000', shadowOffset:{width:0,height:4}, shadowOpacity:0.2, shadowRadius:8, elevation:6},
-  header: {flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingHorizontal:16, paddingTop:12, paddingBottom:8},
-  sub: {fontSize:12, color:TEXT2, marginBottom:3},
-  title: {fontSize:24, color:TEXT, fontWeight:'900', letterSpacing:-0.5},
-  headerRight: {flexDirection:'row', alignItems:'center', gap:10},
-  toggle: {flexDirection:'row', backgroundColor:SURFACE, borderRadius:10, padding:2},
-  toggleBtn: {padding:8, borderRadius:8},
-  toggleBtnOn: {backgroundColor:TEXT},
+  container: {flex:1, backgroundColor:'#EDF9F3'},
+  topBlock: {backgroundColor:'#EDF9F3'},
+
+  // Carousel
+  carouselWrap: {flexDirection:'row', alignItems:'center', paddingVertical:4, backgroundColor:'#EDF9F3'},
+  carArrowBtn: {width:32, height:48, alignItems:'center', justifyContent:'center'},
+  carCell: {width:44, alignItems:'center', paddingVertical:6, paddingHorizontal:1, borderRadius:10, gap:1},
+  carCellActive: {backgroundColor:SURFACE},
+  carCellToday: {backgroundColor:RED},
+  carDayName: {fontSize:9, fontWeight:'700', color:TEXT3},
+  carDayNum: {fontSize:15, fontWeight:'900', color:TEXT},
+
+  // Past banner
+  pastBanner: {flexDirection:'row', alignItems:'center', gap:5, paddingHorizontal:16, paddingVertical:6, backgroundColor:CARD},
+  pastBannerTxt: {fontSize:11, color:TEXT3},
+
+  fabWrap: {position:'absolute'},
+  fab: {width:52, height:52, borderRadius:12, backgroundColor:RED, alignItems:'center', justifyContent:'center', shadowColor:'#000', shadowOffset:{width:0,height:4}, shadowOpacity:0.2, shadowRadius:8, elevation:6},
+  header: {flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingHorizontal:16, paddingTop:10, paddingBottom:6},
+  headerLeft: {flexDirection:'row', alignItems:'center', gap:10},
+  headerAvatar: {width:28, height:28, borderRadius:14},
+  headerAvatarPlaceholder: {width:28, height:28, borderRadius:14, backgroundColor:SURFACE, alignItems:'center', justifyContent:'center'},
+  sub: {fontSize:11, color:TEXT2, marginBottom:1},
+  title: {fontSize:15, color:TEXT, fontWeight:'500', letterSpacing:-0.3},
   settBtn: {width:40, height:40, borderRadius:20, backgroundColor:SURFACE, alignItems:'center', justifyContent:'center'},
   settBtnRest: {backgroundColor:'#34495e'},
 
-  // Story Progress Bar
-  storyBar: {flexDirection:'row', gap:4, marginBottom:8},
-  storySegment: {flex:1, height:3, borderRadius:2},
-
   // List
   list: {},
-  setDivider: {height:0.5, backgroundColor:BORDER, marginVertical:2},
-  setGroup: {paddingHorizontal:16, paddingTop:10, paddingBottom:6, backgroundColor:RED+'10'},
-  setGroupAlt: {backgroundColor:RED+'1C'},
-  setGroupHeader: {flexDirection:'row', alignItems:'center', gap:5, alignSelf:'flex-start', backgroundColor:SURFACE, borderRadius:8, paddingHorizontal:8, paddingVertical:4, marginBottom:7},
-  setGroupTitle: {fontSize:12, fontWeight:'700', color:TEXT, letterSpacing:0.2},
+  setLabel: {paddingHorizontal:16, paddingTop:16, paddingBottom:4},
+  setLabelTxt: {fontSize:10, fontWeight:'800', color:TEXT3, letterSpacing:0.8},
   row: {flexDirection:'row', alignItems:'center', gap:10, paddingVertical:12, borderBottomWidth:0.5, borderBottomColor:BORDER},
   check: {width:18, height:18, borderRadius:9, borderWidth:1.5, alignItems:'center', justifyContent:'center', backgroundColor:'transparent'},
   rowName: {fontSize:13, color:TEXT, fontWeight:'600', letterSpacing:-0.2},
   rowMeta: {fontSize:11, color:TEXT3, marginTop:1},
 
-  // Routine Cards
-  routineRow: {flexDirection:'row', alignItems:'center', gap:8},
-  checkBtn: {width:34, height:34, borderRadius:17, alignItems:'center', justifyContent:'center'},
-  checkBtnDone: {backgroundColor:RED},
-  checkBtnPending: {backgroundColor:GOLD},
-  routineCard: {flex:1, backgroundColor:CARD, borderRadius:12, overflow:'hidden'},
-  routineCardDone: {backgroundColor:RED},
-  routineCardRow: {flexDirection:'row', alignItems:'center'},
-  routineStripe: {width:4, alignSelf:'stretch'},
-  routineCardMain: {flex:1, paddingVertical:11, paddingLeft:14, paddingRight:8},
-  routineCardCamera: {marginRight:10, width:28, height:28, borderRadius:8, backgroundColor:SURFACE, alignItems:'center', justifyContent:'center'},
-  routineCardCameraDone: {backgroundColor:'rgba(255,255,255,0.25)'},
-  routineCardChevron: {paddingVertical:11, paddingLeft:4, paddingRight:12},
-  routineCardDesc: {paddingHorizontal:14, paddingBottom:10, paddingTop:1},
+  // Task rows (new list style)
+  taskRow: {flexDirection:'row', alignItems:'center', gap:10, paddingVertical:13, paddingHorizontal:16, backgroundColor:BG},
+  taskDivider: {height:1, backgroundColor:BORDER, marginHorizontal:20},
+  catIcon: {width:36, height:36, borderRadius:10, alignItems:'center', justifyContent:'center'},
+  taskCamera: {width:30, height:30, borderRadius:8, alignItems:'center', justifyContent:'center'},
+  taskActions: {flexDirection:'row', alignItems:'center', gap:6},
+  taskName: {fontSize:14, color:TEXT, fontWeight:'500'},
+  taskNameDone: {color:TEXT3},
+  taskMetaRow: {flexDirection:'row', alignItems:'center', gap:5, marginTop:3},
+  catChip: {borderRadius:4, paddingHorizontal:5, paddingVertical:1},
+  catChipTxt: {fontSize:10, fontWeight:'600', color:'#fff'},
+  taskMeta: {fontSize:11, color:TEXT3},
+  taskRowSkipped: {opacity: 0.55},
+  taskCheck: {width:30, height:30, borderRadius:15, borderWidth:1.5, borderColor:BORDER, alignItems:'center', justifyContent:'center'},
+  taskCheckDone: {backgroundColor:RED, borderColor:RED},
+  taskCheckSkipped: {borderColor:SURFACE, backgroundColor:SURFACE},
+  swipeAction: {width:72, justifyContent:'center', alignItems:'center', gap:4},
+  swipeLabel: {fontSize:10, color:'#fff', fontWeight:'800'},
+  menuNoteBadge: {backgroundColor:RED, borderRadius:999, paddingHorizontal:7, paddingVertical:2, marginLeft:'auto'},
+  menuNoteBadgeTxt: {fontSize:11, color:'#fff', fontWeight:'800'},
+
+  // Skeleton
+  skeletonList: { paddingHorizontal: 16, gap: 12, paddingTop: 12 },
+  skeletonRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 },
+  skeletonTextWrap: { flex: 1, gap: 6 },
 
   // Empty
-  empty: {alignItems:'center', paddingTop:60, gap:12},
-  emptyTitle: {fontSize:18, color:TEXT2, fontWeight:'800'},
-  emptySub: {fontSize:14, color:TEXT3},
+  empty: {alignItems:'center', paddingTop:48, gap:8},
+  emptyTitle: {fontSize:16, color:TEXT2, fontWeight:'800'},
+  emptySub: {fontSize:13, color:TEXT3},
 
   // Calendar
   calHeader: {flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingHorizontal:16, paddingVertical:12},
@@ -681,8 +757,24 @@ const s = StyleSheet.create({
   checkLocked: {borderColor:SURFACE, backgroundColor:SURFACE},
 
 
+  // Task Menu Bottom Sheet
+  taskMenuSheet: {backgroundColor:BG, borderTopLeftRadius:24, borderTopRightRadius:24, paddingHorizontal:16, paddingTop:8},
+  taskMenuHeader: {flexDirection:'row', alignItems:'center', gap:12, paddingVertical:14, paddingHorizontal:4},
+  taskMenuName: {fontSize:17, color:TEXT, fontWeight:'800', letterSpacing:-0.3},
+  taskMenuSub: {fontSize:12, color:TEXT2, marginTop:2},
+  menuDetailsWrap: {backgroundColor:CARD, borderRadius:16, padding:14, marginBottom:12, gap:9},
+  menuDetailRow: {flexDirection:'row', alignItems:'center', gap:8},
+  menuDetailTxt: {fontSize:13, color:TEXT2},
+  menuActionsCard: {backgroundColor:CARD, borderRadius:16, marginBottom:10, overflow:'hidden'},
+  menuActionBtn: {flexDirection:'row', alignItems:'center', gap:12, paddingHorizontal:16, paddingVertical:15},
+  menuActionTxt: {fontSize:15, color:TEXT, fontWeight:'600'},
+  menuActionDivider: {height:0.5, backgroundColor:BORDER, marginLeft:47},
+  menuDeleteBtn: {flexDirection:'row', alignItems:'center', gap:12, backgroundColor:CARD, borderRadius:16, paddingHorizontal:16, paddingVertical:15},
+  menuDeleteTxt: {fontSize:15, color:'#e74c3c', fontWeight:'600'},
+
   // Sheet rest day toggle
   sheetRestBtn: {flexDirection:'row', alignItems:'center', gap:10, backgroundColor:CARD, borderRadius:12, padding:12, marginBottom:12, borderWidth:1, borderColor:BORDER},
   sheetRestBtnOn: {backgroundColor:'#34495e', borderColor:'#2c3e50'},
   sheetRestTxt: {fontSize:13, color:TEXT2, fontWeight:'700', flex:1},
 });
+

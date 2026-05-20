@@ -11,7 +11,7 @@ import { useStore } from '../store/useStore';
 import LocationSearch, { LocationResult } from '../components/LocationSearch';
 
 const { width } = Dimensions.get('window');
-const RED = '#00bf63';
+const RED = '#00cc6d';
 const TEXT = '#111111'; const TEXT2 = '#767676'; const TEXT3 = '#ABABAB';
 const BORDER = '#EFEFEF'; const CARD = '#F8F8F8'; const BG = '#FFFFFF';
 
@@ -162,7 +162,7 @@ export default function OnboardingScreen() {
         >
           <Animated.View style={[s.content, { transform: [{ translateX: slideAnim }] }]}>
 
-            {/* ── Step 0: Gender ── */}
+            {/* â”€â”€ Step 0: Gender â”€â”€ */}
             {step === 0 && (
               <View style={s.stepWrap}>
                 <Text style={s.stepTitle}>Sen kimsin?</Text>
@@ -206,7 +206,7 @@ export default function OnboardingScreen() {
               </View>
             )}
 
-            {/* ── Step 1: Age ── */}
+            {/* â”€â”€ Step 1: Age â”€â”€ */}
             {step === 1 && (
               <View style={s.stepWrap}>
                 <Text style={s.stepTitle}>Kaç yaşındasın?</Text>
@@ -230,7 +230,7 @@ export default function OnboardingScreen() {
               </View>
             )}
 
-            {/* ── Step 2: Location ── */}
+            {/* â”€â”€ Step 2: Location â”€â”€ */}
             {step === 2 && (
               <View style={s.stepWrap}>
                 <Text style={s.stepTitle}>Neredensin?</Text>
@@ -248,7 +248,7 @@ export default function OnboardingScreen() {
               </View>
             )}
 
-            {/* ── Step 3: Interests ── */}
+            {/* â”€â”€ Step 3: Interests â”€â”€ */}
             {step === 3 && (
               <View style={s.stepWrap}>
                 <Text style={s.stepTitle}>İlgi alanların neler?</Text>
@@ -273,7 +273,7 @@ export default function OnboardingScreen() {
               </View>
             )}
 
-            {/* ── Step 4: Avatar ── */}
+            {/* â”€â”€ Step 4: Avatar â”€â”€ */}
             {step === 4 && (
               <View style={s.stepWrap}>
                 <Text style={s.stepTitle}>Nasıl görünüyorsun?</Text>
@@ -302,7 +302,7 @@ export default function OnboardingScreen() {
               </View>
             )}
 
-            {/* ── Step 5: Username ── */}
+            {/* â”€â”€ Step 5: Username â”€â”€ */}
             {step === 5 && (
               <View style={s.stepWrap}>
                 <Text style={s.stepTitle}>Kullanıcı Adın?</Text>
@@ -443,3 +443,4 @@ const s = StyleSheet.create({
   nextBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 14, height: 52, shadowColor: RED, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 6 },
   nextTxt: { fontSize: 16, color: '#fff', fontWeight: '800' },
 });
+

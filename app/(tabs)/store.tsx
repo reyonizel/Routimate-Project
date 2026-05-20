@@ -10,7 +10,7 @@ import { supabase } from '../../lib/supabase';
 
 const BG = '#FFFFFF'; const CARD = '#F4F4F4';
 const TEXT = '#111111'; const TEXT2 = '#767676'; const TEXT3 = '#ABABAB';
-const GREEN = '#00bf63'; const BORDER = '#E8E8E8'; const PILL = 999;
+const GREEN = '#00cc6d'; const BORDER = '#E8E8E8'; const PILL = 999;
 
 const SLOGANS = [
   'İndirimleri Kaçırma',
@@ -291,3 +291,4 @@ const s = StyleSheet.create({
   },
   doneBtnTxt: { fontSize: 15, fontWeight: '700', color: TEXT },
 });
+

@@ -19,7 +19,7 @@ const NAVBAR_H = 56; // approximate navbar height
 
 const BG = '#FFFFFF'; const CARD = '#F4F4F4'; const SURFACE = '#EEEEEE';
 const TEXT = '#111111'; const TEXT2 = '#767676'; const TEXT3 = '#ABABAB';
-const RED = '#00bf63'; const GREEN = '#008800'; const GOLD = '#D4860A';
+const RED = '#00cc6d'; const GREEN = '#008800'; const GOLD = '#D4860A';
 const BORDER = '#E8E8E8'; const PILL = 999;
 
 export default function MateProfileScreen() {
@@ -195,7 +195,7 @@ export default function MateProfileScreen() {
         <View style={{ height: 80 }} />
       </ScrollView>
 
-      {/* ─── FULL BLUR OVERLAY (non-Pro) ──────────────────────────── */}
+      {/* â”€â”€â”€ FULL BLUR OVERLAY (non-Pro) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {!user.isPro && (
         <BlurView intensity={15} tint="light" experimentalBlurMethod="dimezisBlurView" style={styles.blurOverlay} pointerEvents="auto">
           <View style={styles.blurContent}>
@@ -359,3 +359,4 @@ const styles = StyleSheet.create({
   blurBack: { paddingVertical: 8 },
   blurBackText: { fontSize: 14, color: TEXT3, fontWeight: '600' },
 });
+

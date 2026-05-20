@@ -13,7 +13,7 @@ export default function CartScreen() {
         <Ionicons name="chevron-back" size={22} color="#111" />
       </TouchableOpacity>
       <View style={s.body}>
-        <Text style={s.emoji}>🛒</Text>
+        <Text style={s.emoji}>ğŸ›’</Text>
         <Text style={s.title}>Mağaza Yakında Açılıyor</Text>
         <Text style={s.sub}>Sepet özelliği mağaza açıldığında kullanılabilir olacak.</Text>
       </View>
@@ -29,3 +29,4 @@ const s = StyleSheet.create({
   title: { fontSize: 20, fontWeight: '900', color: '#111', marginBottom: 8, textAlign: 'center' },
   sub: { fontSize: 14, color: '#767676', textAlign: 'center', lineHeight: 20 },
 });
+

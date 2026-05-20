@@ -594,3 +594,36 @@ export const SessionAPI = {
     return data as number;
   },
 };
+
+// ─── Routine Notes ────────────────────────────────────────────────────────────
+
+export const RoutineNoteAPI = {
+  async getAll(userId: string): Promise<{ routine_id: string; notes: { id: string; date: string; text: string }[] }[]> {
+    const { data } = await supabase
+      .from('routine_notes')
+      .select('routine_id, id, note_date, text')
+      .eq('user_id', userId)
+      .order('note_date', { ascending: false });
+    if (!data) return [];
+    const grouped: { [key: string]: { id: string; date: string; text: string }[] } = {};
+    data.forEach(n => {
+      if (!grouped[n.routine_id]) grouped[n.routine_id] = [];
+      grouped[n.routine_id].push({ id: n.id, date: n.note_date, text: n.text });
+    });
+    return Object.entries(grouped).map(([routine_id, notes]) => ({ routine_id, notes }));
+  },
+
+  async add(userId: string, routineId: string, date: string, text: string): Promise<string> {
+    const { data, error } = await supabase
+      .from('routine_notes')
+      .insert({ user_id: userId, routine_id: routineId, note_date: date, text })
+      .select('id')
+      .single();
+    if (error) throw error;
+    return data.id;
+  },
+
+  async delete(id: string): Promise<void> {
+    await supabase.from('routine_notes').delete().eq('id', id);
+  },
+};

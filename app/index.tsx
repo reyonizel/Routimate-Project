@@ -9,10 +9,11 @@ export default function Index() {
   if (isInitializing) {
     return (
       <View style={{ flex: 1, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator size="large" color="#00bf63" />
+        <ActivityIndicator size="large" color="#00cc6d" />
       </View>
     );
   }
 
   return <Redirect href={isLoggedIn ? '/(tabs)' : '/welcome'} />;
 }
+

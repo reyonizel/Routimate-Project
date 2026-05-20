@@ -11,7 +11,7 @@ import { supabase } from '../lib/supabase';
 import { useStore } from '../store/useStore';
 
 const { width, height } = Dimensions.get('window');
-const THEME_GREEN = '#00bf63';
+const THEME_GREEN = '#00cc6d';
 const BG = '#FFFFFF';
 const TEXT = '#000000';
 const TEXT_MUTED = '#999999';
@@ -441,3 +441,4 @@ const s = StyleSheet.create({
   resendBtn: { alignSelf: 'center', marginTop: 24 },
   resendTxt: { color: THEME_GREEN, fontSize: 13, fontWeight: '500' },
 });
+

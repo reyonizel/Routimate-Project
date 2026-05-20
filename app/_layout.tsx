@@ -16,7 +16,7 @@ if (Platform.OS === 'android') {
     name: 'Rutin Bildirimleri',
     importance: Notifications.AndroidImportance.MAX,
     vibrationPattern: [0, 250, 250, 250],
-    lightColor: '#00bf63',
+    lightColor: '#00cc6d',
     sound: 'default',
     enableVibrate: true,
     showBadge: true,
@@ -121,6 +121,9 @@ export default function RootLayout() {
         <Stack.Screen name="cart" />
         <Stack.Screen name="orders" />
         <Stack.Screen name="mate-profile" />
+        <Stack.Screen name="routine-edit" />
+        <Stack.Screen name="routine-stats" />
+        <Stack.Screen name="routine-note" />
         <Stack.Screen name="debug" options={{ href: null } as any} />
         <Stack.Screen name="welcome"     options={{ animation: 'fade' }} />
         <Stack.Screen name="auth"        options={{ animation: 'slide_from_bottom' }} />
@@ -131,3 +134,4 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({ root: { flex: 1, backgroundColor: '#FFFFFF' } });
+

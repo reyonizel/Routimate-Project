@@ -16,7 +16,7 @@ import { handleError, ValidationErrors, showError } from '../lib/errors';
 
 const BG = '#FFFFFF'; const CARD = '#F4F4F4'; const SURFACE = '#EEEEEE';
 const TEXT = '#111111'; const TEXT2 = '#767676'; const TEXT3 = '#ABABAB';
-const GREEN = '#00bf63'; const BORDER = '#E8E8E8';
+const GREEN = '#00cc6d'; const BORDER = '#E8E8E8';
 
 export default function EditProfileScreen() {
   const router = useRouter();
@@ -261,7 +261,7 @@ function Field({
         onBlur={() => setFocused(false)}
         multiline={multiline}
         autoCapitalize={autoCapitalize ?? 'sentences'}
-        selectionColor="#00bf63"
+        selectionColor="#00cc6d"
       />
       <View style={[f.underline, focused && f.underlineFocused]} />
     </View>
@@ -274,7 +274,7 @@ const f = StyleSheet.create({
   input: { fontSize: 16, color: '#111', paddingVertical: 6 },
   inputMulti: { minHeight: 72, textAlignVertical: 'top' },
   underline: { height: 1, backgroundColor: '#E8E8E8', marginTop: 2 },
-  underlineFocused: { height: 1.5, backgroundColor: '#00bf63' },
+  underlineFocused: { height: 1.5, backgroundColor: '#00cc6d' },
 });
 
 const s = StyleSheet.create({
@@ -315,3 +315,4 @@ const s = StyleSheet.create({
   },
   dateValue: { fontSize: 16, color: TEXT, fontWeight: '500' },
 });
+

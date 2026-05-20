@@ -14,10 +14,10 @@ import { sendTestNotification } from '../lib/notifications';
 
 const BG = '#FFFFFF';
 const TEXT = '#111111'; const TEXT2 = '#767676'; const TEXT3 = '#ABABAB';
-const RED = '#00bf63'; const GOLD = '#C9920A'; const BORDER = '#F0F0F0';
+const RED = '#00cc6d'; const GOLD = '#C9920A'; const BORDER = '#F0F0F0';
 const CARD = '#F8F8F8'; const PILL = 999;
 
-// ─── Animated Pro Card ───────────────────────────────────────────────────────
+// â”€â”€â”€ Animated Pro Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function ProCard({ isPro, onToggle }: { isPro: boolean; onToggle: () => void }) {
   const anim = useRef(new Animated.Value(0)).current;
 
@@ -76,7 +76,7 @@ function ProCard({ isPro, onToggle }: { isPro: boolean; onToggle: () => void }) 
   );
 }
 
-// ─── TikTok-style Section ────────────────────────────────────────────────────
+// â”€â”€â”€ TikTok-style Section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <View style={s.section}>
@@ -90,7 +90,7 @@ function Divider() {
   return <View style={s.divider} />;
 }
 
-// ─── Row ─────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function Row({
   icon, label, sub, onPress, danger = false, right, iconBg,
 }: {
@@ -112,7 +112,7 @@ function Row({
   );
 }
 
-// ─── Notification Sound Sheet ─────────────────────────────────────────────────
+// â”€â”€â”€ Notification Sound Sheet â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const SOUNDS = [
   { id: 'default', label: 'Varsayılan', icon: 'notifications-outline' as const, file: null },
   { id: 'correct', label: 'Doğru', icon: 'checkmark-circle-outline' as const, file: require('../assets/images/dragon-studio-correct-472358.mp3') },
@@ -128,7 +128,7 @@ const SOUNDS = [
   { id: 'none', label: 'Sessiz', icon: 'volume-mute-outline' as const, file: null },
 ];
 
-// ─── Main Screen ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ Main Screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export default function ModalScreen() {
   const router     = useRouter();
   const user       = useStore((s) => s.user);
@@ -501,7 +501,7 @@ export default function ModalScreen() {
   );
 }
 
-// ─── Pro Card Styles ──────────────────────────────────────────────────────────
+// â”€â”€â”€ Pro Card Styles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const pro = StyleSheet.create({
   card:    { borderRadius: 22, overflow: 'hidden', backgroundColor: '#0D0D1F', padding: 24, minHeight: 200 },
   blob:    { position: 'absolute', borderRadius: 999, opacity: 0.55 },
@@ -518,7 +518,7 @@ const pro = StyleSheet.create({
   btnTxt:  { fontSize: 15, color: '#0D0D1F', fontWeight: '800' },
 });
 
-// ─── Main Styles ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ Main Styles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
   handle:    { width: 36, height: 4, backgroundColor: BORDER, borderRadius: 2, alignSelf: 'center', marginTop: 10, marginBottom: 4 },
@@ -558,3 +558,4 @@ const s = StyleSheet.create({
   soundIcon:   { width: 38, height: 38, borderRadius: 10, backgroundColor: CARD, alignItems: 'center', justifyContent: 'center' },
   soundLabel:  { flex: 1, fontSize: 15, color: TEXT, fontWeight: '500' },
 });
+

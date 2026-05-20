@@ -1,4 +1,4 @@
-﻿import { Tabs } from 'expo-router';
+import { Tabs } from 'expo-router';
 import { StyleSheet, View, Image } from 'react-native';
 import { Ionicons, MaterialCommunityIcons, SimpleLineIcons } from '@expo/vector-icons';
 import Octicons from '@expo/vector-icons/Octicons';
@@ -18,14 +18,17 @@ export default function TabsLayout() {
         tabBarHideOnKeyboard: true,
         animation: 'shift',
         tabBarStyle: {
-          backgroundColor: '#FFFFFF',
-          borderTopWidth: 0.5,
-          borderTopColor: '#E8E8E8',
-          height: 52 + bottomInset,
+          backgroundColor: '#EDF9F3',
+          borderTopWidth: 0,
+          height: 60 + bottomInset,
           paddingBottom: bottomInset,
-          paddingTop: 0,
+          paddingTop: 8,
           elevation: 0,
           shadowOpacity: 0,
+        },
+        tabBarIconStyle: {
+          marginTop: 0,
+          marginBottom: 0,
         },
         tabBarActiveTintColor: '#111111',
         tabBarInactiveTintColor: '#ABABAB',
@@ -94,3 +97,4 @@ export default function TabsLayout() {
 }
 
 const styles = StyleSheet.create({});
+

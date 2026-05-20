@@ -1,5 +1,5 @@
-﻿import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, FlatList, TextInput } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -41,7 +41,7 @@ const CircularProgress = ({ size = 72, strokeWidth = 5, progress = 0, color = '#
 const today = localDateStr();
 const BG='#FFFFFF'; const CARD='#F4F4F4'; const SURFACE='#EEEEEE';
 const TEXT='#111111'; const TEXT2='#767676'; const TEXT3='#ABABAB';
-const RED='#00bf63'; const GREEN='#008800'; const GOLD='#D4860A';
+const RED='#00cc6d'; const GREEN='#008800'; const GOLD='#D4860A';
 const BORDER='#E8E8E8'; const PILL=999;
 
 // ── Uyumluluk algoritması ─────────────────────────────────────────────────────
@@ -94,8 +94,8 @@ function calcCompat(user: User, mate: Mate): number {
 }
 
 function compatLabel(pct: number): string {
-  if (pct >= 85) return 'Yüksek Uyum 🔥';
-  if (pct >= 65) return 'İyi Uyum ✓';
+  if (pct >= 85) return 'Yüksek Uyum';
+  if (pct >= 65) return 'İyi Uyum';
   return 'Temel Uyum';
 }
 
@@ -216,109 +216,138 @@ export default function MateScreen() {
     );
   };
 
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredDiscovery = sortedDiscovery.filter(item => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      item.username.toLowerCase().includes(q) ||
+      (item.fullName && item.fullName.toLowerCase().includes(q)) ||
+      item.interests.some(i => i.toLowerCase().includes(q))
+    );
+  });
+
   const renderDiscovery = () => {
     return (
       <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={{ height: 16 }} />
+        {/* Search bar */}
+        <View style={s.searchWrap}>
+          <Ionicons name="search" size={18} color={TEXT3} />
+          <TextInput
+            style={s.searchInput}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="İsim veya ilgi alanı ara..."
+            placeholderTextColor={TEXT3}
+            autoCapitalize="none"
+            clearButtonMode="while-editing"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')} style={s.searchClear}>
+              <Ionicons name="close-circle" size={18} color={TEXT3} />
+            </TouchableOpacity>
+          )}
+        </View>
 
+        {/* Match requests */}
         {matchRequests.length > 0 && (
           <View style={s.requestSection}>
-            <Text style={s.sectionHeaderDiscovery}>Eşleşme İstekleri</Text>
-            {matchRequests.map(req => {
-              const reqAccent = req.fromUser.gender === 'female' ? '#e91e63' : '#3498db';
-              return (
-                <View key={req.id} style={s.requestCard}>
-                  <View style={[s.reqAvatarWrap, { borderColor: reqAccent }]}>
-                    <Image source={{ uri: req.fromUser.avatarUri || '' }} style={s.reqAvatar} contentFit="cover" cachePolicy="memory-disk" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.reqText}><Text style={{ fontWeight: '800' }}>{req.fromUser.username}</Text> seninle eşleşmek istiyor.</Text>
-                    <View style={s.reqBtnRow}>
-                      <TouchableOpacity style={[s.reqBtn, s.acceptBtn]} onPress={() => acceptMatchRequest(req)}>
-                        <Text style={s.acceptBtnTxt}>Kabul Et</Text>
+            <Text style={s.igSectionTitle}>Eşleşme İstekleri</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingHorizontal: 16 }}>
+              {matchRequests.map(req => {
+                const reqAccent = req.fromUser.gender === 'female' ? '#e91e63' : '#3498db';
+                return (
+                  <View key={req.id} style={s.requestStoryCard}>
+                    <View style={[s.reqStoryAvatar, { borderColor: reqAccent }]}>
+                      <Image source={{ uri: req.fromUser.avatarUri || '' }} style={{ width: '100%', height: '100%', borderRadius: 999 }} contentFit="cover" cachePolicy="memory-disk" />
+                    </View>
+                    <Text style={s.reqStoryName} numberOfLines={1}>{req.fromUser.username}</Text>
+                    <View style={s.reqStoryBtns}>
+                      <TouchableOpacity style={s.reqStoryAccept} onPress={() => acceptMatchRequest(req)}>
+                        <Text style={s.reqStoryAcceptTxt}>Kabul</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity style={[s.reqBtn, s.rejectBtn]} onPress={() => rejectMatchRequest(req.id)}>
-                        <Text style={s.rejectBtnTxt}>Reddet</Text>
+                      <TouchableOpacity style={s.reqStoryReject} onPress={() => rejectMatchRequest(req.id)}>
+                        <Text style={s.reqStoryRejectTxt}>✕</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
-                </View>
-              );
-            })}
+                );
+              })}
+            </ScrollView>
           </View>
         )}
 
-        <View style={s.discoverySection}>
-          <Text style={s.sectionHeaderDiscovery}>Önerilen Kişiler</Text>
-          {sortedDiscovery.length === 0 && (
+        {/* Suggested — Instagram style */}
+        <View style={s.suggestedSection}>
+          <View style={s.suggestedHeader}>
+            <Text style={s.igSectionTitle}>Önerilen Kişiler</Text>
+            <Text style={s.igSeeAll}>Tümünü Gör</Text>
+          </View>
+
+          {filteredDiscovery.length === 0 && (
             <View style={s.empty}>
               <Ionicons name="people-outline" size={40} color={TEXT3} />
-              <Text style={s.emptyTxt}>Şu an önerilecek kimse yok</Text>
-              <Text style={[s.emptyTxt, { fontSize: 12, marginTop: 4 }]}>Profil doldurunca eşleşmeler başlar</Text>
+              <Text style={s.emptyTxt}>{searchQuery ? 'Sonuç bulunamadı' : 'Şu an önerilecek kimse yok'}</Text>
             </View>
           )}
-          {sortedDiscovery.map(item => {
+
+          {filteredDiscovery.map(item => {
             const isSent = sentRequests.includes(item.id);
             const accentColor = item.gender === 'female' ? '#e91e63' : '#3498db';
             const compat = calcCompat(user, item);
             const displayName = item.fullName ?? item.username;
 
             return (
-              <View key={item.id} style={s.discoveryCard}>
-                {/* Avatar — blurred, gender border */}
-                <View style={[s.discoveryAvatarWrap, { borderColor: accentColor }]}>
-                  <Image
-                    source={{ uri: item.avatarUri || '' }}
-                    style={s.discoveryAvatar}
-                    contentFit="cover"
-                    cachePolicy="memory-disk"
-                    blurRadius={6}
-                  />
+              <View key={item.id} style={s.igCard}>
+                {/* Avatar */}
+                <View style={[s.igAvatarWrap, { borderColor: accentColor }]}>
+                  {item.avatarUri ? (
+                    <Image
+                      source={{ uri: item.avatarUri }}
+                      style={s.igAvatar}
+                      contentFit="cover"
+                      cachePolicy="memory-disk"
+                      blurRadius={user.isPro ? 0 : 6}
+                    />
+                  ) : (
+                    <View style={s.igAvatarFallback}>
+                      <Ionicons name="person" size={22} color={accentColor} />
+                    </View>
+                  )}
                 </View>
 
-                <View style={{ flex: 1 }}>
-                  {/* Name + compat */}
-                  <View style={s.discoveryTopRow}>
-                    <Text style={s.discoveryName}>{displayName}</Text>
-                    <View style={[s.similarityPill, { backgroundColor: compat >= 85 ? '#FFF0E0' : compat >= 65 ? '#E8F5E9' : '#F4F4F4' }]}>
-                      <Text style={[s.similarityTxt, { color: compat >= 85 ? '#D4860A' : compat >= 65 ? '#2E7D32' : TEXT3 }]}>
-                        {compatLabel(compat)} · %{compat}
-                      </Text>
+                {/* Info */}
+                <View style={s.igInfo}>
+                  <Text style={s.igName} numberOfLines={1}>{displayName}</Text>
+                  <Text style={s.igCompat}>{compatLabel(compat)} · %{compat}</Text>
+                  {item.interests.length > 0 ? (
+                    <View style={s.igInterests}>
+                      {item.interests.slice(0, 3).map(int => {
+                        const icon = INTEREST_ICON[int] ?? 'star-outline';
+                        return (
+                          <View key={int} style={s.igInterestChip}>
+                            <Ionicons name={icon} size={10} color="#2E7D32" />
+                            <Text style={s.igInterestTxt}>{int}</Text>
+                          </View>
+                        );
+                      })}
                     </View>
-                  </View>
-
-                  {/* Interests */}
-                  <View style={s.interestRow}>
-                    {item.interests.slice(0, 3).map(int => {
-                      const icon = INTEREST_ICON[int] ?? 'star-outline';
-                      return (
-                        <View key={int} style={s.interestChip}>
-                          <Ionicons name={icon} size={11} color={TEXT3} />
-                          <Text style={s.interestTxt}>{int}</Text>
-                        </View>
-                      );
-                    })}
-                  </View>
-
-                  {/* Score + action */}
-                  <View style={s.discoveryBottomRow}>
-                    <View style={s.scoreRow}>
-                      <Ionicons name="trophy" size={12} color={GOLD} />
-                      <Text style={s.scoreTxt}>%{item.achievementScore} başarı</Text>
-                    </View>
-                    {isSent ? (
-                      <TouchableOpacity style={s.cancelBtn} onPress={() => cancelMatchRequest(item.id)} activeOpacity={0.8}>
-                        <Ionicons name="close" size={12} color={TEXT2} />
-                        <Text style={s.cancelBtnTxt}>Geri Çek</Text>
-                      </TouchableOpacity>
-                    ) : (
-                      <TouchableOpacity style={[s.matchBtn, { backgroundColor: RED }]} onPress={() => sendMatchRequest(item)} activeOpacity={0.85}>
-                        <Ionicons name="heart" size={12} color="#fff" />
-                        <Text style={s.matchBtnTxt}>Eşleş</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
+                  ) : (
+                    <Text style={s.igNoInterests}>İlgi alanı eklenmemiş</Text>
+                  )}
                 </View>
+
+                {/* Action button */}
+                {isSent ? (
+                  <TouchableOpacity style={s.igCancelBtn} onPress={() => cancelMatchRequest(item.id)} activeOpacity={0.8}>
+                    <Text style={s.igCancelTxt}>Geri Çek</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity style={s.igFollowBtn} onPress={() => sendMatchRequest(item)} activeOpacity={0.8}>
+                    <Text style={s.igFollowTxt}>Eşleş</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             );
           })}
@@ -340,46 +369,8 @@ const s = StyleSheet.create({
   header: {paddingHorizontal:20, paddingTop:24, paddingBottom:16},
   title: {fontSize:32, color:TEXT, fontWeight:'900', letterSpacing:-1},
   subTitle: {fontSize:14, color:TEXT2, marginTop:4, fontWeight:'500'},
-  discoverySpacer: { height: 16 },
   
-  // Discovery Styles
-  requestSection: { paddingHorizontal: 16, marginBottom: 8 },
-  sectionHeaderDiscovery: { fontSize: 16, fontWeight: '800', color: TEXT, marginBottom: 10 },
-  requestCard: { flexDirection: 'row', backgroundColor: CARD, padding: 12, borderRadius: 18, alignItems: 'center', marginBottom: 8, gap: 12 },
-  reqAvatarWrap: { width: 46, height: 46, borderRadius: 23, borderWidth: 2, overflow: 'hidden', flexShrink: 0 },
-  reqAvatar: { width: '100%', height: '100%' },
-  reqText: { fontSize: 13, color: TEXT, lineHeight: 17 },
-  reqBtnRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
-  reqBtn: { flex: 1, paddingVertical: 7, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  acceptBtn: { backgroundColor: RED },
-  acceptBtnTxt: { color: '#fff', fontSize: 12, fontWeight: '800' },
-  rejectBtn: { backgroundColor: SURFACE },
-  rejectBtnTxt: { color: TEXT2, fontSize: 12, fontWeight: '700' },
-
-  discoverySection: { paddingHorizontal: 16 },
-  discoveryCard: {
-    flexDirection: 'row', gap: 14,
-    backgroundColor: CARD, borderRadius: 18, padding: 14,
-    marginBottom: 8,
-  },
-  discoveryAvatarWrap: { width: 58, height: 58, borderRadius: 29, borderWidth: 2.5, overflow: 'hidden', flexShrink: 0 },
-  discoveryAvatar: { width: '100%', height: '100%' },
-  discoveryTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 7 },
-  discoveryName: { fontSize: 15, fontWeight: '800', color: TEXT, letterSpacing: -0.2 },
-  similarityPill: { backgroundColor: SURFACE, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
-  similarityTxt: { fontSize: 10, fontWeight: '700', color: TEXT2 },
-  interestRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginBottom: 10 },
-  interestChip: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: SURFACE, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
-  interestTxt: { fontSize: 11, fontWeight: '600', color: TEXT2 },
-  discoveryBottomRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  scoreRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  scoreTxt: { fontSize: 12, color: TEXT2, fontWeight: '600' },
-  matchBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10 },
-  matchBtnTxt: { color: '#fff', fontSize: 12, fontWeight: '800' },
-  cancelBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: SURFACE, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10 },
-  cancelBtnTxt: { color: TEXT2, fontSize: 11, fontWeight: '700' },
-
-  // Active Match Styles (Original)
+  // Active Match
   mateCard: {marginHorizontal:16, paddingVertical:20, borderBottomWidth:1, borderBottomColor:BORDER},
   mateTop: {flexDirection:'row', alignItems:'center', gap:14, marginBottom:24},
   avatar: {width:56, height:56, borderRadius:28, borderWidth:2, backgroundColor:BG, alignItems:'center', justifyContent:'center'},
@@ -402,4 +393,41 @@ const s = StyleSheet.create({
   rowMeta: {fontSize:11, color:TEXT3, marginTop:1},
   empty: {alignItems:'center', paddingTop:40, gap:12},
   emptyTxt: {fontSize:14, color:TEXT2},
+
+  // Instagram-style Discovery
+  searchWrap: {flexDirection:'row', alignItems:'center', backgroundColor:SURFACE, borderRadius:12, marginHorizontal:16, marginVertical:12, paddingHorizontal:12, height:40},
+  searchInput: {flex:1, fontSize:14, color:TEXT, marginLeft:8},
+  searchClear: {paddingLeft:8},
+
+  // Match requests — horizontal stories
+  requestSection: {paddingVertical:12},
+  igSectionTitle: {fontSize:15, color:TEXT, fontWeight:'500', marginLeft:16, marginBottom:10},
+  requestStoryCard: {width:90, alignItems:'center', gap:4},
+  reqStoryAvatar: {width:64, height:64, borderRadius:32, borderWidth:2.5, overflow:'hidden'},
+  reqStoryName: {fontSize:11, color:TEXT, fontWeight:'600', textAlign:'center'},
+  reqStoryBtns: {flexDirection:'row', gap:4},
+  reqStoryAccept: {backgroundColor:RED, borderRadius:6, paddingHorizontal:8, paddingVertical:3},
+  reqStoryAcceptTxt: {color:'#fff', fontSize:10, fontWeight:'700'},
+  reqStoryReject: {backgroundColor:SURFACE, borderRadius:6, width:24, height:24, alignItems:'center', justifyContent:'center'},
+  reqStoryRejectTxt: {fontSize:10, color:TEXT2},
+
+  // Suggested — Instagram card style
+  suggestedSection: {paddingTop:0},
+  suggestedHeader: {flexDirection:'row', justifyContent:'space-between', alignItems:'center', paddingHorizontal:16, marginBottom:10, marginTop:12},
+  igSeeAll: {fontSize:13, color:TEXT2, fontWeight:'600'},
+  igCard: {flexDirection:'row', alignItems:'flex-start', paddingHorizontal:16, paddingVertical:12, gap:12},
+  igAvatarWrap: {width:44, height:44, borderRadius:22, borderWidth:2, overflow:'hidden', flexShrink:0},
+  igAvatar: {width:'100%', height:'100%'},
+  igAvatarFallback: {width:'100%', height:'100%', backgroundColor:SURFACE, alignItems:'center', justifyContent:'center'},
+  igInfo: {flex:1, gap:3},
+  igName: {fontSize:14, color:TEXT, fontWeight:'600'},
+  igCompat: {fontSize:12, color:TEXT2, fontWeight:'500'},
+  igInterests: {flexDirection:'row', flexWrap:'wrap', gap:4, marginTop:4},
+  igInterestChip: {flexDirection:'row', alignItems:'center', gap:3, backgroundColor:'#E8F5E9', borderRadius:6, paddingHorizontal:8, paddingVertical:4, borderWidth:0.5, borderColor:'#C8E6C9'},
+  igInterestTxt: {fontSize:11, color:'#2E7D32', fontWeight:'600'},
+  igNoInterests: {fontSize:11, color:TEXT3, marginTop:2},
+  igFollowBtn: {backgroundColor:RED, borderRadius:8, paddingHorizontal:16, paddingVertical:7},
+  igFollowTxt: {color:'#fff', fontSize:13, fontWeight:'700'},
+  igCancelBtn: {backgroundColor:SURFACE, borderRadius:8, paddingHorizontal:12, paddingVertical:7},
+  igCancelTxt: {color:TEXT2, fontSize:12, fontWeight:'600'},
 });

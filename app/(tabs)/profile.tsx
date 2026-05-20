@@ -18,7 +18,7 @@ const today = localDateStr();
 
 const BG = '#FFFFFF'; const CARD = '#F4F4F4'; const SURFACE = '#EEEEEE';
 const TEXT = '#111111'; const TEXT2 = '#767676'; const TEXT3 = '#ABABAB';
-const RED = '#00bf63'; const GREEN = '#008800'; const GOLD = '#D4860A';
+const RED = '#00cc6d'; const GREEN = '#008800'; const GOLD = '#D4860A';
 const BORDER = '#E8E8E8'; const PILL = 999;
 
 function LineChart({ data, color = RED }: { data: number[]; color?: string }) {
@@ -172,10 +172,11 @@ export default function ProfileScreen() {
       if (r.frequency === 'monthly') return r.monthlyDays?.includes(dm) ?? false;
       return false;
     });
-    const done = scheduled.filter(r => r.completedDates.includes(dateStr)).length;
-    const pct = scheduled.length > 0 ? done / scheduled.length : 0;
-    return { dateStr, dayLabel: TR_DAYS[dw], pct, isToday: dateStr === today };
+    const doneCount = scheduled.filter(r => r.completedDates.includes(dateStr)).length;
+    const pct = scheduled.length > 0 ? doneCount / scheduled.length : 0;
+    return { dateStr, dayLabel: TR_DAYS[dw], pct, doneCount, isToday: dateStr === today };
   });
+  const maxDoneCount = Math.max(...last7Data.map(d => d.doneCount), 1);
 
   const editTimeDate = new Date();
   editTimeDate.setHours(parseInt(editHour || '7', 10));
@@ -434,11 +435,26 @@ export default function ProfileScreen() {
         {activeTab === 2 && (
           <View style={{ backgroundColor: BG }}>
 
-            {/* Son 7 Gün — Çizgi Grafiği */}
+            {/* Aktiflik — Son 7 Gün */}
             <View style={st.sec}>
-              <View style={st.secHeader}>
-                <Text style={st.secTitle}>Son 7 Gün</Text>
+              <Text style={st.secTitle}>Aktiflik</Text>
+              <Text style={st.secDesc}>Son 7 günde her gün kaç görev tamamladığın</Text>
+              <LineChart data={last7Data.map(d => d.doneCount / maxDoneCount)} />
+              <View style={st.dayRow}>
+                {last7Data.map(d => (
+                  <Text key={d.dateStr} style={[st.dayLbl, d.isToday && { color: RED, fontWeight: '800' }]}>
+                    {d.dayLabel}
+                  </Text>
+                ))}
               </View>
+            </View>
+
+            <View style={st.div} />
+
+            {/* Görev Tamamlama — Son 7 Gün */}
+            <View style={st.sec}>
+              <Text style={st.secTitle}>Görev Tamamlama</Text>
+              <Text style={st.secDesc}>Planlanan görevlerinden kaçını tamamladığın</Text>
               <LineChart data={last7Data.map(d => d.pct)} />
               <View style={st.dayRow}>
                 {last7Data.map(d => (
@@ -454,30 +470,14 @@ export default function ProfileScreen() {
             {/* Tamamlama */}
             <View style={st.sec}>
               <Text style={st.secTitle}>Tamamlama</Text>
-              <View style={st.numLine}>
-                <Text style={[st.numBig, { color: RED }]}>{totalDoneAllTime.toLocaleString('tr-TR')}</Text>
-                <Text style={st.numOf}>/ {totalExpectedAllTime.toLocaleString('tr-TR')} beklenen görev</Text>
+              <Text style={st.secDesc}>Rutin başlangıcından bu yana tüm beklenen görevler</Text>
+              <View style={[st.numLine, { marginTop: 4 }]}>
+                <Text style={st.numBig}>{totalDoneAllTime.toLocaleString('tr-TR')}</Text>
+                <Text style={st.numOf}>/ {totalExpectedAllTime.toLocaleString('tr-TR')} görev yapıldı</Text>
               </View>
               <View style={[st.numLine, { marginTop: 8 }]}>
-                <Text style={[st.numBig, { color: '#F59E0B' }]}>{proofPhotos}</Text>
-                <Text style={st.numOf}>/ {totalExpectedAllTime.toLocaleString('tr-TR')} kanıtlandı</Text>
-              </View>
-            </View>
-
-            <View style={st.div} />
-
-            {/* Başarı & Seri */}
-            <View style={[st.sec, { flexDirection: 'row' }]}>
-              <View style={{ flex: 1 }}>
-                <Text style={st.secTitle}>Başarı Skoru</Text>
-                <Text style={[st.bigN, {
-                  color: user.achievementScore >= 70 ? RED : user.achievementScore >= 40 ? '#F59E0B' : '#EF4444',
-                }]}>{user.achievementScore}<Text style={st.bigNUnit}>/100</Text></Text>
-              </View>
-              <View style={st.vDiv} />
-              <View style={{ flex: 1 }}>
-                <Text style={st.secTitle}>Günlük Seri</Text>
-                <Text style={[st.bigN, { color: '#8B5CF6' }]}>{streakDays}<Text style={st.bigNUnit}> gün</Text></Text>
+                <Text style={st.numBig}>{proofPhotos}</Text>
+                <Text style={st.numOf}>/ {totalExpectedAllTime.toLocaleString('tr-TR')} fotoğrafla kanıtlandı</Text>
               </View>
             </View>
 
@@ -486,10 +486,11 @@ export default function ProfileScreen() {
             {/* Bugün */}
             <View style={st.sec}>
               <View style={st.secHeader}>
-                <Text style={st.secTitle}>Bugün</Text>
-                <Text style={[st.badge, {
-                  color: todayPct === 100 ? RED : todayPct > 0 ? '#F59E0B' : TEXT3,
-                }]}>
+                <View>
+                  <Text style={st.secTitle}>Bugün</Text>
+                  <Text style={st.secDesc}>Bugün planlanan rutinlerin</Text>
+                </View>
+                <Text style={[st.badge, { color: TEXT2 }]}>
                   {todayScheduled.length > 0 ? `${todayDone}/${todayScheduled.length} tamamlandı` : 'Bugün görev yok'}
                 </Text>
               </View>
@@ -522,17 +523,21 @@ export default function ProfileScreen() {
             {mate && (
               <>
                 <View style={st.div} />
-                <View style={[st.sec, { flexDirection: 'row' }]}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={st.secTitle}>Sen</Text>
-                    <Text style={[st.bigN, { color: RED }]}>{user.achievementScore}<Text style={st.bigNUnit}>/100</Text></Text>
-                    <Text style={[st.numOf, { marginTop: 4 }]}>{streakDays} gün seri</Text>
-                  </View>
-                  <View style={st.vDiv} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={st.secTitle}>@{mate.username}</Text>
-                    <Text style={[st.bigN, { color: '#8B5CF6' }]}>{mate.achievementScore}<Text style={st.bigNUnit}>/100</Text></Text>
-                    {mateStreakDays !== null && <Text style={[st.numOf, { marginTop: 4 }]}>{mateStreakDays} gün seri</Text>}
+                <View style={st.sec}>
+                  <Text style={st.secTitle}>Mate Karşılaştırması</Text>
+                  <Text style={[st.secDesc, { marginBottom: 12 }]}>Başarı skorları ve günlük seriler</Text>
+                  <View style={{ flexDirection: 'row' }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[st.secTitle, { marginBottom: 4 }]}>Sen</Text>
+                      <Text style={st.bigN}>{user.achievementScore}<Text style={st.bigNUnit}>/100</Text></Text>
+                      <Text style={[st.numOf, { marginTop: 4 }]}>{streakDays} gün seri</Text>
+                    </View>
+                    <View style={st.vDiv} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[st.secTitle, { marginBottom: 4 }]}>@{mate.username}</Text>
+                      <Text style={st.bigN}>{mate.achievementScore}<Text style={st.bigNUnit}>/100</Text></Text>
+                      {mateStreakDays !== null && <Text style={[st.numOf, { marginTop: 4 }]}>{mateStreakDays} gün seri</Text>}
+                    </View>
                   </View>
                 </View>
               </>
@@ -544,8 +549,8 @@ export default function ProfileScreen() {
                 <View style={st.div} />
                 <View style={st.sec}>
                   <Text style={st.secTitle}>En Aktif Saat</Text>
+                  <Text style={st.secDesc}>Kanıt fotoğraflarına göre en çok görev yaptığın saat</Text>
                   <Text style={st.bigN}>{String(avgHour).padStart(2, '0')}:00</Text>
-                  <Text style={[st.numOf, { marginTop: 2 }]}>kanıt fotoğraflarına göre</Text>
                 </View>
               </>
             )}
@@ -781,7 +786,7 @@ const styles = StyleSheet.create({
   actionRow: { flexDirection: 'row', paddingHorizontal: 16, marginBottom: 12 },
   proBadge: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: SURFACE, borderRadius: 5, paddingVertical: 10, borderWidth: 1, borderColor: BORDER },
   proBadgeText: { fontSize: 13, fontWeight: '700' },
-  upgradeBtn: { flexDirection: 'row', gap: 8, backgroundColor: '#00bf63', borderRadius: 8, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', width: '100%' },
+  upgradeBtn: { flexDirection: 'row', gap: 8, backgroundColor: '#00cc6d', borderRadius: 8, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', width: '100%' },
   upgradeBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' },
   editProfileBtn: { backgroundColor: SURFACE, borderRadius: 8, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: BORDER },
   editProfileBtnText: { color: TEXT, fontSize: 14, fontWeight: '700' },
@@ -866,7 +871,8 @@ const styles = StyleSheet.create({
 const st = StyleSheet.create({
   sec:      { paddingHorizontal: 20, paddingVertical: 18 },
   secHeader:{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  secTitle: { fontSize: 12, fontWeight: '700', color: TEXT2, marginBottom: 12 },
+  secTitle: { fontSize: 12, fontWeight: '700', color: TEXT2, marginBottom: 2 },
+  secDesc:  { fontSize: 12, color: TEXT3, marginBottom: 10 },
   div:      { height: 1, backgroundColor: BORDER },
   vDiv:     { width: 1, backgroundColor: BORDER, marginHorizontal: 20 },
 
@@ -891,3 +897,4 @@ const st = StyleSheet.create({
   taskDot:  { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: TEXT3, alignItems: 'center', justifyContent: 'center' },
   taskName: { flex: 1, fontSize: 14, color: TEXT, fontWeight: '500' },
 });
+

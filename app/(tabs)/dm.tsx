@@ -12,9 +12,9 @@ import { MessageAPI } from '../../lib/api';
 
 const { width: SW } = Dimensions.get('window');
 
-// ── Palette ──────────────────────────────────────────────────────────────────
+// â”€â”€ Palette â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const CHAT_BG = '#F0F2F5';
-const ME_BG   = '#00bf63';
+const ME_BG   = '#00cc6d';
 const MATE_BG = '#E4E6EB';
 const TEXT    = '#111111';
 const TEXT2   = '#767676';
@@ -22,10 +22,10 @@ const TEXT3   = '#ABABAB';
 const BORDER  = '#E8E8E8';
 const SURFACE = '#F4F4F4';
 const GOLD    = '#D4860A';
-const GREEN   = '#00bf63';
+const GREEN   = '#00cc6d';
 
 
-// ── Quick-reply answer map ────────────────────────────────────────────────────
+// â”€â”€ Quick-reply answer map â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const QR_ANSWER_MAP: { keys: string[]; replies: string[] }[] = [
   {
     keys: ['rutin', 'tamamla', 'yaptın', 'hedef', 'görev'],
@@ -70,7 +70,7 @@ function getAnswerReplies(text: string): string[] {
   return QR_DEFAULT;
 }
 
-// ── Question bank ─────────────────────────────────────────────────────────────
+// â”€â”€ Question bank â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const ALL_QUESTIONS = [
   // Rutin
   'Bugün tüm rutinlerini tamamladın mı? 👀',
@@ -109,7 +109,7 @@ const ALL_QUESTIONS = [
   'En büyük hayalin ne?',
 ];
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function msgTime(iso: string) {
   return new Date(iso).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
 }
@@ -157,7 +157,7 @@ function buildChatItems(messages: Message[]): ChatItem[] {
   return items;
 }
 
-// ── Bubble ────────────────────────────────────────────────────────────────────
+// â”€â”€ Bubble â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 type BubbleProps = {
   item: Extract<ChatItem, { type: 'msg' }>;
   mateAvatarUri: string;
@@ -196,7 +196,7 @@ const Bubble = React.memo(({ item, mateAvatarUri, mateAccent, isPro, onLongPress
   );
 });
 
-// ── QuickReplyList ────────────────────────────────────────────────────────────
+// â”€â”€ QuickReplyList â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const QuickReplyList = React.memo(({ replies, onSend }: { replies: string[]; onSend: (t: string) => void }) => (
   <View style={s.qrSection}>
     <Text style={s.qrLabel}>Yanıt Ver</Text>
@@ -208,7 +208,7 @@ const QuickReplyList = React.memo(({ replies, onSend }: { replies: string[]; onS
   </View>
 ));
 
-// ── Main screen ───────────────────────────────────────────────────────────────
+// â”€â”€ Main screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export default function DMScreen() {
   const isPro         = useStore(s => s.user.isPro);
   const userId        = useStore(s => s.user.id);
@@ -280,7 +280,7 @@ export default function DMScreen() {
   return (
     <SafeAreaView style={s.container} edges={['top']}>
 
-      {/* ── Header ─────────────────────────────────────────────────────── */}
+      {/* â”€â”€ Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <View style={s.header}>
         <View style={[s.headerAvatar, { borderColor: mateAccent }]}>
           <Image source={{ uri: mateAvatarUri }} style={{ width: '100%', height: '100%' }} contentFit="cover" blurRadius={isPro ? 0 : 12} />
@@ -297,7 +297,7 @@ export default function DMScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* ── KAV: pushes input above keyboard on both platforms ─────────── */}
+      {/* â”€â”€ KAV: pushes input above keyboard on both platforms â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
 
         {/* Chat area + floating "Soru Sor" button */}
@@ -359,7 +359,7 @@ export default function DMScreen() {
 
       </KeyboardAvoidingView>
 
-      {/* ── Question popup (centered square card) ──────────────────────── */}
+      {/* â”€â”€ Question popup (centered square card) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {questionOpen && (
         <Modal transparent visible animationType="fade" onRequestClose={() => setQuestionOpen(false)}>
           <TouchableOpacity style={s.qpOverlay} activeOpacity={1} onPress={() => setQuestionOpen(false)}>
@@ -388,7 +388,7 @@ export default function DMScreen() {
         </Modal>
       )}
 
-      {/* ── Message long-press sheet ────────────────────────────────────── */}
+      {/* â”€â”€ Message long-press sheet â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {sheetMsgId && (
         <Modal transparent visible animationType="fade" onRequestClose={() => setSheetMsgId(null)}>
           <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={() => setSheetMsgId(null)}>
@@ -403,7 +403,7 @@ export default function DMScreen() {
         </Modal>
       )}
 
-      {/* ── More menu sheet ─────────────────────────────────────────────── */}
+      {/* â”€â”€ More menu sheet â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {moreOpen && (
         <Modal transparent visible animationType="fade" onRequestClose={() => setMoreOpen(false)}>
           <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={() => setMoreOpen(false)}>
@@ -423,7 +423,7 @@ export default function DMScreen() {
         </Modal>
       )}
 
-      {/* ── Unmatch confirm ─────────────────────────────────────────────── */}
+      {/* â”€â”€ Unmatch confirm â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {confirmUnmatch && (
         <Modal transparent visible animationType="fade" onRequestClose={() => setConfirmUnmatch(false)}>
           <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={() => setConfirmUnmatch(false)}>
@@ -447,7 +447,7 @@ export default function DMScreen() {
   );
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
+// â”€â”€ Styles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FFFFFF' },
 
@@ -565,3 +565,4 @@ const s = StyleSheet.create({
   sheetRowTxt:  { fontSize: 16, color: TEXT, fontWeight: '600' },
   sheetDivider: { height: 0.5, backgroundColor: BORDER },
 });
+
