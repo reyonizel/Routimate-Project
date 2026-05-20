@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Image, Alert, Dimensions } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, { useSharedValue, withSpring, useAnimatedStyle, withSequence, withRepeat, withTiming } from 'react-native-reanimated';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
@@ -326,10 +327,14 @@ export default function HomeScreen() {
             ))}
           </View>
         ) : selIsRestDay ? (
-          <View style={s.empty}>
-            <Ionicons name="cafe-outline" size={40} color={TEXT3} />
+          <View style={s.restDayWrap}>
+            <ExpoImage
+              source={require('../../assets/images/sleeping-cat.gif')}
+              style={s.catGif}
+              contentFit="contain"
+            />
             <Text style={s.emptyTitle}>Dinlenme günü</Text>
-            <Text style={s.emptySub}>İyi dinlenmeler!</Text>
+            <Text style={s.emptySub}>İyi dinlenmeler! 😴</Text>
           </View>
         ) : selRoutines.length === 0 ? (
           <View style={s.empty}>
@@ -720,6 +725,13 @@ const s = StyleSheet.create({
   empty: {alignItems:'center', paddingTop:48, gap:8},
   emptyTitle: {fontSize:16, color:TEXT2, fontWeight:'800'},
   emptySub: {fontSize:13, color:TEXT3},
+  restDayWrap: {
+    minHeight: Dimensions.get('window').height * 0.46,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  catGif: { width: 220, height: 220 },
 
   // Calendar
   calHeader: {flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingHorizontal:16, paddingVertical:12},
