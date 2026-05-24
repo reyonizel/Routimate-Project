@@ -7,7 +7,7 @@ import { useStore } from '../store/useStore';
 import type { Routine } from '../store/useStore';
 import { getAppDate } from '../lib/date';
 
-const BG = '#FCF7F0'; const CARD = '#FFFFFF'; const SURFACE = '#F5EDE0';
+const BG = '#EEE3D0'; const CARD = '#FFFFFF'; const SURFACE = '#F5EDE0';
 const TEXT = '#0A3B25'; const TEXT2 = '#3D6B58'; const TEXT3 = '#B2B7AA';
 const GREEN = '#2A6151'; const BORDER = '#B2B7AA'; const GOLD = '#D8C2A4';
 const SCREEN_W = Dimensions.get('window').width;

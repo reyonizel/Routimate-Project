@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
 const GREEN = '#00bf63';
-const TEXT = '#111111'; const TEXT2 = '#767676'; const TEXT3 = '#ABABAB';
+const TEXT = '#111111'; const TEXT2 = '#767676'; const TEXT3 = '#B2B7AA';
 const CARD = '#F4F4F4';
 
 export type ErrorVariant = 'not_found' | 'network' | 'upload' | 'server' | 'permission' | 'empty';
@@ -51,7 +51,7 @@ const PRESETS: Record<ErrorVariant, { icon: React.ComponentProps<typeof Ionicons
   },
   empty: {
     icon: 'file-tray-outline',
-    iconColor: '#ABABAB',
+    iconColor: '#B2B7AA',
     title: 'Henüz İçerik Yok',
     message: 'Burası şu an boş. İlk içeriği eklemek için başla!',
   },

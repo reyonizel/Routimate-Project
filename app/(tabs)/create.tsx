@@ -1,41 +1,32 @@
-import React, { useState, useRef } from 'react';
+import { useState } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity,
   ScrollView, Alert, Platform,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useStore, Routine } from '../../store/useStore';
 import { generateId } from '../../lib/api';
 import { localDateStr } from '../../lib/date';
 
-const BG = '#FCF7F0'; const SURFACE = '#F5EDE0'; const BORDER = '#B2B7AA';
+const BG = '#EEE3D0'; const SURFACE = '#F5EDE0'; const BORDER = '#B2B7AA';
 const TEXT = '#0A3B25'; const TEXT2 = '#3D6B58'; const TEXT3 = '#B2B7AA';
-const GREEN = '#2A6151';
+const GREEN = '#2A6151'; const PILL = 999;
 
 type Freq = 'daily' | 'weekly' | 'monthly';
-type Scope = 'once' | 'recurring';
-type FreqScope = 'daily-once' | 'daily-rec' | 'weekly-once' | 'weekly-rec' | 'monthly-once' | 'monthly-rec';
 
 const WEEK_DAYS = [
   { label: 'Pzt', js: 1 }, { label: 'Sal', js: 2 }, { label: 'Çar', js: 3 },
   { label: 'Per', js: 4 }, { label: 'Cum', js: 5 }, { label: 'Cmt', js: 6 }, { label: 'Paz', js: 0 },
 ];
 
-const FS_OPTIONS: { value: FreqScope; label: string; freq: Freq; scope: Scope }[] = [
-  { value: 'daily-once',   label: 'Sadece Bugün',   freq: 'daily',   scope: 'once' },
-  { value: 'daily-rec',    label: 'Her Gün',         freq: 'daily',   scope: 'recurring' },
-  { value: 'weekly-once',  label: 'Sadece Bu Hafta', freq: 'weekly',  scope: 'once' },
-  { value: 'weekly-rec',   label: 'Her Hafta',       freq: 'weekly',  scope: 'recurring' },
-  { value: 'monthly-once', label: 'Sadece Bu Ay',    freq: 'monthly', scope: 'once' },
-  { value: 'monthly-rec',  label: 'Her Ay',          freq: 'monthly', scope: 'recurring' },
+const FREQ_OPTS: { value: Freq; label: string }[] = [
+  { value: 'daily',   label: 'Günlük' },
+  { value: 'weekly',  label: 'Haftalık' },
+  { value: 'monthly', label: 'Aylık' },
 ];
-
-const scopeLabel = (freq: Freq, scope: Scope) =>
-  FS_OPTIONS.find(o => o.freq === freq && o.scope === scope)?.label ?? '';
 
 const getOnceRange = (freq: Freq): { start: string; end: string } => {
   const now = new Date();
@@ -49,18 +40,8 @@ const getOnceRange = (freq: Freq): { start: string; end: string } => {
   }
   return {
     start: fmt(new Date(now.getFullYear(), now.getMonth(), 1)),
-    end: fmt(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
+    end:   fmt(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
   };
-};
-
-type RoutineDraft = {
-  tempId: string;
-  title: string;
-  hour: string;
-  min: string;
-  freqScope: FreqScope;
-  days: number[];
-  monthDays: number[];
 };
 
 export default function CreateScreen() {
@@ -69,163 +50,137 @@ export default function CreateScreen() {
   const addRoutines = useStore(s => s.addRoutines);
   const selectedCategory = useStore(s => s.selectedCategory);
   const setSelectedCategory = useStore(s => s.setSelectedCategory);
-  const user = useStore(s => s.user);
 
-  const [drafts, setDrafts] = useState<RoutineDraft[]>([]);
+  const [title, setTitle]       = useState('');
+  const [freq, setFreq]         = useState<Freq>('daily');
+  const [recurring, setRecurring] = useState(true);
+  const [days, setDays]         = useState<number[]>([]);
+  const [monthDays, setMonthDays] = useState<number[]>([]);
+  const [hour, setHour]         = useState('09');
+  const [min, setMin]           = useState('00');
+  const [showTime, setShowTime] = useState(false);
 
-  const [fTitle, setFTitle] = useState('');
-  const [fHour, setFHour] = useState('09');
-  const [fMin, setFMin] = useState('00');
-  const [fFreqScope, setFFreqScope] = useState<FreqScope>('daily-rec');
-  const [fDays, setFDays] = useState<number[]>([]);
-  const [fMonthDays, setFMonthDays] = useState<number[]>([]);
-  const [fShowTime, setFShowTime] = useState(false);
+  const timeDate = new Date();
+  timeDate.setHours(parseInt(hour, 10));
+  timeDate.setMinutes(parseInt(min, 10));
 
-  const fOpt = FS_OPTIONS.find(o => o.value === fFreqScope)!;
-  const fTimeDate = new Date();
-  fTimeDate.setHours(parseInt(fHour, 10));
-  fTimeDate.setMinutes(parseInt(fMin, 10));
+  const hasCategory = !!selectedCategory && selectedCategory.name !== 'new';
 
-  const canAdd = fTitle.trim().length > 0
-    && (fOpt.freq === 'weekly' ? fDays.length > 0 : true)
-    && (fOpt.freq === 'monthly' ? fMonthDays.length > 0 : true);
-
-  useFocusEffect(
-    React.useCallback(() => {
-      return () => { setSelectedCategory(null); };
-    }, [setSelectedCategory])
-  );
-
-  const handleAddDraft = () => {
-    if (!fTitle.trim()) return;
-    setDrafts(prev => [...prev, {
-      tempId: Date.now().toString(),
-      title: fTitle.trim(), hour: fHour, min: fMin,
-      freqScope: fFreqScope, days: fDays, monthDays: fMonthDays,
-    }]);
-    setFTitle(''); setFHour('09'); setFMin('00'); setFFreqScope('daily-rec');
-    setFDays([]); setFMonthDays([]); setFShowTime(false);
-  };
+  const canSave = title.trim().length > 0
+    && hasCategory
+    && (freq === 'weekly'  ? days.length > 0     : true)
+    && (freq === 'monthly' ? monthDays.length > 0 : true);
 
   const handleSave = () => {
-    if (drafts.length === 0) return;
+    if (!canSave) return;
     const catName = selectedCategory?.name && selectedCategory.name !== 'new' ? selectedCategory.name : undefined;
     const catIcon = selectedCategory?.icon && catName ? selectedCategory.icon : undefined;
-    const routines: Routine[] = drafts.map(d => {
-      const opt = FS_OPTIONS.find(o => o.value === d.freqScope)!;
-      return {
-        id: generateId(), name: d.title, frequency: opt.freq,
-        notificationTime: `${d.hour}:${d.min}`, completedDates: [],
-        createdAt: new Date().toISOString(),
-        setName: catName, setIcon: catIcon,
-        scope: opt.scope, onceRange: opt.scope === 'once' ? getOnceRange(opt.freq) : undefined,
-        targetDays: opt.freq === 'weekly' && d.days.length > 0 ? d.days : undefined,
-        monthlyDays: opt.freq === 'monthly' && d.monthDays.length > 0 ? d.monthDays : undefined,
-      };
-    });
-    addRoutines(routines);
-    setDrafts([]); setSelectedCategory(null);
-    Alert.alert('Kaydedildi ✓', `${routines.length} rutin${catName ? ` "${catName}" kategorisine` : ''} eklendi.`);
+    const scope = recurring ? 'recurring' : 'once';
+    const routine: Routine = {
+      id: generateId(),
+      name: title.trim(),
+      frequency: freq,
+      notificationTime: `${hour}:${min}`,
+      completedDates: [],
+      createdAt: new Date().toISOString(),
+      setName: catName,
+      setIcon: catIcon,
+      scope,
+      onceRange: scope === 'once' ? getOnceRange(freq) : undefined,
+      targetDays: freq === 'weekly' && days.length > 0 ? days : undefined,
+      monthlyDays: freq === 'monthly' && monthDays.length > 0 ? monthDays : undefined,
+    };
+    addRoutines([routine]);
+    setTitle(''); setFreq('daily'); setRecurring(true);
+    setDays([]); setMonthDays([]); setHour('09'); setMin('00'); setShowTime(false);
+    setSelectedCategory(null);
+    Alert.alert('Eklendi ✓', `"${routine.name}" rutini oluşturuldu.`);
   };
-
-  const removeDraft = (tempId: string) => setDrafts(prev => prev.filter(d => d.tempId !== tempId));
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
       <View style={s.header}>
         <Text style={s.headerTitle}>Yeni Rutin</Text>
-        {drafts.length > 0 && (
-          <TouchableOpacity style={s.saveHeaderBtn} onPress={handleSave} activeOpacity={0.85}>
-            <Text style={s.saveHeaderTxt}>Kaydet</Text>
-          </TouchableOpacity>
-        )}
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}>
-        {/* Kategori seçimi */}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
+      >
+        {/* Kategori */}
         <TouchableOpacity style={s.catRow} onPress={() => router.push('/category-select')} activeOpacity={0.7}>
-          <View style={s.catIcon}>
-            <Ionicons name={selectedCategory?.icon ? (selectedCategory.icon as any) : 'grid-outline'} size={18} color={selectedCategory ? GREEN : TEXT3} />
+          <View style={s.catIconBox}>
+            <Ionicons
+              name={(selectedCategory?.icon as any) ?? 'grid-outline'}
+              size={18}
+              color={selectedCategory ? GREEN : TEXT3}
+            />
           </View>
-          <Text style={[s.catLabel, selectedCategory && { color: TEXT }]}>{selectedCategory?.name && selectedCategory.name !== 'new' ? selectedCategory.name : 'Kategori seç'}</Text>
-          <Ionicons name="chevron-forward" size={18} color={TEXT3} />
+          <Text style={[s.catLabel, selectedCategory && { color: TEXT }]}>
+            {selectedCategory?.name && selectedCategory.name !== 'new' ? selectedCategory.name : 'Kategori seç'}
+          </Text>
+          <Ionicons name="chevron-forward" size={16} color={TEXT3} />
         </TouchableOpacity>
 
         <View style={s.divider} />
 
-        {/* Eklenen rutinler */}
-        {drafts.length > 0 && (
-          <>
-            <View style={s.sectionLabel}>
-              <Text style={s.sectionLabelTxt}>Eklenen Rutinler</Text>
-              <View style={s.badge}><Text style={s.badgeTxt}>{drafts.length}</Text></View>
-            </View>
-            {drafts.map((d, idx) => {
-              const opt = FS_OPTIONS.find(o => o.value === d.freqScope)!;
+        <View style={s.form}>
+          {/* Rutin adı */}
+          <TextInput
+            style={s.nameInput}
+            value={title}
+            onChangeText={setTitle}
+            placeholder="Rutin adı..."
+            placeholderTextColor={TEXT3}
+            maxLength={80}
+          />
+
+          {/* Frekans */}
+          <View style={s.freqRow}>
+            {FREQ_OPTS.map(opt => {
+              const on = freq === opt.value;
               return (
-                <View key={d.tempId} style={[s.draftRow, idx < drafts.length - 1 && s.draftBorder]}>
-                  <View style={[s.draftDot, { backgroundColor: opt.freq === 'daily' ? '#2980b9' : opt.freq === 'weekly' ? '#8e44ad' : '#d35400' }]} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.draftTitle}>{d.title}</Text>
-                    <Text style={s.draftMeta}>{scopeLabel(opt.freq, opt.scope)} · {d.hour}:{d.min}</Text>
-                  </View>
-                  <TouchableOpacity hitSlop={10} onPress={() => removeDraft(d.tempId)}>
-                    <Ionicons name="close-circle" size={18} color={TEXT3} />
-                  </TouchableOpacity>
-                </View>
+                <TouchableOpacity
+                  key={opt.value}
+                  style={[s.freqPill, on && s.freqPillOn]}
+                  onPress={() => { setFreq(opt.value); setDays([]); setMonthDays([]); }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[s.freqPillTxt, on && { color: '#fff' }]}>{opt.label}</Text>
+                </TouchableOpacity>
               );
             })}
-            <View style={s.divider} />
-          </>
-        )}
-
-        {/* Rutin ekleme */}
-        <View style={s.sectionLabel}>
-          <Text style={[s.sectionLabelTxt, { color: GREEN }]}>Rutin Ekle</Text>
-        </View>
-
-        <View style={s.formWrap}>
-          {/* Rutin adı kutucuğu */}
-          <View style={s.nameBox}>
-            <TextInput style={s.nameInput} value={fTitle} onChangeText={setFTitle} placeholder="Rutin adı..." placeholderTextColor={TEXT3} maxLength={80} />
           </View>
 
-          {/* Saat ve Periyot yan yana */}
-          <View style={s.rowSplit}>
-            <TouchableOpacity style={s.splitBtn} onPress={() => setFShowTime(v => !v)} activeOpacity={0.7}>
-              <Ionicons name="time-outline" size={16} color={TEXT2} />
-              <Text style={s.splitBtnTxt}>{fHour}:{fMin}</Text>
-            </TouchableOpacity>
-
-            <View style={s.freqWrap}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.freqScroll}>
-                {FS_OPTIONS.map(opt => {
-                  const on = fFreqScope === opt.value;
-                  return (
-                    <TouchableOpacity key={opt.value} style={[s.freqChip, on && s.freqChipOn]} onPress={() => setFFreqScope(opt.value)} activeOpacity={0.7}>
-                      <Text style={[s.freqChipTxt, on && { color: '#fff' }]}>{opt.label}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            </View>
+          {/* Tekrarlayan / Sadece bu sefer */}
+          <View style={s.scopeCol}>
+            {[{ val: true, label: 'Tekrarlayan' }, { val: false, label: 'Sadece Bu Sefer' }].map(opt => (
+              <TouchableOpacity
+                key={String(opt.val)}
+                style={s.radioRow}
+                onPress={() => setRecurring(opt.val)}
+                activeOpacity={0.7}
+              >
+                <View style={s.radioOuter}>
+                  {recurring === opt.val && <View style={s.radioInner} />}
+                </View>
+                <Text style={[s.radioLabel, recurring === opt.val && s.radioLabelOn]}>{opt.label}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
 
-          {fShowTime && Platform.OS === 'ios' && (
-            <View style={{ overflow: 'hidden', marginTop: 8 }}>
-              <DateTimePicker value={fTimeDate} mode="time" display="spinner" is24Hour onChange={(_, d) => { if (d) { setFHour(String(d.getHours()).padStart(2, '0')); setFMin(String(d.getMinutes()).padStart(2, '0')); } }} style={{ width: '100%', height: 110 }} />
-            </View>
-          )}
-          {fShowTime && Platform.OS === 'android' && (
-            <DateTimePicker value={fTimeDate} mode="time" display="spinner" is24Hour onChange={(e, d) => { setFShowTime(false); if (e.type === 'set' && d) { setFHour(String(d.getHours()).padStart(2, '0')); setFMin(String(d.getMinutes()).padStart(2, '0')); } }} />
-          )}
-
-          {fOpt.freq === 'weekly' && (
+          {/* Haftalık gün seçimi */}
+          {freq === 'weekly' && (
             <View style={s.dayRow}>
               {WEEK_DAYS.map(({ label, js }) => {
-                const on = fDays.includes(js);
+                const on = days.includes(js);
                 return (
-                  <TouchableOpacity key={js} style={[s.dayChip, on && s.dayChipOn]} onPress={() => setFDays(prev => on ? prev.filter(d => d !== js) : [...prev, js])}>
+                  <TouchableOpacity
+                    key={js}
+                    style={[s.dayChip, on && s.dayChipOn]}
+                    onPress={() => setDays(prev => on ? prev.filter(d => d !== js) : [...prev, js])}
+                  >
                     <Text style={[s.dayChipTxt, on && { color: '#fff' }]}>{label}</Text>
                   </TouchableOpacity>
                 );
@@ -233,87 +188,159 @@ export default function CreateScreen() {
             </View>
           )}
 
-          {fOpt.freq === 'monthly' && (
+          {/* Aylık gün seçimi */}
+          {freq === 'monthly' && (
             <View style={s.calGrid}>
               {Array.from({ length: 31 }, (_, i) => i + 1).map(d => {
-                const on = fMonthDays.includes(d);
+                const on = monthDays.includes(d);
                 return (
-                  <TouchableOpacity key={d} style={[s.calCell, on && s.calCellOn]} onPress={() => setFMonthDays(prev => on ? prev.filter(x => x !== d) : [...prev, d])}>
+                  <TouchableOpacity
+                    key={d}
+                    style={[s.calCell, on && s.calCellOn]}
+                    onPress={() => setMonthDays(prev => on ? prev.filter(x => x !== d) : [...prev, d])}
+                  >
                     <Text style={[s.calCellTxt, on && { color: '#fff' }]}>{d}</Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
           )}
-        </View>
 
-        <TouchableOpacity style={[s.addBtn, !canAdd && s.addBtnOff]} onPress={handleAddDraft} disabled={!canAdd} activeOpacity={0.8}>
-          <Ionicons name="add" size={18} color={canAdd ? '#fff' : TEXT3} />
-          <Text style={s.addBtnTxt}>Listeye Ekle</Text>
-        </TouchableOpacity>
+          {/* Bildirim saati */}
+          <TouchableOpacity style={s.timeBtn} onPress={() => setShowTime(v => !v)} activeOpacity={0.7}>
+            <Ionicons name="time-outline" size={16} color={TEXT2} />
+            <Text style={s.timeLbl}>Bildirim saati</Text>
+            <Text style={s.timeVal}>{hour}:{min}</Text>
+            <Ionicons name={showTime ? 'chevron-up' : 'chevron-down'} size={14} color={TEXT3} />
+          </TouchableOpacity>
+
+          {showTime && Platform.OS === 'ios' && (
+            <View style={{ overflow: 'hidden' }}>
+              <DateTimePicker
+                value={timeDate} mode="time" display="spinner" is24Hour
+                onChange={(_, d) => {
+                  if (d) {
+                    setHour(String(d.getHours()).padStart(2, '0'));
+                    setMin(String(d.getMinutes()).padStart(2, '0'));
+                  }
+                }}
+                style={{ width: '100%', height: 110 }}
+              />
+            </View>
+          )}
+          {showTime && Platform.OS === 'android' && (
+            <DateTimePicker
+              value={timeDate} mode="time" display="spinner" is24Hour
+              onChange={(e, d) => {
+                setShowTime(false);
+                if (e.type === 'set' && d) {
+                  setHour(String(d.getHours()).padStart(2, '0'));
+                  setMin(String(d.getMinutes()).padStart(2, '0'));
+                }
+              }}
+            />
+          )}
+        </View>
       </ScrollView>
+
+      {/* Ekle butonu */}
+      <View style={[s.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+        <TouchableOpacity
+          style={[s.addBtn, !canSave && s.addBtnOff]}
+          onPress={handleSave}
+          disabled={!canSave}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="add" size={20} color={canSave ? '#fff' : TEXT3} />
+          <Text style={[s.addBtnTxt, !canSave && { color: TEXT3 }]}>Rutin Ekle</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6 },
+
+  header: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 8 },
   headerTitle: { fontSize: 22, color: TEXT, fontWeight: '800', letterSpacing: -0.3 },
-  saveHeaderBtn: { backgroundColor: GREEN, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 6 },
-  saveHeaderTxt: { fontSize: 14, color: '#fff', fontWeight: '700' },
 
-  divider: { height: 1, backgroundColor: BORDER },
+  divider: { height: 0.5, backgroundColor: BORDER },
 
-  // Category row
-  catRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 14 },
-  catIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center' },
+  catRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 16, paddingVertical: 14,
+  },
+  catIconBox: {
+    width: 34, height: 34, borderRadius: 10,
+    backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center',
+  },
   catLabel: { flex: 1, fontSize: 14, color: TEXT3, fontWeight: '500' },
 
-  // Section label
-  sectionLabel: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
-  sectionLabelTxt: { fontSize: 13, color: TEXT2, fontWeight: '700', letterSpacing: 0.5 },
-  badge: { backgroundColor: GREEN + '15', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },
-  badgeTxt: { fontSize: 11, color: GREEN, fontWeight: '700' },
+  form: { paddingHorizontal: 16, paddingTop: 20, gap: 14 },
 
-  // Drafts
-  draftRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 11 },
-  draftBorder: { borderBottomWidth: 1, borderBottomColor: BORDER },
-  draftDot: { width: 8, height: 8, borderRadius: 4 },
-  draftTitle: { fontSize: 14, color: TEXT, fontWeight: '500' },
-  draftMeta: { fontSize: 11, color: TEXT3, marginTop: 2 },
+  nameInput: {
+    fontSize: 20, fontWeight: '700', color: TEXT,
+    backgroundColor: SURFACE, borderRadius: 16,
+    paddingHorizontal: 16, paddingVertical: 16,
+  },
 
-  // Form
-  formWrap: { paddingHorizontal: 16, paddingTop: 8, gap: 12 },
+  freqRow: { flexDirection: 'row', gap: 8 },
+  freqPill: {
+    flex: 1, paddingVertical: 12, borderRadius: PILL,
+    backgroundColor: SURFACE, alignItems: 'center',
+  },
+  freqPillOn: { backgroundColor: GREEN },
+  freqPillTxt: { fontSize: 13, fontWeight: '700', color: TEXT2 },
 
-  // Name box
-  nameBox: { backgroundColor: SURFACE, borderRadius: 12, borderWidth: 1, borderColor: BORDER },
-  nameInput: { fontSize: 14, color: TEXT, paddingVertical: 12, paddingHorizontal: 14 },
+  scopeCol: { flexDirection: 'row', gap: 24 },
+  radioRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  radioOuter: {
+    width: 20, height: 20, borderRadius: 10,
+    borderWidth: 2, borderColor: BORDER,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  radioInner: {
+    width: 10, height: 10, borderRadius: 5,
+    backgroundColor: GREEN,
+  },
+  radioLabel: { fontSize: 14, fontWeight: '500', color: TEXT2 },
+  radioLabelOn: { color: TEXT, fontWeight: '700' },
 
-  // Row split: time + frequency
-  rowSplit: { flexDirection: 'row', gap: 10 },
-  splitBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: SURFACE, borderRadius: 12, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 14, paddingVertical: 10 },
-  splitBtnTxt: { fontSize: 15, fontWeight: '700', color: TEXT, letterSpacing: 0.5 },
-  freqWrap: { flex: 1 },
-  freqScroll: { gap: 6 },
-  freqChip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: SURFACE, borderWidth: 1, borderColor: BORDER },
-  freqChipOn: { backgroundColor: GREEN, borderColor: GREEN },
-  freqChipTxt: { fontSize: 12, fontWeight: '600', color: TEXT2 },
-
-  // Day chips
   dayRow: { flexDirection: 'row', gap: 5 },
-  dayChip: { flex: 1, aspectRatio: 1, borderRadius: 999, backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center' },
+  dayChip: {
+    flex: 1, aspectRatio: 1, borderRadius: PILL,
+    backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center',
+  },
   dayChipOn: { backgroundColor: TEXT },
   dayChipTxt: { fontSize: 11, fontWeight: '700', color: TEXT2 },
 
-  // Month grid
   calGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
-  calCell: { width: '12%', aspectRatio: 1, borderRadius: 10, backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center' },
+  calCell: {
+    width: '12%', aspectRatio: 1, borderRadius: 10,
+    backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center',
+  },
   calCellOn: { backgroundColor: GREEN },
   calCellTxt: { fontSize: 12, fontWeight: '700', color: TEXT2 },
 
-  // Buttons
-  addBtn: { marginHorizontal: 16, marginTop: 20, borderRadius: 12, paddingVertical: 14, alignItems: 'center', backgroundColor: GREEN, flexDirection: 'row', justifyContent: 'center', gap: 8 },
+  timeBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: SURFACE, borderRadius: 14,
+    paddingHorizontal: 16, paddingVertical: 13,
+  },
+  timeLbl: { fontSize: 13, color: TEXT2, flex: 1 },
+  timeVal: { fontSize: 16, fontWeight: '800', color: TEXT, letterSpacing: 0.5 },
+
+  footer: {
+    paddingHorizontal: 16, paddingTop: 12,
+    borderTopWidth: 0.5, borderTopColor: BORDER,
+    backgroundColor: BG,
+  },
+  addBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, backgroundColor: GREEN,
+    borderRadius: PILL, paddingVertical: 16,
+  },
   addBtnOff: { backgroundColor: SURFACE },
-  addBtnTxt: { fontSize: 15, color: '#fff', fontWeight: '700' },
+  addBtnTxt: { fontSize: 16, color: '#fff', fontWeight: '800' },
 });

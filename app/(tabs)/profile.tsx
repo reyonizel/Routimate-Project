@@ -16,7 +16,7 @@ const { width } = Dimensions.get('window');
 const PHOTO_SIZE = (width - 32 - 4) / 3;
 const today = localDateStr();
 
-const BG = '#FCF7F0'; const CARD = '#FFFFFF'; const SURFACE = '#F5EDE0';
+const BG = '#EEE3D0'; const CARD = '#FFFFFF'; const SURFACE = '#F5EDE0';
 const TEXT = '#0A3B25'; const TEXT2 = '#3D6B58'; const TEXT3 = '#B2B7AA';
 const RED = '#2A6151'; const GREEN = '#1A4F3A'; const GOLD = '#D8C2A4';
 const BORDER = '#B2B7AA'; const PILL = 999;
@@ -222,34 +222,24 @@ export default function ProfileScreen() {
       <View style={styles.topRow}>
         <Text style={styles.topUsername}>{user.username}</Text>
         <TouchableOpacity style={styles.settingsBtn} onPress={() => router.push('/modal')}>
-          <Ionicons name="menu" size={28} color={TEXT} />
+          <Ionicons name="menu" size={22} color={TEXT} />
         </TouchableOpacity>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Instagram style Header: Avatar on left, Stats on right */}
-        <View style={styles.instaHeader}>
-          {/* Avatar */}
-          <View style={styles.avatarCol}>
-            <TouchableOpacity onPress={pickAvatar} activeOpacity={0.85} style={styles.avatarWrap}>
-              <View style={[styles.avatarRing, { borderColor: accentColor }]}>
-                {user.avatarUri
-                  ? <Image source={{ uri: user.avatarUri }} style={styles.avatarImage} contentFit="cover" cachePolicy="memory-disk" transition={250} placeholder="#F5EDE0" />
-                  : (
-                    <View style={styles.avatarInner}>
-                      <Text style={[styles.avatarLetter, { color: accentColor }]}>{(user.username || '?')[0].toUpperCase()}</Text>
-                    </View>
-                  )
-                }
+        {/* Instagram Header: avatar sol, istatistikler sağ */}
+        <View style={styles.instaHead}>
+          <TouchableOpacity onPress={pickAvatar} activeOpacity={0.8}>
+            {user.avatarUri ? (
+              <Image source={{ uri: user.avatarUri }} style={styles.avatar} contentFit="cover" cachePolicy="memory-disk" transition={200} />
+            ) : (
+              <View style={[styles.avatarFallback, { backgroundColor: accentColor + '20' }]}>
+                <Text style={[styles.avatarInitial, { color: accentColor }]}>{(user.username || '?')[0].toUpperCase()}</Text>
               </View>
-              <View style={styles.cameraChip}>
-                <Ionicons name="add" size={14} color="#fff" />
-              </View>
-            </TouchableOpacity>
-          </View>
+            )}
+          </TouchableOpacity>
 
-          {/* Stats */}
-          <View style={styles.statsContainer}>
+          <View style={styles.statsRow}>
             <View style={styles.statItem}>
               <Text style={styles.statNum}>{user.achievementScore}%</Text>
               <Text style={styles.statLabel}>Başarı</Text>
@@ -265,38 +255,24 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Bio Section */}
-        <View style={styles.bioSection}>
-          {user.fullName ? <Text style={styles.profileFullName}>{user.fullName}</Text> : null}
+        {/* Bio */}
+        <View style={styles.bioArea}>
+          {user.fullName ? <Text style={styles.profileName}>{user.fullName}</Text> : null}
+          <Text style={styles.profileHandle}>@{user.username}{user.isPro ? ' · Pro' : ''}</Text>
           {user.bio ? <Text style={styles.profileBio}>{user.bio}</Text> : null}
-          {user.locationName ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-              <Ionicons name="location-outline" size={14} color={TEXT2} />
-              <Text style={styles.profileLocation}>{user.locationName}</Text>
-            </View>
-          ) : null}
+          {user.locationName ? <Text style={styles.profileLoc}>{user.locationName}</Text> : null}
         </View>
 
-        {/* Pro badge / upgrade */}
-        <View style={styles.actionRow}>
-          {user.isPro ? (
-            <View style={[styles.proBadge, { flex: 1 }]}>
-              <Ionicons name="star" size={13} color={GOLD} />
-              <Text style={[styles.proBadgeText, { color: GOLD }]}>Pro Üye</Text>
-            </View>
-          ) : (
-            <TouchableOpacity style={[styles.upgradeBtn, { flex: 1 }]} onPress={() => router.push('/pro-upgrade')} activeOpacity={0.85}>
-              <FontAwesome5 name="crown" size={14} color="#fff" />
-              <Text style={styles.upgradeBtnText}>Pro'ya Geç</Text>
+        {/* Buttons */}
+        <View style={styles.btnRow}>
+          {!user.isPro && (
+            <TouchableOpacity style={styles.proBtn} onPress={() => router.push('/pro-upgrade')} activeOpacity={0.85}>
+              <FontAwesome5 name="crown" size={13} color="#fff" />
+              <Text style={styles.proBtnTxt}>Pro'ya Geç</Text>
             </TouchableOpacity>
           )}
-
-          <TouchableOpacity
-            style={[styles.editProfileBtn, { flex: 1, marginLeft: 8 }]}
-            onPress={() => router.push('/edit-profile')}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.editProfileBtnText}>Profili Düzenle</Text>
+          <TouchableOpacity style={styles.editBtn} onPress={() => router.push('/edit-profile')} activeOpacity={0.85}>
+            <Text style={styles.editBtnTxt}>Profili Düzenle</Text>
           </TouchableOpacity>
         </View>
 
@@ -324,66 +300,19 @@ export default function ProfileScreen() {
               });
               return Object.entries(groups).map(([setName, routines]) => {
                 const isInactive = (user.inactiveSets ?? []).includes(setName);
-                const isExpanded = expandedSet === setName;
                 return (
-                  <View key={setName} style={styles.setBlock}>
-                    {/* Collapsed header — tap chevron to expand */}
-                    <TouchableOpacity
-                      style={styles.setHeader}
-                      onPress={() => setExpandedSet(isExpanded ? null : setName)}
-                      activeOpacity={0.7}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.setTitle, isInactive && styles.setTitleInactive]}>{setName}</Text>
-                        <Text style={styles.setMeta}>{routines.length} rutin · {isInactive ? 'Pasif' : 'Aktif'}</Text>
-                      </View>
-                      <Ionicons
-                        name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                        size={18}
-                        color={TEXT3}
-                      />
-                    </TouchableOpacity>
-
-                    {/* Expanded: routine rows + pasifleştir butonu */}
-                    {isExpanded && (
-                      <>
-                        {routines.map(r => {
-                          const done = r.completedDates.includes(today);
-                          return (
-                            <TouchableOpacity
-                              key={r.id}
-                              style={styles.routineRow}
-                              onLongPress={() => openEditSheet(r)}
-                              delayLongPress={300}
-                              activeOpacity={0.7}
-                            >
-                              <View style={[styles.routineDot, {
-                                backgroundColor: done ? RED : SURFACE,
-                                borderWidth: done ? 0 : 1.5,
-                                borderColor: BORDER,
-                              }]}>
-                                {done && <Ionicons name="checkmark" size={10} color="#fff" />}
-                              </View>
-                              <View style={{ flex: 1 }}>
-                                <Text style={[styles.routineName, done && { color: TEXT3 }]}>{r.name}</Text>
-                                <Text style={styles.routineMeta}>{FREQ_LABEL[r.frequency]} · {r.completedDates.length} tamamlama</Text>
-                              </View>
-                              <Ionicons name="ellipsis-horizontal" size={16} color={TEXT3} />
-                            </TouchableOpacity>
-                          );
-                        })}
-                        <TouchableOpacity
-                          style={[styles.setActionBtn, isInactive && styles.setActionBtnActive]}
-                          onPress={() => toggleSetActive(setName)}
-                          activeOpacity={0.8}
-                        >
-                          <Text style={[styles.setActionTxt, isInactive && { color: RED }]}>
-                            {isInactive ? 'Aktifleştir' : 'Pasifleştir'}
-                          </Text>
-                        </TouchableOpacity>
-                      </>
-                    )}
-                  </View>
+                  <TouchableOpacity
+                    key={setName}
+                    style={styles.setHeader}
+                    onPress={() => router.push({ pathname: '/set-panel', params: { setName } })}
+                    activeOpacity={0.7}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.setTitle, isInactive && styles.setTitleInactive]}>{setName}</Text>
+                      <Text style={styles.setMeta}>{routines.length} rutin · {isInactive ? 'Pasif' : 'Aktif'}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color={TEXT3} />
+                  </TouchableOpacity>
                 );
               });
             })()}
@@ -761,51 +690,45 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
-  topUsername: { fontSize: 22, color: TEXT, fontWeight: 'bold' },
-  settingsBtn: { padding: 4 },
+  topUsername: { fontSize: 19, color: TEXT, fontWeight: '800', letterSpacing: -0.3 },
+  settingsBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center' },
   
-  instaHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12 },
-  avatarCol: { alignItems: 'center', marginRight: 24 },
-  avatarWrap: { position: 'relative' },
-  avatarRing: { width: 80, height: 80, borderRadius: 40, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  avatarImage: { width: 72, height: 72, borderRadius: 36 },
-  avatarInner: { width: 72, height: 72, borderRadius: 36, backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center' },
-  avatarLetter: { fontSize: 28, fontWeight: '900' },
-  cameraChip: { position: 'absolute', bottom: 0, right: 0, width: 22, height: 22, borderRadius: 11, backgroundColor: '#3498db', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: BG },
-  
-  bioSection: { paddingHorizontal: 16, marginBottom: 16 },
-  profileFullName: { fontSize: 14, color: TEXT, fontWeight: '700' },
-  profileBio: { fontSize: 14, color: TEXT, marginTop: 2, lineHeight: 18 },
-  profileLocation: { fontSize: 13, color: TEXT2, marginLeft: 4 },
-
-  statsContainer: { flex: 1, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' },
+  instaHead: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 16, gap: 24 },
+  avatar: { width: 84, height: 84, borderRadius: 42 },
+  avatarFallback: { width: 84, height: 84, borderRadius: 42, alignItems: 'center', justifyContent: 'center' },
+  avatarInitial: { fontSize: 32, fontWeight: '900' },
+  statsRow: { flex: 1, flexDirection: 'row', justifyContent: 'space-around' },
   statItem: { alignItems: 'center' },
-  statNum: { fontSize: 18, color: TEXT, fontWeight: 'bold' },
-  statLabel: { fontSize: 13, color: TEXT, marginTop: 2 },
+  statNum: { fontSize: 20, fontWeight: '900', color: TEXT, letterSpacing: -0.4 },
+  statLabel: { fontSize: 11, color: TEXT3, marginTop: 3, fontWeight: '600' },
 
-  actionRow: { flexDirection: 'row', paddingHorizontal: 16, marginBottom: 12 },
-  proBadge: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: SURFACE, borderRadius: 5, paddingVertical: 10, borderWidth: 1, borderColor: BORDER },
-  proBadgeText: { fontSize: 13, fontWeight: '700' },
-  upgradeBtn: { flexDirection: 'row', gap: 8, backgroundColor: '#D8C2A4', borderRadius: 8, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', width: '100%' },
-  upgradeBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: 'bold' },
-  editProfileBtn: { backgroundColor: SURFACE, borderRadius: 8, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: BORDER },
-  editProfileBtnText: { color: TEXT, fontSize: 14, fontWeight: '700' },
+  bioArea: { paddingHorizontal: 16, paddingBottom: 14, gap: 2 },
+  profileName: { fontSize: 15, fontWeight: '800', color: TEXT },
+  profileHandle: { fontSize: 13, color: TEXT3, fontWeight: '500' },
+  profileBio: { fontSize: 14, color: TEXT2, lineHeight: 19, marginTop: 4 },
+  profileLoc: { fontSize: 13, color: TEXT3, marginTop: 2 },
+
+  btnRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginBottom: 12 },
+  proBtn: { flex: 1, flexDirection: 'row', gap: 7, backgroundColor: GOLD, borderRadius: PILL, paddingVertical: 10, alignItems: 'center', justifyContent: 'center' },
+  proBtnTxt: { color: '#0A3B25', fontSize: 14, fontWeight: '800' },
+  editBtn: { flex: 1, backgroundColor: SURFACE, borderRadius: PILL, paddingVertical: 10, alignItems: 'center', justifyContent: 'center' },
+  editBtnTxt: { color: TEXT, fontSize: 14, fontWeight: '700' },
   tabs: { flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: BORDER, marginHorizontal: 16 },
   tab: { flex: 1, paddingVertical: 12, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
   tabActive: { borderBottomColor: TEXT },
   tabText: { fontSize: 13, color: TEXT2, fontWeight: '600' },
   tabTextActive: { color: TEXT, fontWeight: '800' },
-  tabContent: { padding: 16 },
+  tabContent: { paddingTop: 4 },
   emptyMsg: { textAlign: 'center', color: TEXT3, fontSize: 14, paddingTop: 30 },
-  setBlock: { marginBottom: 12, backgroundColor: CARD, borderRadius: 16, overflow: 'hidden' },
-  setHeader: { flexDirection: 'row', alignItems: 'center', padding: 14 },
-  setTitle: { fontSize: 15, color: TEXT, fontWeight: '800', letterSpacing: -0.3 },
+  setBlock: { marginBottom: 0 },
+  setHeader: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderTopWidth: 0.5, borderTopColor: BORDER, backgroundColor: 'rgba(42,97,81,0.05)' },
+  setTitle: { fontSize: 14, color: RED, fontWeight: '700' },
   setTitleInactive: { color: TEXT3 },
-  setMeta: { fontSize: 11, color: TEXT3, marginTop: 2 },
-  setActionBtn: { margin: 12, marginTop: 4, borderRadius: 10, paddingVertical: 11, alignItems: 'center', backgroundColor: SURFACE },
-  setActionBtnActive: { backgroundColor: RED + '15' },
-  setActionTxt: { fontSize: 13, fontWeight: '700', color: TEXT2 },
-  routineRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 14, gap: 10, borderTopWidth: 0.5, borderTopColor: BORDER },
+  setMeta: { fontSize: 11, color: TEXT3, marginTop: 1 },
+  setActionBtn: { alignSelf: 'flex-end', marginRight: 16, marginTop: 6, marginBottom: 10, paddingHorizontal: 14, paddingVertical: 6, backgroundColor: SURFACE, borderRadius: PILL },
+  setActionBtnActive: { backgroundColor: 'rgba(42,97,81,0.10)' },
+  setActionTxt: { fontSize: 12, fontWeight: '700', color: TEXT3 },
+  routineRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 11, paddingHorizontal: 16, gap: 10, borderTopWidth: 0.5, borderTopColor: BORDER },
   routineDot: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   routineName: { fontSize: 13, color: TEXT, fontWeight: '600' },
   routineMeta: { fontSize: 11, color: TEXT3, marginTop: 2 },
@@ -826,6 +749,7 @@ const styles = StyleSheet.create({
   metricCard: {
     flex: 1, minWidth: '45%', backgroundColor: CARD, borderRadius: 16,
     padding: 14, gap: 6,
+    shadowColor: '#0A3B25', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.07, shadowRadius: 10, elevation: 3,
   },
   metricIconWrap: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 2 },
   metricLabel: { fontSize: 12, fontWeight: '700', color: TEXT },

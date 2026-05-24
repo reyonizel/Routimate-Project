@@ -1,53 +1,52 @@
-// ─── RoutinMate Design System v2 — Green Nature Palette ──────────────────────
+// ─── RoutinMate Design System v3 — Lime × Lavender Palette ──────────────────
 
 export const Colors = {
   // ── Backgrounds ──────────────────────────────────────────────────────────
-  background: '#FCF7F0',              // Light cream  — ana ekran zemini
-  surface:    '#FFFFFF',              // Saf beyaz    — kart / liste / istatistik bloğu
-  surface2:   '#F5EDE0',              // Orta cream   — nested / ikincil yüzey
-  overlay:    'rgba(252,247,240,0.96)',
+  background: '#EEE3D0',              // Warm near-white — ana ekran zemini
+  surface:    '#F5EDE0',              // Soft warm — ikincil yüzey
+  surface2:   '#EEEDC8',              // Daha doygun — nested yüzey
+  overlay:    'rgba(255,254,236,0.96)',
 
   // ── Cards ────────────────────────────────────────────────────────────────
   card:       '#FFFFFF',
   cardBorder: 'transparent',
 
-  // ── Primary — aktif elemanlar, FAB, takvim seçili gün, tik butonları ────
-  primary:     '#2A6151',             // Moderate green
-  primarySoft: 'rgba(42,97,81,0.10)',
+  // ── Primary — lavender — aktif elemanlar, FAB, butonlar ─────────────────
+  primary:     '#2A6151',             // Soft lavender
+  primarySoft: 'rgba(168,138,237,0.12)',
 
-  // ── Text / Dark — başlıklar, kart metinleri, aktif navbar ikonları ───────
-  text:          '#0A3B25',           // Deep bluish green
-  textSecondary: '#3D6B58',           // Orta ton — ikincil kart metni
-  textMuted:     '#B2B7AA',           // Laurel green — alt metin, separator
+  // ── Accent — lime — vurgu, tamamlama noktaları, highlight ───────────────
+  accent:      '#D8C2A4',             // Lime / chartreuse
+  accentSoft:  'rgba(203,216,59,0.15)',
+  accentDark:  '#B89B76',             // Koyu lime (pressed)
+
+  // ── Text ─────────────────────────────────────────────────────────────────
+  text:          '#0A3B25',           // Dark charcoal
+  textSecondary: '#3D6B58',           // Medium gray
+  textMuted:     '#B2B7AA',           // Muted
   textInverse:   '#FFFFFF',
 
-  // ── Muted — pasif günler, boş yuvarlak kontür, border/separator ──────────
-  muted:       '#B2B7AA',             // Laurel green
-  mutedSoft:   'rgba(178,183,170,0.20)',
+  // ── Muted / Border ───────────────────────────────────────────────────────
+  muted:       '#B2B7AA',
+  mutedSoft:   'rgba(171,171,171,0.20)',
   border:      '#B2B7AA',
 
-  // ── Accent — özel rutin yıldız ikonları, ikon arka planları (fuşya) ──────
-  accent:     '#E91E63',              // Canlı pembe / fuşya — AYNEN KORUNDU
-  accentSoft: 'rgba(233,30,99,0.10)',
-
-  // ── Tuscan Gold — Premium buton, başarı rozeti, uyum skoru ───────────────
-  tuscanGold:     '#D8C2A4',
-  tuscanGoldSoft: 'rgba(216,194,164,0.18)',
-  tuscanGoldDark: '#B89B76',          // pressed / darker variant
-
   // ── Semantic ─────────────────────────────────────────────────────────────
-  success:     '#2A6151',
-  successSoft: 'rgba(42,97,81,0.10)',
-  danger:      '#C0392B',
-  dangerSoft:  'rgba(192,57,43,0.10)',
+  success:     '#D8C2A4',
+  successSoft: 'rgba(203,216,59,0.15)',
+  danger:      '#EF4444',
+  dangerSoft:  'rgba(239,68,68,0.10)',
 
-  // ── Legacy aliases — geriye dönük uyumluluk (kademeli geçiş için) ─────────
-  brand:        '#2A6151',            // eski brand → primary
-  brandSoft:    'rgba(42,97,81,0.08)',
+  // ── Legacy aliases ────────────────────────────────────────────────────────
+  brand:        '#2A6151',
+  brandSoft:    'rgba(168,138,237,0.12)',
   male:         '#3498DB',
-  female:       '#E91E63',            // accent ile aynı
-  proGold:      '#D8C2A4',            // tuscanGold ile aynı
-  proGoldSoft:  'rgba(216,194,164,0.18)',
+  female:       '#E91E63',
+  proGold:      '#D8C2A4',
+  proGoldSoft:  'rgba(203,216,59,0.15)',
+  tuscanGold:     '#D8C2A4',
+  tuscanGoldSoft: 'rgba(203,216,59,0.15)',
+  tuscanGoldDark: '#B89B76',
 };
 
 // ─── Shadows — kart derinliği (#0A3B25 temelli, cream zemin uyumlu) ──────────
@@ -113,7 +112,7 @@ export const FontWeight = {
 
 // ─── Frequency Badges — günlük/haftalık/aylık rutin etiketleri ───────────────
 export const FrequencyColor = {
-  daily:   { bg: 'rgba(42,97,81,0.10)',  border: 'rgba(42,97,81,0.25)',  text: '#2A6151' },
-  weekly:  { bg: 'rgba(10,59,37,0.08)',  border: 'rgba(10,59,37,0.20)',  text: '#0A3B25' },
-  monthly: { bg: 'rgba(216,194,164,0.20)', border: 'rgba(216,194,164,0.50)', text: '#B89B76' },
+  daily:   { bg: 'rgba(168,138,237,0.10)', border: 'rgba(168,138,237,0.25)', text: '#2A6151' },
+  weekly:  { bg: 'rgba(139,111,232,0.08)', border: 'rgba(139,111,232,0.20)', text: '#1A4F3A' },
+  monthly: { bg: 'rgba(203,216,59,0.15)',  border: 'rgba(203,216,59,0.35)',  text: '#B89B76' },
 };

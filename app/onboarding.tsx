@@ -13,7 +13,7 @@ import LocationSearch, { LocationResult } from '../components/LocationSearch';
 const { width } = Dimensions.get('window');
 const RED = '#2A6151';
 const TEXT = '#0A3B25'; const TEXT2 = '#3D6B58'; const TEXT3 = '#B2B7AA';
-const BORDER = '#B2B7AA'; const CARD = '#FFFFFF'; const BG = '#FCF7F0';
+const BORDER = '#B2B7AA'; const CARD = '#FFFFFF'; const BG = '#EEE3D0';
 
 const STEPS = ['Cinsiyet', 'Yaş', 'Konum', 'İlgi Alanları', 'Profil Fotoğrafı', 'Kullanıcı Adı'];
 

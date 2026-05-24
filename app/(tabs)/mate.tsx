@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, FlatList, TextInput } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { useStore, User, Mate, MatchRequest } from '../../store/useStore';
+import { MatchAPI } from '../../lib/api';
+import { supabase } from '../../lib/supabase';
 import { localDateStr } from '../../lib/date';
 import Svg, { Circle } from 'react-native-svg';
 
@@ -39,7 +41,7 @@ const CircularProgress = ({ size = 72, strokeWidth = 5, progress = 0, color = '#
 };
 
 const today = localDateStr();
-const BG='#FCF7F0'; const CARD='#FFFFFF'; const SURFACE='#F5EDE0';
+const BG='#EEE3D0'; const CARD='#FFFFFF'; const SURFACE='#F5EDE0';
 const TEXT='#0A3B25'; const TEXT2='#3D6B58'; const TEXT3='#B2B7AA';
 const RED='#2A6151'; const GREEN='#1A4F3A'; const GOLD='#D8C2A4';
 const BORDER='#B2B7AA'; const PILL=999;
@@ -123,12 +125,65 @@ export default function MateScreen() {
   const matchRequests = useStore(s => s.matchRequests);
   const sentRequests = useStore(s => s.sentMatchRequests);
   
+  const addMatchRequest    = useStore(s => s.addMatchRequest);
   const sendMatchRequest   = useStore(s => s.sendMatchRequest);
   const cancelMatchRequest = useStore(s => s.cancelMatchRequest);
   const acceptMatchRequest = useStore(s => s.acceptMatchRequest);
   const rejectMatchRequest = useStore(s => s.rejectMatchRequest);
+  const loadUserData       = useStore(s => s.loadUserData);
 
   const router = useRouter();
+
+  // Realtime: incoming match requests
+  useEffect(() => {
+    if (!user.id) return;
+    const channel = MatchAPI.subscribeToRequests(user.id, addMatchRequest);
+    return () => { supabase.removeChannel(channel); };
+  }, [user.id]);
+
+  // Realtime + polling: sent request accepted → load new match
+  useEffect(() => {
+    if (!user.id || mate) return;
+    const ts = Date.now();
+
+    const handleMatchFound = () => { loadUserData().catch(() => {}); };
+
+    // Realtime channels (instant if realtime pub is set up)
+    const ch1 = supabase
+      .channel(`match_new_a:${user.id}:${ts}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'matches', filter: `user_a=eq.${user.id}` },
+        handleMatchFound)
+      .subscribe();
+    const ch2 = supabase
+      .channel(`match_new_b:${user.id}:${ts}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'matches', filter: `user_b=eq.${user.id}` },
+        handleMatchFound)
+      .subscribe();
+
+    // Fallback poll every 8s — fires even if realtime misses the event
+    const poll = setInterval(() => {
+      MatchAPI.getActiveMatch(user.id).then(md => {
+        if (md.matchId) handleMatchFound();
+      }).catch(() => {});
+    }, 8000);
+
+    return () => {
+      supabase.removeChannel(ch1);
+      supabase.removeChannel(ch2);
+      clearInterval(poll);
+    };
+  }, [user.id, !!mate]);
+
+  // Focus: incoming requests + full refresh if no mate yet
+  useFocusEffect(useCallback(() => {
+    if (!user.id) return;
+    MatchAPI.getRequests(user.id).then(requests => {
+      requests.forEach(addMatchRequest);
+    }).catch(() => {});
+    if (!mate) {
+      loadUserData().catch(() => {});
+    }
+  }, [user.id, !!mate]));
 
   const sortedDiscovery = [...discoveryUsers]
     .filter(u => u.id !== user.id)
@@ -253,28 +308,29 @@ export default function MateScreen() {
         {/* Match requests */}
         {matchRequests.length > 0 && (
           <View style={s.requestSection}>
-            <Text style={s.igSectionTitle}>Eşleşme İstekleri</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingHorizontal: 16 }}>
-              {matchRequests.map(req => {
-                const reqAccent = req.fromUser.gender === 'female' ? '#e91e63' : '#3498db';
-                return (
-                  <View key={req.id} style={s.requestStoryCard}>
-                    <View style={[s.reqStoryAvatar, { borderColor: reqAccent }]}>
-                      <Image source={{ uri: req.fromUser.avatarUri || '' }} style={{ width: '100%', height: '100%', borderRadius: 999 }} contentFit="cover" cachePolicy="memory-disk" />
-                    </View>
-                    <Text style={s.reqStoryName} numberOfLines={1}>{req.fromUser.username}</Text>
-                    <View style={s.reqStoryBtns}>
-                      <TouchableOpacity style={s.reqStoryAccept} onPress={() => acceptMatchRequest(req)}>
-                        <Text style={s.reqStoryAcceptTxt}>Kabul</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={s.reqStoryReject} onPress={() => rejectMatchRequest(req.id)}>
-                        <Text style={s.reqStoryRejectTxt}>✕</Text>
-                      </TouchableOpacity>
-                    </View>
+            <Text style={s.reqSectionTitle}>Eşleşme İstekleri</Text>
+            {matchRequests.map(req => {
+              const reqAccent = req.fromUser.gender === 'female' ? '#e91e63' : '#3498db';
+              return (
+                <View key={req.id} style={s.reqCard}>
+                  <View style={[s.reqAvatar, { borderColor: reqAccent }]}>
+                    <Image source={{ uri: req.fromUser.avatarUri || '' }} style={{ width: '100%', height: '100%', borderRadius: 999 }} contentFit="cover" cachePolicy="memory-disk" blurRadius={8} />
                   </View>
-                );
-              })}
-            </ScrollView>
+                  <View style={s.reqInfo}>
+                    <Text style={s.reqName}>{req.fromUser.username}</Text>
+                    <Text style={s.reqSub}>eşleşmek istiyor</Text>
+                  </View>
+                  <View style={s.reqActions}>
+                    <TouchableOpacity style={s.reqAcceptBtn} onPress={() => acceptMatchRequest(req)} activeOpacity={0.8}>
+                      <Ionicons name="checkmark" size={18} color="#fff" />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={s.reqRejectBtn} onPress={() => rejectMatchRequest(req.id)} activeOpacity={0.8}>
+                      <Ionicons name="close" size={16} color={TEXT2} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            })}
           </View>
         )}
 
@@ -399,17 +455,17 @@ const s = StyleSheet.create({
   searchInput: {flex:1, fontSize:14, color:TEXT, marginLeft:8},
   searchClear: {paddingLeft:8},
 
-  // Match requests — horizontal stories
-  requestSection: {paddingVertical:12},
-  igSectionTitle: {fontSize:15, color:TEXT, fontWeight:'500', marginLeft:16, marginBottom:10},
-  requestStoryCard: {width:90, alignItems:'center', gap:4},
-  reqStoryAvatar: {width:64, height:64, borderRadius:32, borderWidth:2.5, overflow:'hidden'},
-  reqStoryName: {fontSize:11, color:TEXT, fontWeight:'600', textAlign:'center'},
-  reqStoryBtns: {flexDirection:'row', gap:4},
-  reqStoryAccept: {backgroundColor:RED, borderRadius:6, paddingHorizontal:8, paddingVertical:3},
-  reqStoryAcceptTxt: {color:'#fff', fontSize:10, fontWeight:'700'},
-  reqStoryReject: {backgroundColor:SURFACE, borderRadius:6, width:24, height:24, alignItems:'center', justifyContent:'center'},
-  reqStoryRejectTxt: {fontSize:10, color:TEXT2},
+  // Match requests — vertical card list
+  requestSection: { paddingVertical: 8, paddingHorizontal: 16, gap: 8 },
+  reqSectionTitle: { fontSize: 11, color: TEXT3, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 },
+  reqCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: SURFACE, borderRadius: 16, padding: 12 },
+  reqAvatar: { width: 50, height: 50, borderRadius: 25, borderWidth: 2, overflow: 'hidden', flexShrink: 0 },
+  reqInfo: { flex: 1 },
+  reqName: { fontSize: 15, color: TEXT, fontWeight: '700' },
+  reqSub: { fontSize: 12, color: TEXT2, marginTop: 2 },
+  reqActions: { flexDirection: 'row', gap: 8, flexShrink: 0 },
+  reqAcceptBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: RED, alignItems: 'center', justifyContent: 'center' },
+  reqRejectBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' },
 
   // Suggested — Instagram card style
   suggestedSection: {paddingTop:0},

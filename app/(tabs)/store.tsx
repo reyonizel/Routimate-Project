@@ -8,7 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../../store/useStore';
 import { supabase } from '../../lib/supabase';
 
-const BG = '#FCF7F0'; const CARD = '#FFFFFF';
+const BG = '#EEE3D0'; const CARD = '#FFFFFF';
 const TEXT = '#0A3B25'; const TEXT2 = '#3D6B58'; const TEXT3 = '#B2B7AA';
 const GREEN = '#2A6151'; const BORDER = '#B2B7AA'; const PILL = 999;
 

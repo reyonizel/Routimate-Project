@@ -1,9 +1,10 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Image, Alert, Dimensions } from 'react-native';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Image, Alert, Dimensions, BackHandler } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Animated, { useSharedValue, withSpring, useAnimatedStyle, withSequence, withRepeat, withTiming } from 'react-native-reanimated';
+import Animated, { useSharedValue, withSpring, useAnimatedStyle, withSequence, withRepeat, withTiming, runOnJS } from 'react-native-reanimated';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
+import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -42,12 +43,12 @@ const playCompletionSound = async (soundId: string) => {
   } catch (e) {}
 };
 
-const BG='#FCF7F0'; const CARD='#FFFFFF'; const SURFACE='#F5EDE0';
+const BG='#EEE3D0'; const CARD='#FFFFFF'; const SURFACE='#F5EDE0';
 const TEXT='#0A3B25'; const TEXT2='#3D6B58'; const TEXT3='#B2B7AA';
 const RED='#2A6151'; const GREEN='#1A4F3A'; const GOLD='#D8C2A4';
 const BORDER='#B2B7AA'; const PILL=999;
 
-const FREQ_COLOR: Record<string,string> = { daily:'#2A6151', weekly:'#0A3B25', monthly:'#B89B76' };
+const FREQ_COLOR: Record<string,string> = { daily:'#2A6151', weekly:'#1A4F3A', monthly:'#D8C2A4' };
 const CAT_COLORS = ['#E91E63','#9C27B0','#3F51B5','#2196F3','#00ACC1','#00897B','#F4511E','#6D4C41','#546E7A','#558B2F'];
 function catColor(name: string): string {
   let h = 0;
@@ -76,6 +77,55 @@ export default function HomeScreen() {
   const [selectedDate, setSelectedDate] = useState<string>(today);
   const [sheetVisible, setSheetVisible] = useState(false);
   const [taskMenu, setTaskMenu] = useState<string | null>(null);
+
+  const sheetY = useSharedValue(0);
+  const onDismissRef = useRef<() => void>(() => {});
+
+  const callDismiss = useCallback(() => {
+    onDismissRef.current();
+  }, []);
+
+  const panGesture = useMemo(() => Gesture.Pan()
+    .onUpdate((e) => { if (e.translationY > 0) sheetY.value = e.translationY; })
+    .onEnd((e) => {
+      if (e.translationY > 80 || e.velocityY > 800) {
+        sheetY.value = withTiming(800, { duration: 200 }, (done) => {
+          if (done) runOnJS(callDismiss)();
+        });
+      } else {
+        sheetY.value = withSpring(0, { damping: 20 });
+      }
+    }), [callDismiss]);
+
+  const sheetAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: sheetY.value }],
+  }));
+
+  useEffect(() => {
+    if (sheetVisible) {
+      sheetY.value = 800;
+      onDismissRef.current = () => setSheetVisible(false);
+      sheetY.value = withTiming(0, { duration: 320 });
+    }
+  }, [sheetVisible]);
+
+  useEffect(() => {
+    if (taskMenu) {
+      sheetY.value = 800;
+      onDismissRef.current = () => setTaskMenu(null);
+      sheetY.value = withTiming(0, { duration: 320 });
+    }
+  }, [taskMenu]);
+
+  useEffect(() => {
+    if (!sheetVisible && !taskMenu) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (sheetVisible) { setSheetVisible(false); return true; }
+      if (taskMenu) { setTaskMenu(null); return true; }
+      return false;
+    });
+    return () => sub.remove();
+  }, [sheetVisible, taskMenu]);
 
   const fabOffset = useSharedValue(0);
   const fabStyle = useAnimatedStyle(() => ({
@@ -463,10 +513,11 @@ export default function HomeScreen() {
       </Animated.View>
 
       {/* â”€â”€ Takvim Modalı â”€â”€ */}
-      <Modal visible={sheetVisible} transparent animationType="slide" onRequestClose={() => setSheetVisible(false)}>
-        <TouchableOpacity style={s.sheetBg} activeOpacity={1} onPress={() => setSheetVisible(false)} />
-        <View style={[s.sheet, { paddingBottom: insets.bottom + 12 }]}>
-          <View style={s.sheetHandle} />
+      {sheetVisible && <>
+        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setSheetVisible(false)} />
+        <GestureDetector gesture={panGesture}>
+          <Animated.View style={[s.sheet, s.sheetPos, { paddingBottom: insets.bottom + 12 }, sheetAnimStyle]}>
+            <View style={s.sheetHandle} />
 
           {/* Ay navigasyonu */}
           <View style={s.calHeader}>
@@ -533,8 +584,9 @@ export default function HomeScreen() {
               </View>
             ))}
           </View>
-        </View>
-      </Modal>
+          </Animated.View>
+        </GestureDetector>
+      </>}
 
       {/* Task Menu Bottom Sheet */}
       {taskMenu && (() => {
@@ -542,10 +594,11 @@ export default function HomeScreen() {
         if (!menuR) return null;
         const mcc = menuR.setName ? catColor(menuR.setName) : TEXT3;
         return (
-          <Modal transparent visible animationType="slide" onRequestClose={() => setTaskMenu(null)}>
-            <TouchableOpacity style={s.sheetBg} activeOpacity={1} onPress={() => setTaskMenu(null)} />
-            <View style={[s.taskMenuSheet, { paddingBottom: insets.bottom + 16 }]}>
-              <View style={s.sheetHandle} />
+          <>
+            <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setTaskMenu(null)} />
+            <GestureDetector gesture={panGesture}>
+              <Animated.View style={[s.taskMenuSheet, s.sheetPos, { paddingBottom: insets.bottom + 16 }, sheetAnimStyle]}>
+                <View style={s.sheetHandle} />
 
               {/* Rutin başlığı */}
               <View style={s.taskMenuHeader}>
@@ -624,8 +677,9 @@ export default function HomeScreen() {
                 <Ionicons name="trash-outline" size={19} color="#e74c3c" />
                 <Text style={s.menuDeleteTxt}>Sil</Text>
               </TouchableOpacity>
-            </View>
-          </Modal>
+              </Animated.View>
+            </GestureDetector>
+          </>
         );
       })()}
 
@@ -659,11 +713,11 @@ export default function HomeScreen() {
 }
 
 const s = StyleSheet.create({
-  container: {flex:1, backgroundColor:'#FCF7F0'},
-  topBlock: {backgroundColor:'#FCF7F0'},
+  container: {flex:1, backgroundColor:BG},
+  topBlock: {backgroundColor:BG},
 
   // Carousel
-  carouselWrap: {flexDirection:'row', alignItems:'center', paddingVertical:4, backgroundColor:'#FCF7F0'},
+  carouselWrap: {flexDirection:'row', alignItems:'center', paddingVertical:4, backgroundColor:BG},
   carArrowBtn: {width:32, height:48, alignItems:'center', justifyContent:'center'},
   carCell: {width:44, alignItems:'center', paddingVertical:6, paddingHorizontal:1, borderRadius:10, gap:1},
   carCellActive: {backgroundColor:SURFACE},
@@ -696,7 +750,7 @@ const s = StyleSheet.create({
   rowMeta: {fontSize:11, color:TEXT3, marginTop:1},
 
   // Task rows (new list style)
-  taskRow: {flexDirection:'row', alignItems:'center', gap:10, paddingVertical:13, paddingHorizontal:16, backgroundColor:BG},
+  taskRow: {flexDirection:'row', alignItems:'center', gap:10, paddingVertical:13, paddingHorizontal:16, backgroundColor:SURFACE},
   taskDivider: {height:1, backgroundColor:BORDER, marginHorizontal:20},
   catIcon: {width:36, height:36, borderRadius:10, alignItems:'center', justifyContent:'center'},
   taskCamera: {width:30, height:30, borderRadius:8, alignItems:'center', justifyContent:'center'},
@@ -756,8 +810,8 @@ const s = StyleSheet.create({
   legendTxt: {fontSize:11, color:TEXT2},
 
   // Sheet
-  sheetBg: {flex:1, backgroundColor:'rgba(0,0,0,0.25)'},
-  sheet: {backgroundColor:BG, borderTopLeftRadius:24, borderTopRightRadius:24, paddingHorizontal:16, paddingTop:8, paddingBottom:34},
+  sheetPos: { position: 'absolute', bottom: 0, left: 0, right: 0 },
+  sheet: {backgroundColor:GOLD, borderTopLeftRadius:24, borderTopRightRadius:24, paddingHorizontal:16, paddingTop:8, paddingBottom:34},
   sheetHandle: {width:36, height:4, backgroundColor:SURFACE, borderRadius:2, alignSelf:'center', marginBottom:14},
   sheetHead: {flexDirection:'row', alignItems:'flex-start', marginBottom:14},
   sheetDate: {fontSize:17, color:TEXT, fontWeight:'900', marginBottom:5},
@@ -770,22 +824,22 @@ const s = StyleSheet.create({
 
 
   // Task Menu Bottom Sheet
-  taskMenuSheet: {backgroundColor:BG, borderTopLeftRadius:24, borderTopRightRadius:24, paddingHorizontal:16, paddingTop:8},
+  taskMenuSheet: {backgroundColor:GOLD, borderTopLeftRadius:24, borderTopRightRadius:24, paddingHorizontal:16, paddingTop:8},
   taskMenuHeader: {flexDirection:'row', alignItems:'center', gap:12, paddingVertical:14, paddingHorizontal:4},
   taskMenuName: {fontSize:17, color:TEXT, fontWeight:'800', letterSpacing:-0.3},
   taskMenuSub: {fontSize:12, color:TEXT2, marginTop:2},
-  menuDetailsWrap: {backgroundColor:CARD, borderRadius:16, padding:14, marginBottom:12, gap:9},
+  menuDetailsWrap: {backgroundColor:SURFACE, borderRadius:16, padding:14, marginBottom:12, gap:9},
   menuDetailRow: {flexDirection:'row', alignItems:'center', gap:8},
   menuDetailTxt: {fontSize:13, color:TEXT2},
-  menuActionsCard: {backgroundColor:CARD, borderRadius:16, marginBottom:10, overflow:'hidden'},
+  menuActionsCard: {backgroundColor:SURFACE, borderRadius:16, marginBottom:10, overflow:'hidden'},
   menuActionBtn: {flexDirection:'row', alignItems:'center', gap:12, paddingHorizontal:16, paddingVertical:15},
   menuActionTxt: {fontSize:15, color:TEXT, fontWeight:'600'},
   menuActionDivider: {height:0.5, backgroundColor:BORDER, marginLeft:47},
-  menuDeleteBtn: {flexDirection:'row', alignItems:'center', gap:12, backgroundColor:CARD, borderRadius:16, paddingHorizontal:16, paddingVertical:15},
+  menuDeleteBtn: {flexDirection:'row', alignItems:'center', gap:12, backgroundColor:SURFACE, borderRadius:16, paddingHorizontal:16, paddingVertical:15},
   menuDeleteTxt: {fontSize:15, color:'#e74c3c', fontWeight:'600'},
 
   // Sheet rest day toggle
-  sheetRestBtn: {flexDirection:'row', alignItems:'center', gap:10, backgroundColor:CARD, borderRadius:12, padding:12, marginBottom:12, borderWidth:1, borderColor:BORDER},
+  sheetRestBtn: {flexDirection:'row', alignItems:'center', gap:10, backgroundColor:SURFACE, borderRadius:12, padding:12, marginBottom:12, borderWidth:1, borderColor:BORDER},
   sheetRestBtnOn: {backgroundColor:'#B2B7AA', borderColor:'#9BA5A0'},
   sheetRestTxt: {fontSize:13, color:TEXT2, fontWeight:'700', flex:1},
 });

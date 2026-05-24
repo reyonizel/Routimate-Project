@@ -22,7 +22,7 @@ export default function OrdersScreen() {
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FCF7F0' },
+  container: { flex: 1, backgroundColor: '#EEE3D0' },
   back: { margin: 16, width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   body: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
   emoji: { fontSize: 48, marginBottom: 16 },

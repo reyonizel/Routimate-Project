@@ -12,7 +12,7 @@ import { useStore } from '../store/useStore';
 
 const { width, height } = Dimensions.get('window');
 const THEME_GREEN = '#2A6151';
-const BG = '#FCF7F0';
+const BG = '#EEE3D0';
 const TEXT = '#0A3B25';
 const TEXT_MUTED = '#B2B7AA';
 

@@ -28,6 +28,7 @@ function dbToRoutine(r: any): Routine {
     targetDays: r.target_days ?? undefined,
     monthlyDays: r.monthly_days ?? undefined,
     setName: r.set_name ?? undefined,
+    setIcon: r.set_icon ?? undefined,
     scope: (r.scope ?? 'recurring') as Routine['scope'],
     onceRange: r.once_start && r.once_end
       ? { start: r.once_start, end: r.once_end }
@@ -39,7 +40,7 @@ function dbToPhoto(p: any): Photo {
   return {
     id: p.id,
     uri: p.url,
-    uploadedAt: new Date().toISOString(),
+    uploadedAt: p.uploaded_at ?? new Date().toISOString(),
     isPinned: p.is_pinned ?? false,
     proofMeta: p.proof_meta ?? undefined,
   };
@@ -248,17 +249,17 @@ export const ProfileAPI = {
 
 export const RoutineAPI = {
   async getAll(userId: string): Promise<Routine[]> {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('routines')
       .select('*, routine_completions(completed_date)')
       .eq('user_id', userId)
       .order('created_at', { ascending: true });
-    if (!data) return [];
-    return data.map(dbToRoutine);
+    if (error) throw error; // Promise.allSettled catches this → cache fallback, no migration
+    return (data ?? []).map(dbToRoutine);
   },
 
   async create(userId: string, routine: Routine): Promise<void> {
-    const { error } = await supabase.from('routines').insert({
+    const { error } = await supabase.from('routines').upsert({
       id: routine.id,
       user_id: userId,
       name: routine.name,
@@ -268,11 +269,12 @@ export const RoutineAPI = {
       target_days: routine.targetDays ?? [],
       monthly_days: routine.monthlyDays ?? [],
       set_name: routine.setName ?? null,
+      set_icon: routine.setIcon ?? null,
       scope: routine.scope ?? 'recurring',
       once_start: routine.onceRange?.start ?? null,
       once_end: routine.onceRange?.end ?? null,
       created_at: routine.createdAt,
-    });
+    }, { onConflict: 'id', ignoreDuplicates: true });
     if (error && __DEV__) console.error('[RoutineAPI.create]', error.message, error.code);
   },
 
@@ -285,6 +287,7 @@ export const RoutineAPI = {
     if (updates.targetDays !== undefined)       db.target_days = updates.targetDays;
     if (updates.monthlyDays !== undefined)      db.monthly_days = updates.monthlyDays;
     if (updates.setName !== undefined)          db.set_name = updates.setName;
+    if (updates.setIcon !== undefined)          db.set_icon = updates.setIcon;
     if (Object.keys(db).length > 0) {
       await supabase.from('routines').update(db).eq('id', id);
     }
@@ -403,21 +406,21 @@ export const OrderAPI = {
 export const MatchAPI = {
   async sendRequest(fromUserId: string, toUserId: string): Promise<void> {
     await supabase.from('match_requests')
-      .upsert({ from_user_id: fromUserId, to_user_id: toUserId });
+      .upsert({ from_user: fromUserId, to_user: toUserId });
   },
 
   async cancelRequest(fromUserId: string, toUserId: string): Promise<void> {
     await supabase.from('match_requests')
       .delete()
-      .eq('from_user_id', fromUserId)
-      .eq('to_user_id', toUserId);
+      .eq('from_user', fromUserId)
+      .eq('to_user', toUserId);
   },
 
   async getRequests(userId: string): Promise<MatchRequest[]> {
     const { data } = await supabase
       .from('match_requests')
-      .select('id, created_at, from_user:from_user_id(id, username, avatar_url, interests, achievement_score, gender)')
-      .eq('to_user_id', userId);
+      .select('id, created_at, from_user(id, username, avatar_url, interests, achievement_score, gender)')
+      .eq('to_user', userId);
     if (!data) return [];
     return (data as any[]).map(r => ({
       id: r.id,
@@ -436,10 +439,10 @@ export const MatchAPI = {
   async getSentRequests(userId: string): Promise<string[]> {
     const { data } = await supabase
       .from('match_requests')
-      .select('to_user_id')
-      .eq('from_user_id', userId);
+      .select('to_user')
+      .eq('from_user', userId);
     if (!data) return [];
-    return data.map(r => r.to_user_id as string);
+    return data.map(r => r.to_user as string);
   },
 
   async accept(fromUserId: string, toUserId: string, requestId: string): Promise<string | null> {
@@ -447,16 +450,33 @@ export const MatchAPI = {
       ? [fromUserId, toUserId]
       : [toUserId, fromUserId];
 
-    const { data, error } = await supabase
+    const { data: existing } = await supabase
       .from('matches')
-      .insert({ user_a, user_b, status: 'active' })
-      .select('id')
-      .single();
+      .select('id, status')
+      .eq('user_a', user_a)
+      .eq('user_b', user_b)
+      .maybeSingle();
 
-    if (error && __DEV__) console.error('[MatchAPI.accept]', error.message);
+    let matchId: string | null = null;
+    if (existing?.id) {
+      matchId = existing.id;
+      if (existing.status !== 'active') {
+        await supabase.from('matches')
+          .update({ status: 'active', ended_at: null })
+          .eq('id', matchId);
+      }
+    } else {
+      const { data, error } = await supabase
+        .from('matches')
+        .insert({ user_a, user_b, status: 'active' })
+        .select('id')
+        .single();
+      if (error && __DEV__) console.error('[MatchAPI.accept]', error.message);
+      matchId = data?.id ?? null;
+    }
+
     await supabase.from('match_requests').delete().eq('id', requestId);
-
-    return data?.id ?? null;
+    return matchId;
   },
 
   async reject(requestId: string): Promise<void> {
@@ -485,7 +505,7 @@ export const MatchAPI = {
 
     const { data: mateRaw } = await supabase
       .from('profiles')
-      .select('id, username, gender, avatar_url, interests, achievement_score, routines(id, name, description, frequency, notification_time, created_at, target_days, monthly_days, set_name, scope, once_start, once_end, routine_completions(completed_date)), photos(id, uri, is_pinned, created_at, proof_meta)')
+      .select('id, username, gender, avatar_url, interests, achievement_score, routines(id, name, description, frequency, notification_time, created_at, target_days, monthly_days, set_name, scope, once_start, once_end, routine_completions(completed_date)), photos(id, url, is_pinned, uploaded_at, proof_meta)')
       .eq('id', mateId)
       .maybeSingle();
 
@@ -500,6 +520,38 @@ export const MatchAPI = {
     await supabase.from('matches')
       .update({ status: 'ended', ended_at: new Date().toISOString() })
       .eq('id', matchId);
+  },
+
+  subscribeToRequests(userId: string, onRequest: (req: MatchRequest) => void) {
+    return supabase
+      .channel(`requests:${userId}:${Date.now()}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'match_requests', filter: `to_user=eq.${userId}` },
+        async (payload) => {
+          const r = payload.new as any;
+          const { data: fromUser } = await supabase
+            .from('profiles')
+            .select('id, username, avatar_url, interests, achievement_score, gender')
+            .eq('id', r.from_user)
+            .maybeSingle();
+          if (fromUser) {
+            onRequest({
+              id: r.id,
+              fromUser: {
+                id: fromUser.id,
+                username: fromUser.username,
+                avatarUri: fromUser.avatar_url ?? null,
+                interests: fromUser.interests ?? [],
+                achievementScore: fromUser.achievement_score ?? 0,
+                gender: fromUser.gender as Gender,
+              },
+              timestamp: r.created_at,
+            });
+          }
+        }
+      )
+      .subscribe();
   },
 };
 
@@ -531,7 +583,7 @@ export const MessageAPI = {
 
   subscribeToMatch(matchId: string, userId: string, onMessage: (msg: Message) => void) {
     return supabase
-      .channel(`match:${matchId}`)
+      .channel(`match:${matchId}:${Date.now()}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages', filter: `match_id=eq.${matchId}` },

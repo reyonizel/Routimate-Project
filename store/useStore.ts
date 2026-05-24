@@ -60,6 +60,7 @@ export interface Message {
   text: string;
   sentByMe: boolean;
   timestamp: string;
+  isSystem?: boolean;
 }
 
 export interface OrderProduct {
@@ -175,6 +176,7 @@ interface AppState {
   addRoutineNote: (routineId: string, date: string, text: string) => Promise<void>;
   deleteRoutineNote: (routineId: string, noteId: string) => void;
   toggleSetActive: (setName: string) => void;
+  addMatchRequest: (request: MatchRequest) => void;
   sendMatchRequest: (targetUser: Mate) => void;
   cancelMatchRequest: (targetUserId: string) => void;
   acceptMatchRequest: (request: MatchRequest) => void;
@@ -348,10 +350,10 @@ export const useStore = create<AppState>()(
           const sentReqs  = sentRes.status      === 'fulfilled' ? sentRes.value      : [];
           const orders    = ordersRes.status    === 'fulfilled' ? ordersRes.value    : get().orders;
 
-          // Eşleşilen / istek gönderilen kullanıcıları keşfetten çıkar
+          // Eşleşilen ve istek gönderilen kullanıcılar keşfette görünmeye devam etsin
+          // (sentReqs hariç — "Geri Çek" butonu göstermek için discovery'de kalmalı)
           const excludeSet = new Set<string>([
             matchData.mate?.id,
-            ...sentReqs,
             ...matchReqs.map(r => r.fromUser.id),
           ].filter(Boolean) as string[]);
           const rawDiscovery = discoveryRes.status === 'fulfilled' ? discoveryRes.value : [];
@@ -781,6 +783,14 @@ export const useStore = create<AppState>()(
       },
 
       // ── Discovery & Matching ──────────────────────────────────────────────
+      addMatchRequest: (request) => {
+        set((s) => {
+          const exists = s.matchRequests.some(r => r.id === request.id);
+          if (exists) return s;
+          return { matchRequests: [...s.matchRequests, request] };
+        });
+      },
+
       sendMatchRequest: (targetUser) => {
         set((s) => ({ sentMatchRequests: [...s.sentMatchRequests, targetUser.id] }));
         const { user } = get();
@@ -817,9 +827,10 @@ export const useStore = create<AppState>()(
         };
         const welcomeMsg: Message = {
           id: generateId(),
-          text: `🎉 ${request.fromUser.username} ile eşleştin! Rutin yolculuğunuz başlıyor.`,
+          text: `${request.fromUser.username} ile eşleştin`,
           sentByMe: false,
           timestamp: new Date().toISOString(),
+          isSystem: true,
         };
 
         set((s) => ({
@@ -843,10 +854,15 @@ export const useStore = create<AppState>()(
       },
 
       unmatch: () => {
-        const { matchId } = get();
-        set({ mate: null, messages: [], matchId: null, user: { ...get().user, matchedSince: null } });
+        const { matchId, user } = get();
+        set({ mate: null, messages: [], matchId: null, matchRequests: [], user: { ...get().user, matchedSince: null } });
         if (matchId) {
           MatchAPI.unmatch(matchId).catch(console.error);
+        } else if (user.id) {
+          // matchId store'da null olsa bile DB'de hâlâ aktif eşleşme olabilir
+          MatchAPI.getActiveMatch(user.id)
+            .then(md => { if (md.matchId) MatchAPI.unmatch(md.matchId).catch(console.error); })
+            .catch(() => {});
         }
       },
 
@@ -891,7 +907,6 @@ export const useStore = create<AppState>()(
         user: s.user,
         mate: s.mate,
         matchId: s.matchId,
-        messages: s.messages,
         orders: s.orders,
         discoveryUsers: s.discoveryUsers,
         matchRequests: s.matchRequests,

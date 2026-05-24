@@ -126,6 +126,7 @@ const GROUP_THRESHOLD = 3 * 60 * 1000;
 
 type ChatItem =
   | { type: 'date';       id: string; label: string }
+  | { type: 'system';     id: string; text: string }
   | { type: 'msg';        id: string; msg: Message; isFirst: boolean; isLast: boolean }
   | { type: 'quickreply'; id: string; replies: string[] };
 
@@ -134,6 +135,10 @@ function buildChatItems(messages: Message[]): ChatItem[] {
   let lastDate = '';
 
   messages.forEach((msg, i) => {
+    if (msg.isSystem) {
+      items.push({ type: 'system', id: msg.id, text: msg.text });
+      return;
+    }
     const dateKey = new Date(msg.timestamp).toDateString();
     if (dateKey !== lastDate) {
       lastDate = dateKey;
@@ -141,16 +146,16 @@ function buildChatItems(messages: Message[]): ChatItem[] {
     }
     const prev = messages[i - 1];
     const next = messages[i + 1];
-    const sameAsPrev = prev && prev.sentByMe === msg.sentByMe &&
+    const sameAsPrev = prev && !prev.isSystem && prev.sentByMe === msg.sentByMe &&
       new Date(msg.timestamp).getTime() - new Date(prev.timestamp).getTime() < GROUP_THRESHOLD;
-    const sameAsNext = next && next.sentByMe === msg.sentByMe &&
+    const sameAsNext = next && !next.isSystem && next.sentByMe === msg.sentByMe &&
       new Date(next.timestamp).getTime() - new Date(msg.timestamp).getTime() < GROUP_THRESHOLD;
     items.push({ type: 'msg', id: msg.id, msg, isFirst: !sameAsPrev, isLast: !sameAsNext });
   });
 
   // Quick replies only when last message is received
   const lastMsg = messages[messages.length - 1];
-  if (lastMsg && !lastMsg.sentByMe) {
+  if (lastMsg && !lastMsg.sentByMe && !lastMsg.isSystem) {
     items.push({ type: 'quickreply', id: 'qr', replies: getAnswerReplies(lastMsg.text) });
   }
 
@@ -257,6 +262,13 @@ export default function DMScreen() {
   const renderItem = useCallback(({ item }: { item: ChatItem }) => {
     if (item.type === 'date') {
       return <View style={s.datePill}><Text style={s.dateTxt}>{item.label}</Text></View>;
+    }
+    if (item.type === 'system') {
+      return (
+        <View style={s.systemRow}>
+          <Text style={s.systemTxt}>🎉 {item.text}</Text>
+        </View>
+      );
     }
     if (item.type === 'quickreply') {
       if (isPro) return null;
@@ -476,6 +488,10 @@ const s = StyleSheet.create({
   // Date pill
   datePill: { alignItems: 'center', marginVertical: 12 },
   dateTxt:  { fontSize: 11, fontWeight: '600', color: TEXT2, backgroundColor: '#DDE1E7', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 3 },
+
+  // System message
+  systemRow: { alignItems: 'center', marginVertical: 16, paddingHorizontal: 24 },
+  systemTxt: { fontSize: 12, color: TEXT3, textAlign: 'center', fontWeight: '500' },
 
   // Bubble rows
   bubbleRow:     { flexDirection: 'row', alignItems: 'flex-end', maxWidth: '88%' },

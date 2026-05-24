@@ -12,9 +12,9 @@ import { useStore } from '../store/useStore';
 import { supabase } from '../lib/supabase';
 import { sendTestNotification } from '../lib/notifications';
 
-const BG = '#FCF7F0';
+const BG = '#EEE3D0';
 const TEXT = '#0A3B25'; const TEXT2 = '#3D6B58'; const TEXT3 = '#B2B7AA';
-const RED = '#2A6151'; const GOLD = '#D8C2A4'; const BORDER = '#EDE8E1';
+const RED = '#2A6151'; const GOLD = '#D8C2A4'; const BORDER = '#B2B7AA';
 const CARD = '#FFFFFF'; const PILL = 999;
 
 // â”€â”€â”€ Animated Pro Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

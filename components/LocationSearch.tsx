@@ -21,7 +21,7 @@ type Props = {
   placeholder?: string;
 };
 
-const TEXT  = '#111111'; const TEXT2 = '#767676'; const TEXT3 = '#ABABAB';
+const TEXT  = '#111111'; const TEXT2 = '#767676'; const TEXT3 = '#B2B7AA';
 const BORDER = '#E8E8E8'; const CARD = '#F4F4F4'; const BG = '#FFFFFF';
 
 export default function LocationSearch({
