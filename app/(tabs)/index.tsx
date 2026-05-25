@@ -416,7 +416,7 @@ export default function HomeScreen() {
                           friction={2}
                           overshootLeft={false}
                           overshootRight={false}
-                          renderLeftActions={() => (
+                          renderLeftActions={canToggle ? () => (
                             <TouchableOpacity
                               style={[s.swipeAction, { backgroundColor: skipped ? '#2A6151' : '#B2B7AA' }]}
                               onPress={() => { swipeRefs.current[r.id]?.close(); toggleRoutineSkip(r.id, selectedDate); }}
@@ -425,8 +425,8 @@ export default function HomeScreen() {
                               <Ionicons name={skipped ? 'refresh-outline' : 'cafe-outline'} size={20} color="#fff" />
                               <Text style={s.swipeLabel}>{skipped ? 'Devam' : 'Atla'}</Text>
                             </TouchableOpacity>
-                          )}
-                          renderRightActions={() => (
+                          ) : undefined}
+                          renderRightActions={canToggle ? () => (
                             <TouchableOpacity
                               style={[s.swipeAction, { backgroundColor: '#3498db' }]}
                               onPress={() => { swipeRefs.current[r.id]?.close(); router.push(`/routine-edit?id=${r.id}`); }}
@@ -435,7 +435,7 @@ export default function HomeScreen() {
                               <Ionicons name="create-outline" size={20} color="#fff" />
                               <Text style={s.swipeLabel}>Düzenle</Text>
                             </TouchableOpacity>
-                          )}
+                          ) : undefined}
                         >
                           <TouchableOpacity
                             style={[s.taskRow, skipped && s.taskRowSkipped]}

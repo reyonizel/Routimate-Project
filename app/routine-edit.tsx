@@ -1,12 +1,12 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Platform, Modal } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Platform, Modal, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useStore } from '../store/useStore';
 
-const BG = '#EEE3D0'; const CARD = '#FFFFFF'; const SURFACE = '#F5EDE0';
+const BG = '#EEE3D0'; const SURFACE = '#F5EDE0'; const CARD = '#FFFFFF';
 const TEXT = '#0A3B25'; const TEXT2 = '#3D6B58'; const TEXT3 = '#B2B7AA';
 const GREEN = '#2A6151'; const BORDER = '#B2B7AA';
 
@@ -33,6 +33,7 @@ export default function RoutineEditScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const user = useStore(s => s.user);
   const updateRoutine = useStore(s => s.updateRoutine);
+  const deleteRoutine = useStore(s => s.deleteRoutine);
 
   const routine = user.routines.find(r => r.id === id);
 
@@ -99,6 +100,7 @@ export default function RoutineEditScreen() {
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
+      {/* ── Header ─────────────────────────────── */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
           <Ionicons name="chevron-back" size={22} color={TEXT} />
@@ -115,107 +117,134 @@ export default function RoutineEditScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-        <View style={s.card}>
-          <TextInput
-            style={s.nameInput}
-            value={name}
-            onChangeText={t => setName(t.slice(0, 60))}
-            placeholder="Rutin adı"
-            placeholderTextColor={TEXT3}
-            maxLength={60}
-          />
-          <View style={s.divider} />
 
-          <View style={{ padding: 16, gap: 12 }}>
-            {/* Frekans seçici */}
-            <View ref={triggerRef} collapsable={false}>
-              <TouchableOpacity style={s.dropdownTrigger} onPress={openDropdown} activeOpacity={0.7}>
-                <Text style={s.dropdownValue}>{fOpt.label}</Text>
-                <Ionicons name={showDropdown ? 'chevron-up' : 'chevron-down'} size={16} color={TEXT3} />
-              </TouchableOpacity>
-            </View>
+        {/* ── İsim ──────────────────────────────── */}
+        <TextInput
+          style={s.nameInput}
+          value={name}
+          onChangeText={t => setName(t.slice(0, 60))}
+          placeholder="Rutin adı"
+          placeholderTextColor={TEXT3}
+          maxLength={60}
+        />
 
-            <Modal visible={showDropdown} transparent animationType="fade" onRequestClose={() => setShowDropdown(false)}>
-              <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setShowDropdown(false)} />
-              <View style={[s.dropdownList, { top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }]}>
-                {FS_OPTIONS.map((opt, idx) => {
-                  const on = freqScope === opt.value;
-                  return (
-                    <TouchableOpacity
-                      key={opt.value}
-                      style={[s.dropdownItem, idx < FS_OPTIONS.length - 1 && s.dropdownItemBorder, on && s.dropdownItemOn]}
-                      onPress={() => { setFreqScope(opt.value); setDays([]); setMonthDays([]); setShowDropdown(false); }}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[s.dropdownItemTxt, on && s.dropdownItemTxtOn]}>{opt.label}</Text>
-                      {on && <Ionicons name="checkmark" size={15} color={GREEN} />}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </Modal>
+        <View style={s.divider} />
 
-            {/* Haftalık günler */}
-            {fOpt.freq === 'weekly' && (
-              <View style={s.dayRow}>
-                {WEEK_DAYS.map(({ label, js }) => {
-                  const on = days.includes(js);
-                  return (
-                    <TouchableOpacity
-                      key={js}
-                      style={[s.dayChip, on && s.dayChipOn]}
-                      onPress={() => setDays(prev => on ? prev.filter(d => d !== js) : [...prev, js])}
-                    >
-                      <Text style={[s.dayChipTxt, on && { color: '#fff' }]}>{label}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            )}
-
-            {/* Aylık günler */}
-            {fOpt.freq === 'monthly' && (
-              <View style={s.calGrid}>
-                {Array.from({ length: 31 }, (_, i) => i + 1).map(d => {
-                  const on = monthDays.includes(d);
-                  return (
-                    <TouchableOpacity
-                      key={d}
-                      style={[s.calCell, on && s.calCellOn]}
-                      onPress={() => setMonthDays(prev => on ? prev.filter(x => x !== d) : [...prev, d])}
-                    >
-                      <Text style={[s.calCellTxt, on && { color: '#fff' }]}>{d}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            )}
-
-            {/* Saat seçici */}
-            <TouchableOpacity style={s.timeBtn} onPress={() => setShowTimePicker(v => !v)} activeOpacity={0.7}>
-              <Ionicons name="time-outline" size={16} color={TEXT2} />
-              <Text style={s.timeLbl}>Bildirim saati:</Text>
-              <Text style={s.timeBtnTxt}>{hour}:{min}</Text>
-              <Ionicons name={showTimePicker ? 'chevron-up' : 'chevron-down'} size={14} color={TEXT3} />
-            </TouchableOpacity>
-
-            {showTimePicker && Platform.OS === 'ios' && (
-              <View style={{ overflow: 'hidden', marginBottom: 12 }}>
-                <DateTimePicker
-                  value={timeDate} mode="time" display="spinner" is24Hour
-                  onChange={(_, d) => { if (d) { setHour(String(d.getHours()).padStart(2,'0')); setMin(String(d.getMinutes()).padStart(2,'0')); } }}
-                  style={{ width: '100%', height: 110 }}
-                />
-              </View>
-            )}
-            {showTimePicker && Platform.OS === 'android' && (
-              <DateTimePicker
-                value={timeDate} mode="time" display="spinner" is24Hour
-                onChange={(e, d) => { setShowTimePicker(false); if (e.type === 'set' && d) { setHour(String(d.getHours()).padStart(2,'0')); setMin(String(d.getMinutes()).padStart(2,'0')); } }}
-              />
-            )}
-          </View>
+        {/* ── Frekans ───────────────────────────── */}
+        <View ref={triggerRef} collapsable={false}>
+          <TouchableOpacity style={s.row} onPress={openDropdown} activeOpacity={0.7}>
+            <Text style={s.rowLabel}>Sıklık</Text>
+            <Text style={s.rowValue}>{fOpt.label}</Text>
+            <Ionicons name="chevron-forward" size={16} color={TEXT3} />
+          </TouchableOpacity>
         </View>
+
+        <Modal visible={showDropdown} transparent animationType="fade" onRequestClose={() => setShowDropdown(false)}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setShowDropdown(false)} />
+          <View style={[s.dropdownList, { top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }]}>
+            {FS_OPTIONS.map((opt, idx) => {
+              const on = freqScope === opt.value;
+              return (
+                <TouchableOpacity
+                  key={opt.value}
+                  style={[s.dropdownItem, idx < FS_OPTIONS.length - 1 && s.dropdownItemBorder, on && s.dropdownItemOn]}
+                  onPress={() => { setFreqScope(opt.value); setDays([]); setMonthDays([]); setShowDropdown(false); }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[s.dropdownItemTxt, on && s.dropdownItemTxtOn]}>{opt.label}</Text>
+                  {on && <Ionicons name="checkmark" size={15} color={GREEN} />}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </Modal>
+
+        <View style={s.divider} />
+
+        {/* ── Haftalık günler ───────────────────── */}
+        {fOpt.freq === 'weekly' && (
+          <>
+            <View style={s.dayRow}>
+              {WEEK_DAYS.map(({ label, js }) => {
+                const on = days.includes(js);
+                return (
+                  <TouchableOpacity
+                    key={js}
+                    style={[s.dayChip, on && s.dayChipOn]}
+                    onPress={() => setDays(prev => on ? prev.filter(d => d !== js) : [...prev, js])}
+                  >
+                    <Text style={[s.dayChipTxt, on && { color: '#fff' }]}>{label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <View style={s.divider} />
+          </>
+        )}
+
+        {/* ── Aylık günler ──────────────────────── */}
+        {fOpt.freq === 'monthly' && (
+          <>
+            <View style={s.calGrid}>
+              {Array.from({ length: 31 }, (_, i) => i + 1).map(d => {
+                const on = monthDays.includes(d);
+                return (
+                  <TouchableOpacity
+                    key={d}
+                    style={[s.calCell, on && s.calCellOn]}
+                    onPress={() => setMonthDays(prev => on ? prev.filter(x => x !== d) : [...prev, d])}
+                  >
+                    <Text style={[s.calCellTxt, on && { color: '#fff' }]}>{d}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <View style={s.divider} />
+          </>
+        )}
+
+        {/* ── Saat ──────────────────────────────── */}
+        <TouchableOpacity style={s.row} onPress={() => setShowTimePicker(v => !v)} activeOpacity={0.7}>
+          <Text style={s.rowLabel}>Bildirim saati</Text>
+          <Text style={s.rowValue}>{hour}:{min}</Text>
+          <Ionicons name={showTimePicker ? 'chevron-up' : 'chevron-forward'} size={16} color={TEXT3} />
+        </TouchableOpacity>
+
+        {showTimePicker && Platform.OS === 'ios' && (
+          <View style={{ overflow: 'hidden', backgroundColor: SURFACE }}>
+            <DateTimePicker
+              value={timeDate} mode="time" display="spinner" is24Hour
+              onChange={(_, d) => { if (d) { setHour(String(d.getHours()).padStart(2,'0')); setMin(String(d.getMinutes()).padStart(2,'0')); } }}
+              style={{ width: '100%', height: 110 }}
+            />
+          </View>
+        )}
+        {showTimePicker && Platform.OS === 'android' && (
+          <DateTimePicker
+            value={timeDate} mode="time" display="spinner" is24Hour
+            onChange={(e, d) => { setShowTimePicker(false); if (e.type === 'set' && d) { setHour(String(d.getHours()).padStart(2,'0')); setMin(String(d.getMinutes()).padStart(2,'0')); } }}
+          />
+        )}
+
+        <View style={s.divider} />
+
+        {/* ── Sil ───────────────────────────────── */}
+        <TouchableOpacity
+          style={s.deleteBtn}
+          onPress={() => Alert.alert(
+            'Rutini Sil',
+            `"${routine.name}" silinecek. Emin misin?`,
+            [
+              { text: 'Vazgeç', style: 'cancel' },
+              { text: 'Sil', style: 'destructive', onPress: () => { deleteRoutine(routine.id); router.back(); } },
+            ]
+          )}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="trash-outline" size={16} color="#EF4444" />
+          <Text style={s.deleteTxt}>Rutini Sil</Text>
+        </TouchableOpacity>
+
         <View style={{ height: 60 }} />
       </ScrollView>
     </SafeAreaView>
@@ -224,38 +253,73 @@ export default function RoutineEditScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10, gap: 12 },
-  backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center' },
+
+  header: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 12, paddingVertical: 10, gap: 8,
+  },
+  backBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center',
+  },
   headerTitle: { flex: 1, fontSize: 18, color: TEXT, fontWeight: '800', letterSpacing: -0.3 },
   saveBtn: { backgroundColor: GREEN, borderRadius: 999, paddingHorizontal: 18, paddingVertical: 9 },
   saveBtnOff: { backgroundColor: SURFACE },
   saveTxt: { fontSize: 14, color: '#fff', fontWeight: '800' },
 
-  card: { marginHorizontal: 16, marginTop: 8, backgroundColor: CARD, borderRadius: 24, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 12, elevation: 3 },
-  nameInput: { fontSize: 18, fontWeight: '700', color: TEXT, paddingHorizontal: 20, paddingVertical: 20 },
-  divider: { height: 0.5, backgroundColor: BORDER },
+  nameInput: {
+    fontSize: 18, fontWeight: '700', color: TEXT,
+    backgroundColor: SURFACE,
+    paddingHorizontal: 20, paddingVertical: 18,
+  },
 
-  dropdownTrigger: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: SURFACE, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13 },
-  dropdownValue: { fontSize: 14, fontWeight: '700', color: TEXT },
-  dropdownList: { position: 'absolute', backgroundColor: BG, borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.12, shadowRadius: 20, elevation: 12 },
-  dropdownItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 13 },
+  divider: { height: 1, backgroundColor: BORDER, marginHorizontal: 20 },
+
+  row: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: SURFACE, paddingHorizontal: 20, paddingVertical: 16,
+  },
+  rowLabel: { flex: 1, fontSize: 14, fontWeight: '600', color: TEXT },
+  rowValue: { fontSize: 14, fontWeight: '700', color: TEXT2 },
+
+  dropdownList: {
+    position: 'absolute', backgroundColor: BG, borderRadius: 16, overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.12, shadowRadius: 20, elevation: 12,
+  },
+  dropdownItem: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingVertical: 13,
+  },
   dropdownItemBorder: { borderBottomWidth: 0.5, borderBottomColor: BORDER },
   dropdownItemOn: { backgroundColor: GREEN + '12' },
   dropdownItemTxt: { fontSize: 14, color: TEXT2, fontWeight: '500' },
   dropdownItemTxtOn: { color: TEXT, fontWeight: '700' },
 
-  dayRow: { flexDirection: 'row', gap: 5 },
-  dayChip: { flex: 1, aspectRatio: 1, borderRadius: 999, backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center' },
+  dayRow: {
+    flexDirection: 'row', gap: 6,
+    backgroundColor: SURFACE, paddingHorizontal: 16, paddingVertical: 14,
+  },
+  dayChip: {
+    flex: 1, aspectRatio: 1, borderRadius: 999,
+    backgroundColor: BG, alignItems: 'center', justifyContent: 'center',
+  },
   dayChipOn: { backgroundColor: TEXT },
   dayChipTxt: { fontSize: 11, fontWeight: '700', color: TEXT2 },
 
-  calGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
-  calCell: { width: '12%', aspectRatio: 1, borderRadius: 10, backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center' },
+  calGrid: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: 6,
+    backgroundColor: SURFACE, paddingHorizontal: 16, paddingVertical: 14,
+  },
+  calCell: {
+    width: '12%', aspectRatio: 1, borderRadius: 10,
+    backgroundColor: BG, alignItems: 'center', justifyContent: 'center',
+  },
   calCellOn: { backgroundColor: GREEN },
   calCellTxt: { fontSize: 12, fontWeight: '700', color: TEXT2 },
 
-  timeBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: SURFACE, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13 },
-  timeLbl: { fontSize: 13, color: TEXT2, flex: 1 },
-  timeBtnTxt: { fontSize: 16, fontWeight: '800', color: TEXT, letterSpacing: 0.5 },
+  deleteBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: SURFACE, paddingVertical: 16,
+  },
+  deleteTxt: { fontSize: 14, fontWeight: '700', color: '#EF4444' },
 });
-

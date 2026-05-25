@@ -110,6 +110,18 @@ const ALL_QUESTIONS = [
 ];
 
 // â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+type QuoteMsg =
+  | { kind: 'reminder'; routineName: string; body: string }
+  | { kind: 'congrats'; routineName: string; body: string };
+
+function parseQuoteMsg(text: string): QuoteMsg | null {
+  const rm = text.match(/^"(.+?)" (görevini henüz yapmadın, hatırlatmak istedim 💬)$/);
+  if (rm) return { kind: 'reminder', routineName: rm[1], body: rm[2] };
+  const cm = text.match(/^"(.+?)" (.+) \[congrats\]$/);
+  if (cm) return { kind: 'congrats', routineName: cm[1], body: cm[2] };
+  return null;
+}
+
 function msgTime(iso: string) {
   return new Date(iso).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
 }
@@ -189,9 +201,24 @@ const Bubble = React.memo(({ item, mateAvatarUri, mateAccent, isPro, onLongPress
             </View>
           : <View style={s.avatarSmallPlaceholder} />
       )}
-      <TouchableOpacity activeOpacity={0.8} onLongPress={() => onLongPress(msg.id)} delayLongPress={350}
+      <TouchableOpacity activeOpacity={0.8} onLongPress={mine ? () => onLongPress(msg.id) : undefined} delayLongPress={350}
         style={[s.bubble, mine ? s.bubbleMine : s.bubbleMate, radius]}>
-        <Text style={[s.bubbleTxt, mine && s.bubbleTxtMine]}>{msg.text}</Text>
+        {(() => {
+          const q = parseQuoteMsg(msg.text);
+          if (q) {
+            const isCongrats = q.kind === 'congrats';
+            return (
+              <View>
+                <View style={[s.quoteBlock, mine && s.quoteBlockMine, isCongrats && s.quoteBlockCongrats]}>
+                  <View style={[s.quoteBar, mine && s.quoteBarMine, isCongrats && s.quoteBarCongrats]} />
+                  <Text style={[s.quotedName, mine && s.quotedNameMine]} numberOfLines={1}>{q.routineName}</Text>
+                </View>
+                <Text style={[s.bubbleTxt, mine && s.bubbleTxtMine]}>{q.body}</Text>
+              </View>
+            );
+          }
+          return <Text style={[s.bubbleTxt, mine && s.bubbleTxtMine]}>{msg.text}</Text>;
+        })()}
         <View style={s.bubbleMeta}>
           <Text style={[s.bubbleTime, mine && s.bubbleTimeMine]}>{msgTime(msg.timestamp)}</Text>
           {mine && <Ionicons name="checkmark-done" size={13} color="rgba(255,255,255,0.7)" style={{ marginLeft: 2 }} />}
@@ -508,6 +535,15 @@ const s = StyleSheet.create({
   bubble: { maxWidth: SW * 0.7, paddingHorizontal: 13, paddingTop: 8, paddingBottom: 6, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
   bubbleMine:     { backgroundColor: ME_BG, marginLeft: 4 },
   bubbleMate:     { backgroundColor: MATE_BG, marginRight: 4 },
+  quoteBlock:        { flexDirection: 'row', alignItems: 'stretch', backgroundColor: 'rgba(0,0,0,0.08)', borderRadius: 6, marginBottom: 6, overflow: 'hidden' },
+  quoteBlockMine:    { backgroundColor: 'rgba(255,255,255,0.18)' },
+  quoteBlockCongrats:{ backgroundColor: 'rgba(0,0,0,0.18)' },
+  quoteBar:          { width: 3, backgroundColor: 'rgba(0,0,0,0.25)' },
+  quoteBarMine:      { backgroundColor: 'rgba(255,255,255,0.65)' },
+  quoteBarCongrats:  { backgroundColor: GREEN },
+  quotedName:        { flex: 1, fontSize: 12, fontWeight: '700', color: TEXT2, paddingHorizontal: 8, paddingVertical: 6 },
+  quotedNameMine:    { color: 'rgba(255,255,255,0.8)' },
+
   bubbleTxt:      { fontSize: 15, color: TEXT, lineHeight: 21 },
   bubbleTxtMine:  { color: '#FFFFFF' },
   bubbleMeta:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', marginTop: 3, gap: 1 },

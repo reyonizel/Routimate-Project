@@ -1,417 +1,395 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, FlatList, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput } from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useStore, User, Mate, MatchRequest } from '../../store/useStore';
 import { MatchAPI } from '../../lib/api';
 import { supabase } from '../../lib/supabase';
 import { localDateStr } from '../../lib/date';
-import Svg, { Circle } from 'react-native-svg';
-
-const { width } = Dimensions.get('window');
-
-const CircularProgress = ({ size = 72, strokeWidth = 5, progress = 0, color = '#000', children }: any) => {
-  const radius = (size - strokeWidth) / 2;
-  const circum = radius * 2 * Math.PI;
-  const dashoffset = circum - (Math.min(Math.max(progress, 0), 1) * circum);
-
-  return (
-    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-      <View style={{ position: 'absolute', transform: [{ rotate: '-90deg' }] }}>
-        <Svg width={size} height={size}>
-          <Circle stroke="#B2B7AA" fill="none" cx={size/2} cy={size/2} r={radius} strokeWidth={strokeWidth} />
-          <Circle
-            stroke={color}
-            fill="none"
-            cx={size/2}
-            cy={size/2}
-            r={radius}
-            strokeWidth={strokeWidth}
-            strokeDasharray={`${circum} ${circum}`}
-            strokeDashoffset={dashoffset}
-            strokeLinecap="round"
-          />
-        </Svg>
-      </View>
-      {children}
-    </View>
-  );
-};
 
 const today = localDateStr();
-const BG='#EEE3D0'; const CARD='#FFFFFF'; const SURFACE='#F5EDE0';
+const BG='#EEE3D0'; const SURFACE='#F5EDE0'; const CARD='#FFFFFF';
 const TEXT='#0A3B25'; const TEXT2='#3D6B58'; const TEXT3='#B2B7AA';
 const RED='#2A6151'; const GREEN='#1A4F3A'; const GOLD='#D8C2A4';
 const BORDER='#B2B7AA'; const PILL=999;
 
-// ── Uyumluluk algoritması ─────────────────────────────────────────────────────
-function interestScore(a: string[], b: string[]): number {
-  if (!a.length || !b.length) return 0;
-  const common = a.filter(i => b.includes(i)).length;
-  return common / Math.min(a.length, b.length);
+const CAT_COLORS = ['#E91E63','#9C27B0','#3F51B5','#2196F3','#00ACC1','#00897B','#F4511E','#6D4C41','#546E7A','#558B2F'];
+function catColor(name: string): string {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+  return CAT_COLORS[Math.abs(h) % CAT_COLORS.length];
 }
 
+const FREQ_LABEL: Record<string,string> = { daily:'Günlük', weekly:'Haftalık', monthly:'Aylık' };
+
+
+function interestScore(a: string[], b: string[]): number {
+  if (!a.length || !b.length) return 0;
+  return a.filter(i => b.includes(i)).length / Math.min(a.length, b.length);
+}
 function ageScore(dA?: string, dB?: string): number {
   if (!dA || !dB) return 0.5;
   const age = (d: string) => (Date.now() - new Date(d).getTime()) / (365.25 * 24 * 3600 * 1000);
   const diff = Math.abs(age(dA) - age(dB));
-  if (diff <= 2) return 1.0;
-  if (diff <= 5) return 0.8;
-  if (diff <= 10) return 0.5;
-  if (diff <= 15) return 0.2;
-  return 0.0;
+  if (diff <= 2) return 1.0; if (diff <= 5) return 0.8; if (diff <= 10) return 0.5; if (diff <= 15) return 0.2; return 0.0;
 }
-
 function commitmentScore(a: number, b: number): number {
   const diff = Math.abs(a - b);
-  if (diff <= 10) return 1.0;
-  if (diff <= 25) return 0.6;
-  if (diff <= 50) return 0.3;
-  return 0.0;
+  if (diff <= 10) return 1.0; if (diff <= 25) return 0.6; if (diff <= 50) return 0.3; return 0.0;
 }
-
 function locationScore(lat1?: number, lon1?: number, lat2?: number, lon2?: number): number {
   if (!lat1 || !lon1 || !lat2 || !lon2) return 0.5;
-  const R = 6371;
-  const toRad = (d: number) => d * Math.PI / 180;
+  const R = 6371; const toRad = (d: number) => d * Math.PI / 180;
   const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
   const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
   const km = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  if (km < 10) return 1.0;
-  if (km < 50) return 0.8;
-  if (km < 100) return 0.5;
-  if (km < 300) return 0.2;
-  return 0.0;
+  if (km < 10) return 1.0; if (km < 50) return 0.8; if (km < 100) return 0.5; if (km < 300) return 0.2; return 0.0;
 }
-
 function calcCompat(user: User, mate: Mate): number {
   const raw =
     interestScore(user.interests, mate.interests)    * 0.40 +
     ageScore(user.birthDate, mate.birthDate)          * 0.30 +
     commitmentScore(user.achievementScore, mate.achievementScore) * 0.20 +
     locationScore(user.locationLat, user.locationLon, mate.locationLat, mate.locationLon) * 0.10;
-  return Math.round(raw * 59) + 40; // 40–99
+  return Math.round(raw * 59) + 40;
 }
-
 function compatLabel(pct: number): string {
-  if (pct >= 85) return 'Yüksek Uyum';
-  if (pct >= 65) return 'İyi Uyum';
-  return 'Temel Uyum';
+  if (pct >= 85) return 'Yüksek Uyum'; if (pct >= 65) return 'İyi Uyum'; return 'Temel Uyum';
 }
 
 const INTEREST_ICON: Record<string, React.ComponentProps<typeof Ionicons>['name']> = {
-  'Yoga':        'body-outline',
-  'Meditasyon':  'leaf-outline',
-  'Koşu':        'footsteps-outline',
-  'Fitness':     'barbell-outline',
-  'Soğuk Duş':   'water-outline',
-  'Kitap':       'book-outline',
-  'Pilates':     'fitness-outline',
-  'Beslenme':    'nutrition-outline',
-  'Uyku':        'moon-outline',
-  'Bisiklet':    'bicycle-outline',
-  'Müzik':       'musical-notes-outline',
-  'Yazarlık':    'pencil-outline',
-  'Spor':        'basketball-outline',
+  'Yoga':'body-outline', 'Meditasyon':'leaf-outline', 'Koşu':'footsteps-outline',
+  'Fitness':'barbell-outline', 'Soğuk Duş':'water-outline', 'Kitap':'book-outline',
+  'Pilates':'fitness-outline', 'Beslenme':'nutrition-outline', 'Uyku':'moon-outline',
+  'Bisiklet':'bicycle-outline', 'Müzik':'musical-notes-outline', 'Yazarlık':'pencil-outline',
+  'Spor':'basketball-outline',
 };
 
-
 export default function MateScreen() {
-  const user = useStore(s => s.user);
-  const mate = useStore(s => s.mate);
-  const discoveryUsers = useStore(s => s.discoveryUsers);
-  const matchRequests = useStore(s => s.matchRequests);
-  const sentRequests = useStore(s => s.sentMatchRequests);
-  
+  const user        = useStore(s => s.user);
+  const mate        = useStore(s => s.mate);
+  const discoveryUsers  = useStore(s => s.discoveryUsers);
+  const matchRequests   = useStore(s => s.matchRequests);
+  const sentRequests    = useStore(s => s.sentMatchRequests);
   const addMatchRequest    = useStore(s => s.addMatchRequest);
+  const sendMessage        = useStore(s => s.sendMessage);
   const sendMatchRequest   = useStore(s => s.sendMatchRequest);
   const cancelMatchRequest = useStore(s => s.cancelMatchRequest);
   const acceptMatchRequest = useStore(s => s.acceptMatchRequest);
   const rejectMatchRequest = useStore(s => s.rejectMatchRequest);
   const loadUserData       = useStore(s => s.loadUserData);
-
   const router = useRouter();
 
-  // Realtime: incoming match requests
   useEffect(() => {
     if (!user.id) return;
     const channel = MatchAPI.subscribeToRequests(user.id, addMatchRequest);
     return () => { supabase.removeChannel(channel); };
   }, [user.id]);
 
-  // Realtime + polling: sent request accepted → load new match
   useEffect(() => {
     if (!user.id || mate) return;
     const ts = Date.now();
-
     const handleMatchFound = () => { loadUserData().catch(() => {}); };
-
-    // Realtime channels (instant if realtime pub is set up)
-    const ch1 = supabase
-      .channel(`match_new_a:${user.id}:${ts}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'matches', filter: `user_a=eq.${user.id}` },
-        handleMatchFound)
-      .subscribe();
-    const ch2 = supabase
-      .channel(`match_new_b:${user.id}:${ts}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'matches', filter: `user_b=eq.${user.id}` },
-        handleMatchFound)
-      .subscribe();
-
-    // Fallback poll every 8s — fires even if realtime misses the event
+    const ch1 = supabase.channel(`match_new_a:${user.id}:${ts}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'matches', filter: `user_a=eq.${user.id}` }, handleMatchFound).subscribe();
+    const ch2 = supabase.channel(`match_new_b:${user.id}:${ts}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'matches', filter: `user_b=eq.${user.id}` }, handleMatchFound).subscribe();
     const poll = setInterval(() => {
-      MatchAPI.getActiveMatch(user.id).then(md => {
-        if (md.matchId) handleMatchFound();
-      }).catch(() => {});
+      MatchAPI.getActiveMatch(user.id).then(md => { if (md.matchId) handleMatchFound(); }).catch(() => {});
     }, 8000);
-
-    return () => {
-      supabase.removeChannel(ch1);
-      supabase.removeChannel(ch2);
-      clearInterval(poll);
-    };
+    return () => { supabase.removeChannel(ch1); supabase.removeChannel(ch2); clearInterval(poll); };
   }, [user.id, !!mate]);
 
-  // Focus: incoming requests + full refresh if no mate yet
   useFocusEffect(useCallback(() => {
     if (!user.id) return;
-    MatchAPI.getRequests(user.id).then(requests => {
-      requests.forEach(addMatchRequest);
-    }).catch(() => {});
-    if (!mate) {
-      loadUserData().catch(() => {});
-    }
+    MatchAPI.getRequests(user.id).then(requests => { requests.forEach(addMatchRequest); }).catch(() => {});
+    if (!mate) { loadUserData().catch(() => {}); }
   }, [user.id, !!mate]));
 
   const sortedDiscovery = [...discoveryUsers]
     .filter(u => u.id !== user.id)
     .sort((a, b) => calcCompat(user, b) - calcCompat(user, a));
 
+  // ── Aktif Eşleşme ─────────────────────────────────────────────────────────
   const renderActiveMatch = () => {
     if (!mate) return null;
     const accent = mate.gender === 'female' ? '#e91e63' : '#3498db';
-    const daysPassed = user.matchedSince ? Math.floor((Date.now() - new Date(user.matchedSince).getTime()) / 86400000) : 0;
+    const daysPassed = user.matchedSince
+      ? Math.floor((Date.now() - new Date(user.matchedSince).getTime()) / 86400000)
+      : 0;
     const doneToday = mate.routines.filter(r => r.completedDates.includes(today)).length;
-    const FREQ_LABEL: Record<string,string> = { daily:'Günlük', weekly:'Haftalık', monthly:'Aylık' };
+
+    const sortedRoutines = [...mate.routines].sort((a, b) => {
+      const aDone = a.completedDates.includes(today);
+      const bDone = b.completedDates.includes(today);
+      return aDone === bDone ? 0 : aDone ? -1 : 1;
+    });
 
     return (
       <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={s.header}>
-          <Text style={s.title}>Rutinmate</Text>
+
+        {/* ── Top row ─────────────────────────────── */}
+        <View style={s.topRow}>
+          <Text style={s.topUsername}>@{mate.username}</Text>
+          <TouchableOpacity style={s.settingsBtn} onPress={() => router.push('/mate-profile')}>
+            <Ionicons name="person-outline" size={20} color={TEXT} />
+          </TouchableOpacity>
         </View>
 
-        <View style={s.mateCard}>
-          <View style={s.mateTop}>
-            <View style={[s.avatar, {borderColor: accent}]}>
-              {user.isPro
-                ? <Image source={{ uri: mate.avatarUri || '' }} style={{ width: '100%', height: '100%', borderRadius: PILL }} contentFit="cover" cachePolicy="memory-disk" />
-                : <Ionicons name="lock-closed" size={20} color={TEXT3} />}
-            </View>
-            <View style={{flex:1}}>
-              <Text style={s.mateName}>@{mate.username}</Text>
-              <Text style={[s.mateScore, {color: accent}]}>{mate.achievementScore}% genel başarı</Text>
-            </View>
-            <TouchableOpacity style={s.profileBtn} onPress={() => router.push('/mate-profile')}>
-              <Text style={s.profileBtnTxt}>Profil</Text>
-              <Ionicons name="chevron-forward" size={14} color={TEXT2} />
-            </TouchableOpacity>
+        {/* ── Instagram head: avatar + stats ─────── */}
+        <View style={s.instaHead}>
+          <View style={[s.avatar, { borderColor: accent }]}>
+            {mate.avatarUri ? (
+              <Image source={{ uri: mate.avatarUri }} style={{ width: '100%', height: '100%', borderRadius: PILL }} contentFit="cover" cachePolicy="memory-disk" blurRadius={12} />
+            ) : (
+              <Ionicons name="person" size={26} color={TEXT3} />
+            )}
           </View>
-
-          <View style={s.stats}>
+          <View style={s.statsRow}>
             <View style={s.statItem}>
-              <CircularProgress size={40} strokeWidth={4} progress={mate.routines.length > 0 ? doneToday / mate.routines.length : 0} color={GREEN}>
-                <Ionicons name="checkmark-outline" size={18} color={GREEN} />
-              </CircularProgress>
-              <View style={s.statTextGroup}>
-                <Text style={s.statNum}>{doneToday}<Text style={s.statDenom}>/{mate.routines.length}</Text></Text>
-                <Text style={s.statLabel}>Görev</Text>
-              </View>
+              <Text style={s.statNum}>{doneToday}/{mate.routines.length}</Text>
+              <Text style={s.statLabel}>Görev</Text>
             </View>
-            
             <View style={s.statItem}>
-              <CircularProgress size={40} strokeWidth={4} progress={daysPassed / 30} color={accent}>
-                <Ionicons name="calendar-outline" size={16} color={accent} />
-              </CircularProgress>
-              <View style={s.statTextGroup}>
-                <Text style={s.statNum}>{daysPassed}<Text style={s.statDenom}>/30</Text></Text>
-                <Text style={s.statLabel}>Geçen Gün</Text>
-              </View>
+              <Text style={s.statNum}>{daysPassed}</Text>
+              <Text style={s.statLabel}>Gün</Text>
+            </View>
+            <View style={s.statItem}>
+              <Text style={s.statNum}>{mate.achievementScore}%</Text>
+              <Text style={s.statLabel}>Başarı</Text>
             </View>
           </View>
         </View>
 
-        <View style={s.sectionHeader}>
-          <Text style={s.sectionTitle}>Rutin Arkadaşım</Text>
-        </View>
+        {/* ── Bio ──────────────────────────────────── */}
+        {mate.fullName && (
+          <View style={s.bioArea}>
+            <Text style={s.profileName}>{mate.fullName}</Text>
+          </View>
+        )}
 
-        {mate.routines.length === 0 ? (
+        {/* ── Tab ayırıcı ─────────────────────────── */}
+        <View style={s.tabDivider} />
+
+        {/* ── Rutinler ─────────────────────────────── */}
+        {sortedRoutines.length === 0 ? (
           <View style={s.empty}>
             <Ionicons name="clipboard-outline" size={36} color={TEXT3} />
             <Text style={s.emptyTxt}>Mate'in rutini yok</Text>
           </View>
         ) : (
-          <View style={s.list}>
-            {[...mate.routines].sort((a,b) => (a.completedDates.includes(today) === b.completedDates.includes(today) ? 0 : a.completedDates.includes(today) ? -1 : 1)).map(r => (
-              <View key={r.id} style={s.row}>
-                <View style={[s.checkBox, {borderColor: r.completedDates.includes(today) ? GREEN : GOLD}]}>
-                  {r.completedDates.includes(today) ? <Ionicons name="checkmark" size={14} color={GREEN} /> : <Ionicons name="hourglass-outline" size={10} color={GOLD} />}
+          sortedRoutines.map((r, i) => {
+            const done = r.completedDates.includes(today);
+            const cc = catColor(r.setName ?? r.name);
+            return (
+              <View key={r.id}>
+                <View style={s.taskRow}>
+                  <View style={[s.catIcon, { backgroundColor: cc }]}>
+                    <Ionicons name={(r.setIcon as any) || 'star-outline'} size={16} color="#fff" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[s.taskName, done && s.taskNameDone]}>{r.name}</Text>
+                    <Text style={s.taskMeta}>{FREQ_LABEL[r.frequency]} · {r.notificationTime}</Text>
+                    {done ? (
+                      <TouchableOpacity
+                        style={s.congratsBlock}
+                        onPress={() => {
+                          const msgs = [
+                            `"${r.name}" görevini tamamladın, aferin! 🎉 [congrats]`,
+                            `"${r.name}" tamam, çok iyisin! 💪 [congrats]`,
+                            `"${r.name}" bitti, muhteşemsin! 🔥 [congrats]`,
+                            `"${r.name}" tamamlandı, birlikte başaracağız! ✅ [congrats]`,
+                            `"${r.name}" harika iş, devam et! ⭐ [congrats]`,
+                          ];
+                          sendMessage(msgs[Math.floor(Math.random() * msgs.length)]);
+                          router.push('/(tabs)/dm');
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <View style={s.congratsBar} />
+                        <View style={s.remindQuoteContent}>
+                          <Text style={s.congratsTxt}>Görevi tamamladı! 🎉</Text>
+                          <View style={s.remindQuoteAction}>
+                            <Ionicons name="return-down-forward-outline" size={11} color="#2A6151" />
+                            <Text style={[s.remindQuoteTxt, { color: '#2A6151' }]}>Tebrik mesajı gönder</Text>
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    ) : (() => {
+                      const [h, mn] = r.notificationTime.split(':').map(Number);
+                      const now = new Date();
+                      const isPast = now.getHours() > h || (now.getHours() === h && now.getMinutes() >= mn);
+                      return (
+                        <TouchableOpacity
+                          style={s.remindQuote}
+                          onPress={() => {
+                            sendMessage(`"${r.name}" görevini henüz yapmadın, hatırlatmak istedim 💬`);
+                            router.push('/(tabs)/dm');
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <View style={s.remindQuoteBar} />
+                          <View style={s.remindQuoteContent}>
+                            <Text style={[s.remindQuoteRoutine, { color: isPast ? '#EF4444' : '#2A6151' }]}>{isPast ? 'Süresi geçti' : 'Henüz vakit var'}</Text>
+                            <View style={s.remindQuoteAction}>
+                              <Ionicons name="return-down-forward-outline" size={11} color={RED} />
+                              <Text style={s.remindQuoteTxt}>Arkadaşına görevi hatırlat</Text>
+                            </View>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })()}
+                  </View>
+                  {done
+                    ? <View style={s.taskDotDone}><Ionicons name="checkmark" size={12} color="#fff" /></View>
+                    : <View style={s.taskDotPending} />
+                  }
                 </View>
-                <View style={{flex:1}}>
-                  <Text style={[s.rowName, r.completedDates.includes(today) && {color: TEXT2}]}>{r.name}</Text>
-                  <Text style={[s.rowMeta, r.completedDates.includes(today) && {color: TEXT3}]}>{FREQ_LABEL[r.frequency]} · {r.notificationTime}</Text>
-                </View>
+                {i < sortedRoutines.length - 1 && <View style={s.taskDivider} />}
               </View>
-            ))}
-          </View>
+            );
+          })
         )}
-        <View style={{height:80}} />
+
+        <View style={{ height: 80 }} />
       </ScrollView>
     );
   };
 
+  // ── Keşif ─────────────────────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState('');
-
   const filteredDiscovery = sortedDiscovery.filter(item => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
-    return (
-      item.username.toLowerCase().includes(q) ||
-      (item.fullName && item.fullName.toLowerCase().includes(q)) ||
-      item.interests.some(i => i.toLowerCase().includes(q))
-    );
+    return item.username.toLowerCase().includes(q) ||
+      (item.fullName?.toLowerCase().includes(q) ?? false) ||
+      item.interests.some(i => i.toLowerCase().includes(q));
   });
 
-  const renderDiscovery = () => {
-    return (
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Search bar */}
-        <View style={s.searchWrap}>
-          <Ionicons name="search" size={18} color={TEXT3} />
-          <TextInput
-            style={s.searchInput}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="İsim veya ilgi alanı ara..."
-            placeholderTextColor={TEXT3}
-            autoCapitalize="none"
-            clearButtonMode="while-editing"
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')} style={s.searchClear}>
-              <Ionicons name="close-circle" size={18} color={TEXT3} />
-            </TouchableOpacity>
-          )}
-        </View>
+  const renderDiscovery = () => (
+    <ScrollView showsVerticalScrollIndicator={false}>
 
-        {/* Match requests */}
-        {matchRequests.length > 0 && (
-          <View style={s.requestSection}>
-            <Text style={s.reqSectionTitle}>Eşleşme İstekleri</Text>
-            {matchRequests.map(req => {
-              const reqAccent = req.fromUser.gender === 'female' ? '#e91e63' : '#3498db';
-              return (
-                <View key={req.id} style={s.reqCard}>
-                  <View style={[s.reqAvatar, { borderColor: reqAccent }]}>
-                    <Image source={{ uri: req.fromUser.avatarUri || '' }} style={{ width: '100%', height: '100%', borderRadius: 999 }} contentFit="cover" cachePolicy="memory-disk" blurRadius={8} />
-                  </View>
-                  <View style={s.reqInfo}>
-                    <Text style={s.reqName}>{req.fromUser.username}</Text>
-                    <Text style={s.reqSub}>eşleşmek istiyor</Text>
-                  </View>
-                  <View style={s.reqActions}>
-                    <TouchableOpacity style={s.reqAcceptBtn} onPress={() => acceptMatchRequest(req)} activeOpacity={0.8}>
-                      <Ionicons name="checkmark" size={18} color="#fff" />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={s.reqRejectBtn} onPress={() => rejectMatchRequest(req.id)} activeOpacity={0.8}>
-                      <Ionicons name="close" size={16} color={TEXT2} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              );
-            })}
-          </View>
+      {/* ── Başlık ──────────────────────────────── */}
+      <View style={s.topRow}>
+        <Text style={s.pageTitle}>Rutinmate</Text>
+      </View>
+
+      {/* ── Arama ───────────────────────────────── */}
+      <View style={s.searchWrap}>
+        <Ionicons name="search" size={16} color={TEXT3} />
+        <TextInput
+          style={s.searchInput}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="İsim veya ilgi alanı ara..."
+          placeholderTextColor={TEXT3}
+          autoCapitalize="none"
+          clearButtonMode="while-editing"
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <Ionicons name="close-circle" size={17} color={TEXT3} />
+          </TouchableOpacity>
         )}
+      </View>
 
-        {/* Suggested — Instagram style */}
-        <View style={s.suggestedSection}>
-          <View style={s.suggestedHeader}>
-            <Text style={s.igSectionTitle}>Önerilen Kişiler</Text>
-            <Text style={s.igSeeAll}>Tümünü Gör</Text>
-          </View>
-
-          {filteredDiscovery.length === 0 && (
-            <View style={s.empty}>
-              <Ionicons name="people-outline" size={40} color={TEXT3} />
-              <Text style={s.emptyTxt}>{searchQuery ? 'Sonuç bulunamadı' : 'Şu an önerilecek kimse yok'}</Text>
-            </View>
-          )}
-
-          {filteredDiscovery.map(item => {
-            const isSent = sentRequests.includes(item.id);
-            const accentColor = item.gender === 'female' ? '#e91e63' : '#3498db';
-            const compat = calcCompat(user, item);
-            const displayName = item.fullName ?? item.username;
-
+      {/* ── Gelen istekler ──────────────────────── */}
+      {matchRequests.length > 0 && (
+        <View style={s.reqSection}>
+          <Text style={s.sectionLabel}>EŞLEŞME İSTEKLERİ</Text>
+          {matchRequests.map(req => {
+            const reqAccent = req.fromUser.gender === 'female' ? '#e91e63' : '#3498db';
             return (
-              <View key={item.id} style={s.igCard}>
-                {/* Avatar */}
-                <View style={[s.igAvatarWrap, { borderColor: accentColor }]}>
-                  {item.avatarUri ? (
-                    <Image
-                      source={{ uri: item.avatarUri }}
-                      style={s.igAvatar}
-                      contentFit="cover"
-                      cachePolicy="memory-disk"
-                      blurRadius={user.isPro ? 0 : 6}
-                    />
-                  ) : (
-                    <View style={s.igAvatarFallback}>
-                      <Ionicons name="person" size={22} color={accentColor} />
-                    </View>
-                  )}
+              <View key={req.id} style={s.reqCard}>
+                <View style={[s.reqAvatar, { borderColor: reqAccent }]}>
+                  <Image source={{ uri: req.fromUser.avatarUri || '' }} style={{ width: '100%', height: '100%', borderRadius: PILL }} contentFit="cover" cachePolicy="memory-disk" blurRadius={8} />
                 </View>
-
-                {/* Info */}
-                <View style={s.igInfo}>
-                  <Text style={s.igName} numberOfLines={1}>{displayName}</Text>
-                  <Text style={s.igCompat}>{compatLabel(compat)} · %{compat}</Text>
-                  {item.interests.length > 0 ? (
-                    <View style={s.igInterests}>
-                      {item.interests.slice(0, 3).map(int => {
-                        const icon = INTEREST_ICON[int] ?? 'star-outline';
-                        return (
-                          <View key={int} style={s.igInterestChip}>
-                            <Ionicons name={icon} size={10} color="#2A6151" />
-                            <Text style={s.igInterestTxt}>{int}</Text>
-                          </View>
-                        );
-                      })}
-                    </View>
-                  ) : (
-                    <Text style={s.igNoInterests}>İlgi alanı eklenmemiş</Text>
-                  )}
+                <View style={{ flex: 1 }}>
+                  <Text style={s.reqName}>{req.fromUser.username}</Text>
+                  <Text style={s.reqSub}>eşleşmek istiyor</Text>
                 </View>
-
-                {/* Action button */}
-                {isSent ? (
-                  <TouchableOpacity style={s.igCancelBtn} onPress={() => cancelMatchRequest(item.id)} activeOpacity={0.8}>
-                    <Text style={s.igCancelTxt}>Geri Çek</Text>
+                <View style={s.reqActions}>
+                  <TouchableOpacity style={s.reqAcceptBtn} onPress={() => acceptMatchRequest(req)} activeOpacity={0.8}>
+                    <Ionicons name="checkmark" size={18} color="#fff" />
                   </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity style={s.igFollowBtn} onPress={() => sendMatchRequest(item)} activeOpacity={0.8}>
-                    <Text style={s.igFollowTxt}>Eşleş</Text>
+                  <TouchableOpacity style={s.reqRejectBtn} onPress={() => rejectMatchRequest(req.id)} activeOpacity={0.8}>
+                    <Ionicons name="close" size={16} color={TEXT2} />
                   </TouchableOpacity>
-                )}
+                </View>
               </View>
             );
           })}
         </View>
-        <View style={{ height: 100 }} />
-      </ScrollView>
-    );
-  };
+      )}
+
+      {/* ── Önerilen kişiler ────────────────────── */}
+      <View style={s.discSection}>
+        <Text style={s.sectionLabel}>ÖNERİLEN KİŞİLER</Text>
+
+        {filteredDiscovery.length === 0 && (
+          <View style={s.empty}>
+            <Ionicons name="people-outline" size={40} color={TEXT3} />
+            <Text style={s.emptyTxt}>{searchQuery ? 'Sonuç bulunamadı' : 'Şu an önerilecek kimse yok'}</Text>
+          </View>
+        )}
+
+        {filteredDiscovery.map(item => {
+          const isSent = sentRequests.includes(item.id);
+          const accentColor = item.gender === 'female' ? '#e91e63' : '#3498db';
+          const compat = calcCompat(user, item);
+          const displayName = item.fullName ?? item.username;
+
+          return (
+            <View key={item.id} style={s.discCard}>
+              {/* Avatar */}
+              <View style={[s.discAvatar, { borderColor: accentColor }]}>
+                {item.avatarUri ? (
+                  <Image source={{ uri: item.avatarUri }} style={{ width: '100%', height: '100%' }} contentFit="cover" cachePolicy="memory-disk" blurRadius={user.isPro ? 0 : 6} />
+                ) : (
+                  <View style={[s.discAvatarFallback, { backgroundColor: accentColor + '20' }]}>
+                    <Ionicons name="person" size={20} color={accentColor} />
+                  </View>
+                )}
+              </View>
+
+              {/* Bilgi */}
+              <View style={s.discInfo}>
+                <Text style={s.discName} numberOfLines={1}>{displayName}</Text>
+                <Text style={s.discCompat}>{compatLabel(compat)} · %{compat}</Text>
+                {item.interests.length > 0 ? (
+                  <View style={s.interestRow}>
+                    {item.interests.slice(0, 3).map(int => (
+                      <View key={int} style={s.interestChip}>
+                        <Ionicons name={INTEREST_ICON[int] ?? 'star-outline'} size={10} color={RED} />
+                        <Text style={s.interestTxt}>{int}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <Text style={s.noInterests}>İlgi alanı eklenmemiş</Text>
+                )}
+              </View>
+
+              {/* Buton */}
+              {isSent ? (
+                <TouchableOpacity style={s.cancelBtn} onPress={() => cancelMatchRequest(item.id)} activeOpacity={0.8}>
+                  <Text style={s.cancelTxt}>Geri Çek</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity style={s.matchBtn} onPress={() => sendMatchRequest(item)} activeOpacity={0.8}>
+                  <Text style={s.matchTxt}>Eşleş</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          );
+        })}
+      </View>
+
+      <View style={{ height: 100 }} />
+    </ScrollView>
+  );
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
@@ -421,69 +399,79 @@ export default function MateScreen() {
 }
 
 const s = StyleSheet.create({
-  container: {flex:1, backgroundColor:BG},
-  header: {paddingHorizontal:20, paddingTop:24, paddingBottom:16},
-  title: {fontSize:32, color:TEXT, fontWeight:'900', letterSpacing:-1},
-  subTitle: {fontSize:14, color:TEXT2, marginTop:4, fontWeight:'500'},
-  
-  // Active Match
-  mateCard: {marginHorizontal:16, paddingVertical:20, borderBottomWidth:1, borderBottomColor:BORDER},
-  mateTop: {flexDirection:'row', alignItems:'center', gap:14, marginBottom:24},
-  avatar: {width:56, height:56, borderRadius:28, borderWidth:2, backgroundColor:BG, alignItems:'center', justifyContent:'center'},
-  mateName: {fontSize:18, color:TEXT, fontWeight:'800'},
-  mateScore: {fontSize:13, fontWeight:'600', marginTop:2},
-  profileBtn: {flexDirection:'row', alignItems:'center', gap:2},
-  profileBtnTxt: {fontSize:13, color:TEXT2, fontWeight:'600'},
-  stats: {flexDirection:'row', justifyContent:'space-between', gap:16, marginTop:16, marginBottom:8, paddingHorizontal:8},
-  statItem: {flexDirection:'row', alignItems:'center', gap:12},
-  statTextGroup: {alignItems:'flex-start'},
-  statNum: {fontSize:16, color:TEXT, fontWeight:'900', letterSpacing:-0.5},
-  statDenom: {fontSize:12, color:TEXT3, fontWeight:'700'},
-  statLabel: {fontSize:10, color:TEXT2, marginTop:0, fontWeight:'700', letterSpacing:1},
-  sectionHeader: {paddingHorizontal:16, paddingTop:24, paddingBottom:10},
-  sectionTitle: {fontSize:22, color:TEXT, fontWeight:'900', letterSpacing:-0.5},
-  list: {paddingHorizontal:16, paddingTop:4},
-  row: {flexDirection:'row', alignItems:'center', gap:10, paddingVertical:12, borderBottomWidth:0.5, borderBottomColor:BORDER},
-  checkBox: {width:20, height:20, borderRadius:10, borderWidth:1, alignItems:'center', justifyContent:'center', backgroundColor:BG},
-  rowName: {fontSize:14, color:TEXT, fontWeight:'500'},
-  rowMeta: {fontSize:11, color:TEXT3, marginTop:1},
-  empty: {alignItems:'center', paddingTop:40, gap:12},
-  emptyTxt: {fontSize:14, color:TEXT2},
+  container: { flex: 1, backgroundColor: BG },
 
-  // Instagram-style Discovery
-  searchWrap: {flexDirection:'row', alignItems:'center', backgroundColor:SURFACE, borderRadius:12, marginHorizontal:16, marginVertical:12, paddingHorizontal:12, height:40},
-  searchInput: {flex:1, fontSize:14, color:TEXT, marginLeft:8},
-  searchClear: {paddingLeft:8},
+  // Shared header
+  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 10 },
+  topUsername: { fontSize: 16, color: TEXT, fontWeight: '400', letterSpacing: -0.1 },
+  pageTitle: { fontSize: 28, color: TEXT, fontWeight: '900', letterSpacing: -0.8 },
+  settingsBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center' },
 
-  // Match requests — vertical card list
-  requestSection: { paddingVertical: 8, paddingHorizontal: 16, gap: 8 },
-  reqSectionTitle: { fontSize: 11, color: TEXT3, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 },
+  // Active match — insta head
+  instaHead: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, gap: 16 },
+  avatar: { width: 68, height: 68, borderRadius: 34, borderWidth: 2, backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  statsRow: { flex: 1, flexDirection: 'row', justifyContent: 'space-around' },
+  statItem: { alignItems: 'center', gap: 2 },
+  statNum: { fontSize: 18, fontWeight: '900', color: TEXT, letterSpacing: -0.4 },
+  statLabel: { fontSize: 11, color: TEXT3, fontWeight: '600' },
+
+  bioArea: { paddingHorizontal: 16, paddingBottom: 8 },
+  profileName: { fontSize: 14, fontWeight: '600', color: TEXT },
+
+  tabDivider: { height: 0.5, backgroundColor: BORDER, marginTop: 8 },
+
+  // Routine rows (home style)
+  taskRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, paddingHorizontal: 16, backgroundColor: SURFACE },
+  taskDivider: { height: 1, backgroundColor: BORDER, marginHorizontal: 20 },
+  catIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  taskName: { fontSize: 14, color: TEXT, fontWeight: '500' },
+  taskNameDone: { color: TEXT3, textDecorationLine: 'line-through' },
+  taskMeta: { fontSize: 11, color: TEXT3, marginTop: 2 },
+  congratsBlock: { flexDirection: 'row', alignItems: 'center', marginTop: 7, borderRadius: 6, overflow: 'hidden', backgroundColor: '#2A615115' },
+  congratsBar: { width: 3, alignSelf: 'stretch', backgroundColor: '#2A6151' },
+  congratsTxt: { fontSize: 11, color: '#2A6151', fontWeight: '600', paddingHorizontal: 8, paddingVertical: 6 },
+
+  remindQuote: { flexDirection: 'row', alignItems: 'stretch', marginTop: 7, borderRadius: 6, overflow: 'hidden', backgroundColor: RED + '0D' },
+  remindQuoteBar: { width: 3, backgroundColor: RED },
+  remindQuoteContent: { flex: 1, paddingHorizontal: 8, paddingVertical: 5 },
+  remindQuoteRoutine: { fontSize: 11, color: TEXT2, fontWeight: '600', marginBottom: 2 },
+  remindQuoteAction: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  remindQuoteTxt: { fontSize: 11, color: RED, fontWeight: '600' },
+  taskDotDone: { width: 26, height: 26, borderRadius: 13, backgroundColor: RED, alignItems: 'center', justifyContent: 'center' },
+  taskDotPending: { width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: BORDER },
+
+  empty: { alignItems: 'center', paddingTop: 48, gap: 12 },
+  emptyTxt: { fontSize: 14, color: TEXT2 },
+
+  // Discovery — search
+  searchWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: SURFACE, borderRadius: 12, marginHorizontal: 16, marginBottom: 16, paddingHorizontal: 12, height: 42, gap: 8 },
+  searchInput: { flex: 1, fontSize: 14, color: TEXT },
+
+  // Match requests
+  reqSection: { paddingHorizontal: 16, paddingBottom: 8, gap: 8 },
   reqCard: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: SURFACE, borderRadius: 16, padding: 12 },
-  reqAvatar: { width: 50, height: 50, borderRadius: 25, borderWidth: 2, overflow: 'hidden', flexShrink: 0 },
-  reqInfo: { flex: 1 },
+  reqAvatar: { width: 48, height: 48, borderRadius: 24, borderWidth: 2, overflow: 'hidden', flexShrink: 0 },
   reqName: { fontSize: 15, color: TEXT, fontWeight: '700' },
   reqSub: { fontSize: 12, color: TEXT2, marginTop: 2 },
-  reqActions: { flexDirection: 'row', gap: 8, flexShrink: 0 },
+  reqActions: { flexDirection: 'row', gap: 8 },
   reqAcceptBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: RED, alignItems: 'center', justifyContent: 'center' },
   reqRejectBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' },
 
-  // Suggested — Instagram card style
-  suggestedSection: {paddingTop:0},
-  suggestedHeader: {flexDirection:'row', justifyContent:'space-between', alignItems:'center', paddingHorizontal:16, marginBottom:10, marginTop:12},
-  igSeeAll: {fontSize:13, color:TEXT2, fontWeight:'600'},
-  igCard: {flexDirection:'row', alignItems:'flex-start', paddingHorizontal:16, paddingVertical:12, gap:12},
-  igAvatarWrap: {width:44, height:44, borderRadius:22, borderWidth:2, overflow:'hidden', flexShrink:0},
-  igAvatar: {width:'100%', height:'100%'},
-  igAvatarFallback: {width:'100%', height:'100%', backgroundColor:SURFACE, alignItems:'center', justifyContent:'center'},
-  igInfo: {flex:1, gap:3},
-  igName: {fontSize:14, color:TEXT, fontWeight:'600'},
-  igCompat: {fontSize:12, color:TEXT2, fontWeight:'500'},
-  igInterests: {flexDirection:'row', flexWrap:'wrap', gap:4, marginTop:4},
-  igInterestChip: {flexDirection:'row', alignItems:'center', gap:3, backgroundColor:'rgba(42,97,81,0.10)', borderRadius:6, paddingHorizontal:8, paddingVertical:4, borderWidth:0.5, borderColor:'rgba(42,97,81,0.25)'},
-  igInterestTxt: {fontSize:11, color:'#2A6151', fontWeight:'600'},
-  igNoInterests: {fontSize:11, color:TEXT3, marginTop:2},
-  igFollowBtn: {backgroundColor:RED, borderRadius:8, paddingHorizontal:16, paddingVertical:7},
-  igFollowTxt: {color:'#fff', fontSize:13, fontWeight:'700'},
-  igCancelBtn: {backgroundColor:SURFACE, borderRadius:8, paddingHorizontal:12, paddingVertical:7},
-  igCancelTxt: {color:TEXT2, fontSize:12, fontWeight:'600'},
+  // Discovery cards
+  discSection: { paddingBottom: 8 },
+  sectionLabel: { fontSize: 11, fontWeight: '700', color: TEXT3, letterSpacing: 0.8, paddingHorizontal: 16, marginBottom: 8 },
+  discCard: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 16, paddingVertical: 12, gap: 12 },
+  discAvatar: { width: 46, height: 46, borderRadius: 23, borderWidth: 2, overflow: 'hidden', flexShrink: 0 },
+  discAvatarFallback: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
+  discInfo: { flex: 1, gap: 3 },
+  discName: { fontSize: 14, color: TEXT, fontWeight: '600' },
+  discCompat: { fontSize: 12, color: TEXT2, fontWeight: '500' },
+  interestRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
+  interestChip: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: RED + '12', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
+  interestTxt: { fontSize: 11, color: RED, fontWeight: '600' },
+  noInterests: { fontSize: 11, color: TEXT3, marginTop: 2 },
+  matchBtn: { backgroundColor: RED, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8, alignSelf: 'flex-start' },
+  matchTxt: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  cancelBtn: { backgroundColor: SURFACE, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, alignSelf: 'flex-start' },
+  cancelTxt: { color: TEXT2, fontSize: 12, fontWeight: '600' },
 });

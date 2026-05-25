@@ -176,6 +176,8 @@ interface AppState {
   addRoutineNote: (routineId: string, date: string, text: string) => Promise<void>;
   deleteRoutineNote: (routineId: string, noteId: string) => void;
   toggleSetActive: (setName: string) => void;
+  renameSet: (oldName: string, newName: string) => void;
+  deleteSet: (setName: string) => void;
   addMatchRequest: (request: MatchRequest) => void;
   sendMatchRequest: (targetUser: Mate) => void;
   cancelMatchRequest: (targetUserId: string) => void;
@@ -646,6 +648,35 @@ export const useStore = create<AppState>()(
               inactiveSets: newInactive,
             },
           };
+        });
+      },
+
+      renameSet: (oldName, newName) => {
+        const ids = get().user.routines.filter(r => r.setName === oldName).map(r => r.id);
+        set((s) => ({
+          user: {
+            ...s.user,
+            routines: s.user.routines.map(r =>
+              r.setName === oldName ? { ...r, setName: newName } : r
+            ),
+            inactiveSets: (s.user.inactiveSets ?? []).map(n => n === oldName ? newName : n),
+          },
+        }));
+        ids.forEach(id => RoutineAPI.update(id, { setName: newName }).catch(console.error));
+      },
+
+      deleteSet: (setName) => {
+        const ids = get().user.routines.filter(r => r.setName === setName).map(r => r.id);
+        set((s) => ({
+          user: {
+            ...s.user,
+            routines: s.user.routines.filter(r => r.setName !== setName),
+            inactiveSets: (s.user.inactiveSets ?? []).filter(n => n !== setName),
+          },
+        }));
+        ids.forEach(id => {
+          RoutineAPI.delete(id).catch(console.error);
+          cancelRoutineNotification(id).catch(() => {});
         });
       },
 

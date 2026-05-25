@@ -13,13 +13,19 @@ import Svg, { Circle, G, Text as SvgText, Polyline, Path } from 'react-native-sv
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 const { width } = Dimensions.get('window');
-const PHOTO_SIZE = (width - 32 - 4) / 3;
+const PHOTO_SIZE = (width - 8) / 3;
 const today = localDateStr();
 
 const BG = '#EEE3D0'; const CARD = '#FFFFFF'; const SURFACE = '#F5EDE0';
 const TEXT = '#0A3B25'; const TEXT2 = '#3D6B58'; const TEXT3 = '#B2B7AA';
 const RED = '#2A6151'; const GREEN = '#1A4F3A'; const GOLD = '#D8C2A4';
 const BORDER = '#B2B7AA'; const PILL = 999;
+
+function rateColor(rate: number): string {
+  if (rate >= 75) return '#2A6151';
+  if (rate >= 40) return '#D8C2A4';
+  return '#e74c3c';
+}
 
 function LineChart({ data, color = RED }: { data: number[]; color?: string }) {
   const cw = width - 40;
@@ -177,6 +183,7 @@ export default function ProfileScreen() {
     return { dateStr, dayLabel: TR_DAYS[dw], pct, doneCount, isToday: dateStr === today };
   });
   const maxDoneCount = Math.max(...last7Data.map(d => d.doneCount), 1);
+  const last7Pct = Math.round(last7Data.reduce((s, d) => s + d.pct, 0) / last7Data.length * 100);
 
   const editTimeDate = new Date();
   editTimeDate.setHours(parseInt(editHour || '7', 10));
@@ -220,33 +227,38 @@ export default function ProfileScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Top row: username + settings */}
       <View style={styles.topRow}>
-        <Text style={styles.topUsername}>{user.username}</Text>
+        <Text style={styles.topUsername}>@{user.username}</Text>
         <TouchableOpacity style={styles.settingsBtn} onPress={() => router.push('/modal')}>
           <Ionicons name="menu" size={22} color={TEXT} />
         </TouchableOpacity>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
+
         {/* Instagram Header: avatar sol, istatistikler sağ */}
         <View style={styles.instaHead}>
           <TouchableOpacity onPress={pickAvatar} activeOpacity={0.8}>
-            {user.avatarUri ? (
-              <Image source={{ uri: user.avatarUri }} style={styles.avatar} contentFit="cover" cachePolicy="memory-disk" transition={200} />
-            ) : (
-              <View style={[styles.avatarFallback, { backgroundColor: accentColor + '20' }]}>
-                <Text style={[styles.avatarInitial, { color: accentColor }]}>{(user.username || '?')[0].toUpperCase()}</Text>
+            <View>
+              {user.avatarUri ? (
+                <Image source={{ uri: user.avatarUri }} style={styles.avatar} contentFit="cover" cachePolicy="memory-disk" transition={200} />
+              ) : (
+                <View style={[styles.avatarFallback, { backgroundColor: accentColor + '20' }]}>
+                  <Text style={[styles.avatarInitial, { color: accentColor }]}>{(user.username || '?')[0].toUpperCase()}</Text>
+                </View>
+              )}
+              <View style={styles.avatarEditBadge}>
+                <Ionicons name="pencil" size={9} color="#fff" />
               </View>
-            )}
-          </TouchableOpacity>
-
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Text style={styles.statNum}>{user.achievementScore}%</Text>
-              <Text style={styles.statLabel}>Başarı</Text>
             </View>
+          </TouchableOpacity>
+          <View style={styles.statsRow}>
             <View style={styles.statItem}>
               <Text style={styles.statNum}>{user.routines.length}</Text>
               <Text style={styles.statLabel}>Rutin</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statNum}>{user.achievementScore}%</Text>
+              <Text style={styles.statLabel}>Başarı</Text>
             </View>
             <View style={styles.statItem}>
               <Text style={styles.statNum}>{user.photos.length}</Text>
@@ -258,16 +270,14 @@ export default function ProfileScreen() {
         {/* Bio */}
         <View style={styles.bioArea}>
           {user.fullName ? <Text style={styles.profileName}>{user.fullName}</Text> : null}
-          <Text style={styles.profileHandle}>@{user.username}{user.isPro ? ' · Pro' : ''}</Text>
           {user.bio ? <Text style={styles.profileBio}>{user.bio}</Text> : null}
-          {user.locationName ? <Text style={styles.profileLoc}>{user.locationName}</Text> : null}
         </View>
 
         {/* Buttons */}
         <View style={styles.btnRow}>
           {!user.isPro && (
             <TouchableOpacity style={styles.proBtn} onPress={() => router.push('/pro-upgrade')} activeOpacity={0.85}>
-              <FontAwesome5 name="crown" size={13} color="#fff" />
+              <FontAwesome5 name="crown" size={12} color="#fff" />
               <Text style={styles.proBtnTxt}>Pro'ya Geç</Text>
             </TouchableOpacity>
           )}
@@ -364,10 +374,52 @@ export default function ProfileScreen() {
         {activeTab === 2 && (
           <View style={{ backgroundColor: BG }}>
 
-            {/* Aktiflik — Son 7 Gün */}
+            {/* Sayılar */}
+            <View style={st.numRow}>
+              <View style={st.numItem}>
+                <Text style={st.numBig}>{totalDoneAllTime.toLocaleString('tr-TR')}</Text>
+                <Text style={st.numLbl}>Toplam</Text>
+              </View>
+              <View style={st.numDivider} />
+              <View style={st.numItem}>
+                <Text style={st.numBig}>{streakDays}</Text>
+                <Text style={st.numLbl}>Seri</Text>
+              </View>
+              <View style={st.numDivider} />
+              <View style={st.numItem}>
+                <Text style={st.numBig}>{user.achievementScore}</Text>
+                <Text style={st.numLbl}>Başarı</Text>
+              </View>
+            </View>
+
+            <View style={st.div} />
+
+            {/* Yüzdeler */}
+            <View style={st.numRow}>
+              <View style={st.numItem}>
+                <Text style={[st.numBig, { color: rateColor(todayPct) }]}>{todayPct}%</Text>
+                <Text style={st.numLbl}>Bugün</Text>
+                <Text style={st.numSub}>{todayDone}/{todayScheduled.length}</Text>
+              </View>
+              <View style={st.numDivider} />
+              <View style={st.numItem}>
+                <Text style={[st.numBig, { color: rateColor(last7Pct) }]}>{last7Pct}%</Text>
+                <Text style={st.numLbl}>7 Gün</Text>
+                <Text style={st.numSub}>ortalama</Text>
+              </View>
+              <View style={st.numDivider} />
+              <View style={st.numItem}>
+                <Text style={st.numBig}>{proofPhotos}</Text>
+                <Text style={st.numLbl}>Fotoğraf</Text>
+                <Text style={st.numSub}>kanıt</Text>
+              </View>
+            </View>
+
+            <View style={st.div} />
+
+            {/* Son 7 gün */}
             <View style={st.sec}>
-              <Text style={st.secTitle}>Aktiflik</Text>
-              <Text style={st.secDesc}>Son 7 günde her gün kaç görev tamamladığın</Text>
+              <Text style={st.secTitle}>Son 7 Gün</Text>
               <LineChart data={last7Data.map(d => d.doneCount / maxDoneCount)} />
               <View style={st.dayRow}>
                 {last7Data.map(d => (
@@ -378,53 +430,17 @@ export default function ProfileScreen() {
               </View>
             </View>
 
-            <View style={st.div} />
-
-            {/* Görev Tamamlama — Son 7 Gün */}
-            <View style={st.sec}>
-              <Text style={st.secTitle}>Görev Tamamlama</Text>
-              <Text style={st.secDesc}>Planlanan görevlerinden kaçını tamamladığın</Text>
-              <LineChart data={last7Data.map(d => d.pct)} />
-              <View style={st.dayRow}>
-                {last7Data.map(d => (
-                  <Text key={d.dateStr} style={[st.dayLbl, d.isToday && { color: RED, fontWeight: '800' }]}>
-                    {d.dayLabel}
-                  </Text>
-                ))}
-              </View>
-            </View>
-
-            <View style={st.div} />
-
-            {/* Tamamlama */}
-            <View style={st.sec}>
-              <Text style={st.secTitle}>Tamamlama</Text>
-              <Text style={st.secDesc}>Rutin başlangıcından bu yana tüm beklenen görevler</Text>
-              <View style={[st.numLine, { marginTop: 4 }]}>
-                <Text style={st.numBig}>{totalDoneAllTime.toLocaleString('tr-TR')}</Text>
-                <Text style={st.numOf}>/ {totalExpectedAllTime.toLocaleString('tr-TR')} görev yapıldı</Text>
-              </View>
-              <View style={[st.numLine, { marginTop: 8 }]}>
-                <Text style={st.numBig}>{proofPhotos}</Text>
-                <Text style={st.numOf}>/ {totalExpectedAllTime.toLocaleString('tr-TR')} fotoğrafla kanıtlandı</Text>
-              </View>
-            </View>
-
-            <View style={st.div} />
-
             {/* Bugün */}
-            <View style={st.sec}>
-              <View style={st.secHeader}>
-                <View>
-                  <Text style={st.secTitle}>Bugün</Text>
-                  <Text style={st.secDesc}>Bugün planlanan rutinlerin</Text>
-                </View>
-                <Text style={[st.badge, { color: TEXT2 }]}>
-                  {todayScheduled.length > 0 ? `${todayDone}/${todayScheduled.length} tamamlandı` : 'Bugün görev yok'}
-                </Text>
-              </View>
-              {todayScheduled.length > 0 && (
-                <>
+            {todayScheduled.length > 0 && (
+              <>
+                <View style={st.div} />
+                <View style={st.sec}>
+                  <View style={st.secHeader}>
+                    <Text style={st.secTitle}>Bugün</Text>
+                    <Text style={[st.numSub, { color: todayPct === 100 ? RED : TEXT2 }]}>
+                      {todayDone}/{todayScheduled.length} tamamlandı
+                    </Text>
+                  </View>
                   <View style={st.progBg}>
                     <View style={[st.progFill, {
                       width: `${todayPct}%` as any,
@@ -444,9 +460,9 @@ export default function ProfileScreen() {
                       </View>
                     );
                   })}
-                </>
-              )}
-            </View>
+                </View>
+              </>
+            )}
 
             {/* Mate */}
             {mate && (
@@ -454,18 +470,17 @@ export default function ProfileScreen() {
                 <View style={st.div} />
                 <View style={st.sec}>
                   <Text style={st.secTitle}>Mate Karşılaştırması</Text>
-                  <Text style={[st.secDesc, { marginBottom: 12 }]}>Başarı skorları ve günlük seriler</Text>
-                  <View style={{ flexDirection: 'row' }}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[st.secTitle, { marginBottom: 4 }]}>Sen</Text>
-                      <Text style={st.bigN}>{user.achievementScore}<Text style={st.bigNUnit}>/100</Text></Text>
-                      <Text style={[st.numOf, { marginTop: 4 }]}>{streakDays} gün seri</Text>
+                  <View style={st.mateRow}>
+                    <View style={st.mateCol}>
+                      <Text style={st.mateScore}>{user.achievementScore}</Text>
+                      <Text style={st.numLbl}>Sen</Text>
+                      <Text style={st.numSub}>{streakDays} gün seri</Text>
                     </View>
-                    <View style={st.vDiv} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={[st.secTitle, { marginBottom: 4 }]}>@{mate.username}</Text>
-                      <Text style={st.bigN}>{mate.achievementScore}<Text style={st.bigNUnit}>/100</Text></Text>
-                      {mateStreakDays !== null && <Text style={[st.numOf, { marginTop: 4 }]}>{mateStreakDays} gün seri</Text>}
+                    <View style={st.numDivider} />
+                    <View style={st.mateCol}>
+                      <Text style={st.mateScore}>{mate.achievementScore}</Text>
+                      <Text style={[st.numLbl, { textAlign: 'center' }]}>@{mate.username}</Text>
+                      {mateStreakDays !== null && <Text style={st.numSub}>{mateStreakDays} gün seri</Text>}
                     </View>
                   </View>
                 </View>
@@ -478,8 +493,8 @@ export default function ProfileScreen() {
                 <View style={st.div} />
                 <View style={st.sec}>
                   <Text style={st.secTitle}>En Aktif Saat</Text>
-                  <Text style={st.secDesc}>Kanıt fotoğraflarına göre en çok görev yaptığın saat</Text>
-                  <Text style={st.bigN}>{String(avgHour).padStart(2, '0')}:00</Text>
+                  <Text style={st.bigHour}>{String(avgHour).padStart(2, '0')}:00</Text>
+                  <Text style={st.numSub}>kanıt fotoğraflarına göre</Text>
                 </View>
               </>
             )}
@@ -689,30 +704,34 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
-  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
-  topUsername: { fontSize: 19, color: TEXT, fontWeight: '800', letterSpacing: -0.3 },
-  settingsBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center' },
-  
-  instaHead: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 16, gap: 24 },
-  avatar: { width: 84, height: 84, borderRadius: 42 },
-  avatarFallback: { width: 84, height: 84, borderRadius: 42, alignItems: 'center', justifyContent: 'center' },
-  avatarInitial: { fontSize: 32, fontWeight: '900' },
+  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 8 },
+  topUsername: { fontSize: 16, color: TEXT, fontWeight: '400', letterSpacing: -0.1 },
+  settingsBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center' },
+
+  instaHead: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, gap: 16 },
+  avatar: { width: 68, height: 68, borderRadius: 34 },
+  avatarFallback: { width: 68, height: 68, borderRadius: 34, alignItems: 'center', justifyContent: 'center' },
+  avatarInitial: { fontSize: 26, fontWeight: '900' },
+  avatarEditBadge: {
+    position: 'absolute', top: 0, left: 0,
+    width: 20, height: 20, borderRadius: 10,
+    backgroundColor: RED, alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1.5, borderColor: BG,
+  },
   statsRow: { flex: 1, flexDirection: 'row', justifyContent: 'space-around' },
-  statItem: { alignItems: 'center' },
-  statNum: { fontSize: 20, fontWeight: '900', color: TEXT, letterSpacing: -0.4 },
-  statLabel: { fontSize: 11, color: TEXT3, marginTop: 3, fontWeight: '600' },
+  statItem: { alignItems: 'center', gap: 2 },
+  statNum: { fontSize: 18, fontWeight: '900', color: TEXT, letterSpacing: -0.4 },
+  statLabel: { fontSize: 11, color: TEXT3, fontWeight: '600' },
 
-  bioArea: { paddingHorizontal: 16, paddingBottom: 14, gap: 2 },
-  profileName: { fontSize: 15, fontWeight: '800', color: TEXT },
-  profileHandle: { fontSize: 13, color: TEXT3, fontWeight: '500' },
-  profileBio: { fontSize: 14, color: TEXT2, lineHeight: 19, marginTop: 4 },
-  profileLoc: { fontSize: 13, color: TEXT3, marginTop: 2 },
+  bioArea: { paddingHorizontal: 16, paddingBottom: 10, gap: 3 },
+  profileName: { fontSize: 14, fontWeight: '400', color: TEXT },
+  profileBio: { fontSize: 13, color: TEXT2, lineHeight: 18 },
 
-  btnRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginBottom: 12 },
-  proBtn: { flex: 1, flexDirection: 'row', gap: 7, backgroundColor: GOLD, borderRadius: PILL, paddingVertical: 10, alignItems: 'center', justifyContent: 'center' },
-  proBtnTxt: { color: '#0A3B25', fontSize: 14, fontWeight: '800' },
-  editBtn: { flex: 1, backgroundColor: SURFACE, borderRadius: PILL, paddingVertical: 10, alignItems: 'center', justifyContent: 'center' },
-  editBtnTxt: { color: TEXT, fontSize: 14, fontWeight: '700' },
+  btnRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginBottom: 8 },
+  proBtn: { flex: 1, flexDirection: 'row', gap: 6, backgroundColor: GOLD, borderRadius: 10, paddingVertical: 9, alignItems: 'center', justifyContent: 'center' },
+  proBtnTxt: { color: '#0A3B25', fontSize: 13, fontWeight: '800' },
+  editBtn: { flex: 1, backgroundColor: SURFACE, borderRadius: 10, paddingVertical: 9, alignItems: 'center', justifyContent: 'center' },
+  editBtnTxt: { color: TEXT, fontSize: 13, fontWeight: '700' },
   tabs: { flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: BORDER, marginHorizontal: 16 },
   tab: { flex: 1, paddingVertical: 12, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
   tabActive: { borderBottomColor: TEXT },
@@ -732,10 +751,10 @@ const styles = StyleSheet.create({
   routineDot: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   routineName: { fontSize: 13, color: TEXT, fontWeight: '600' },
   routineMeta: { fontSize: 11, color: TEXT3, marginTop: 2 },
-  photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 2 },
+  photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 2, paddingHorizontal: 2 },
   photoAdd: { width: PHOTO_SIZE, height: PHOTO_SIZE, backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center', borderRadius: 10, borderWidth: 1.5, borderColor: BORDER, borderStyle: 'dashed', gap: 6 },
   photoAddText: { fontSize: 11, color: TEXT3, fontWeight: '600' },
-  photoCell: { width: PHOTO_SIZE, height: PHOTO_SIZE, borderRadius: 10, overflow: 'hidden' },
+  photoCell: { width: PHOTO_SIZE, height: PHOTO_SIZE, borderRadius: 4, overflow: 'hidden' },
   photoImage: { width: '100%', height: '100%' },
   barRow: { flexDirection: 'row', justifyContent: 'center', gap: 16, marginTop: 24, alignItems: 'flex-end' },
   barItem: { alignItems: 'center', width: 48 },
@@ -793,32 +812,38 @@ const styles = StyleSheet.create({
 });
 
 const st = StyleSheet.create({
-  sec:      { paddingHorizontal: 20, paddingVertical: 18 },
-  secHeader:{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  secTitle: { fontSize: 12, fontWeight: '700', color: TEXT2, marginBottom: 2 },
-  secDesc:  { fontSize: 12, color: TEXT3, marginBottom: 10 },
-  div:      { height: 1, backgroundColor: BORDER },
-  vDiv:     { width: 1, backgroundColor: BORDER, marginHorizontal: 20 },
+  div: { height: 1, backgroundColor: BORDER },
 
-  // Çizgi grafik
+  // Sayı satırı (kutu yok)
+  numRow:     { flexDirection: 'row', paddingVertical: 20, paddingHorizontal: 16 },
+  numItem:    { flex: 1, alignItems: 'center', gap: 3 },
+  numDivider: { width: 1, backgroundColor: BORDER, marginHorizontal: 4 },
+  numBig:     { fontSize: 26, fontWeight: '900', color: TEXT, letterSpacing: -0.5 },
+  numLbl:     { fontSize: 11, color: TEXT3, fontWeight: '600' },
+  numSub:     { fontSize: 11, color: TEXT3, fontWeight: '500' },
+
+  // Bölüm
+  sec:       { paddingHorizontal: 20, paddingVertical: 18 },
+  secHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  secTitle:  { fontSize: 13, fontWeight: '700', color: TEXT, marginBottom: 12 },
+
+  // Grafik
   dayRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
   dayLbl: { flex: 1, textAlign: 'center', fontSize: 10, color: TEXT3, fontWeight: '600' },
 
-  // Sayılar
-  numLine: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
-  numBig:  { fontSize: 28, fontWeight: '900', color: TEXT },
-  numOf:   { fontSize: 13, color: TEXT2 },
-
-  // Büyük sayılar
-  bigN:     { fontSize: 44, fontWeight: '900', color: TEXT, lineHeight: 48 },
-  bigNUnit: { fontSize: 16, fontWeight: '500', color: TEXT3 },
-
   // Bugün
-  badge:    { fontSize: 13, fontWeight: '600' },
-  progBg:   { height: 4, backgroundColor: SURFACE, borderRadius: 2, overflow: 'hidden', marginBottom: 14 },
+  progBg:   { height: 4, backgroundColor: SURFACE, borderRadius: 2, overflow: 'hidden', marginBottom: 12 },
   progFill: { height: '100%', borderRadius: 2 },
   taskRow:  { flexDirection: 'row', alignItems: 'center', paddingVertical: 9, gap: 10, borderTopWidth: 0.5, borderTopColor: BORDER },
   taskDot:  { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: TEXT3, alignItems: 'center', justifyContent: 'center' },
   taskName: { flex: 1, fontSize: 14, color: TEXT, fontWeight: '500' },
+
+  // Mate
+  mateRow:   { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+  mateCol:   { flex: 1, alignItems: 'center', gap: 4, paddingVertical: 8 },
+  mateScore: { fontSize: 36, fontWeight: '900', color: TEXT, letterSpacing: -1 },
+
+  // En aktif saat
+  bigHour: { fontSize: 40, fontWeight: '900', color: TEXT, letterSpacing: -1, marginBottom: 2 },
 });
 

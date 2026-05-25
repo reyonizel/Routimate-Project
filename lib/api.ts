@@ -505,7 +505,7 @@ export const MatchAPI = {
 
     const { data: mateRaw } = await supabase
       .from('profiles')
-      .select('id, username, gender, avatar_url, interests, achievement_score, routines(id, name, description, frequency, notification_time, created_at, target_days, monthly_days, set_name, scope, once_start, once_end, routine_completions(completed_date)), photos(id, url, is_pinned, uploaded_at, proof_meta)')
+      .select('id, username, gender, avatar_url, interests, achievement_score, routines(id, name, description, frequency, notification_time, created_at, target_days, monthly_days, set_name, set_icon, scope, once_start, once_end, routine_completions(completed_date)), photos(id, url, is_pinned, uploaded_at, proof_meta)')
       .eq('id', mateId)
       .maybeSingle();
 

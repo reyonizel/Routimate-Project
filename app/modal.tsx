@@ -330,6 +330,49 @@ export default function ModalScreen() {
           />
         </Section>
 
+        {/* Diğer Bilgilerim */}
+        <Section title="Diğer Bilgilerim">
+          <Row
+            icon="location-outline"
+            label={user.locationName ? user.locationName : 'Konum ekle'}
+            sub={user.locationName ? 'Konumun' : 'Henüz konum seçilmedi'}
+            onPress={() => { router.back(); setTimeout(() => router.push('/edit-profile'), 250); }}
+          />
+          {(user.interests?.length > 0) && (
+            <>
+              <Divider />
+              <View style={s.interestRow}>
+                <View style={[s.rowIcon, { backgroundColor: BORDER }]}>
+                  <Ionicons name="pricetags-outline" size={18} color={TEXT2} />
+                </View>
+                <View style={s.interestTags}>
+                  {user.interests.map((tag) => (
+                    <TouchableOpacity
+                      key={tag}
+                      style={s.tag}
+                      onPress={() => { router.back(); setTimeout(() => router.push('/edit-profile'), 250); }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={s.tagTxt}>#{tag}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </>
+          )}
+          {(!user.interests || user.interests.length === 0) && (
+            <>
+              <Divider />
+              <Row
+                icon="pricetags-outline"
+                label="İlgi alanı ekle"
+                sub="Seni tanımlayan etiketler"
+                onPress={() => { router.back(); setTimeout(() => router.push('/edit-profile'), 250); }}
+              />
+            </>
+          )}
+        </Section>
+
         {/* Bildirimler */}
         <Section title="Bildirimler & Sesler">
           <Row
@@ -538,6 +581,10 @@ const s = StyleSheet.create({
   rowSub:  { fontSize: 12, color: TEXT3, marginTop: 1 },
   divider: { height: 0.5, backgroundColor: BORDER, marginLeft: 62 },
   genderDot: { width: 12, height: 12, borderRadius: 6 },
+  interestRow: { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 14, paddingVertical: 12, gap: 12 },
+  interestTags: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  tag: { backgroundColor: BORDER, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
+  tagTxt: { fontSize: 13, color: TEXT2, fontWeight: '500' },
 
   // Edit
   editBox:     { padding: 14 },
